@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate(); // Hook for navigation
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -18,44 +18,89 @@ function LoginPage() {
         password,
       });
 
-      // On successful login, save the token and redirect to the dashboard
       const { token } = response.data;
       localStorage.setItem('token', token);
-      navigate('/dashboard'); // Redirect to dashboard
+      navigate('/dashboard');
 
     } catch (err) {
-      setError('Failed to log in. Please check your credentials.');
+      const message = err.response ? err.response.data.message : 'Login failed. Please check credentials or server status.';
+      setError(message);
       console.error('Login error:', err.response ? err.response.data : err.message);
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '400px', margin: '100px auto' }}>
-      <h2>BuildWise Login</h2>
-      <form onSubmit={handleLogin}>
-        <div style={{ marginBottom: '10px' }}>
-          <label>Email:</label><br />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px' }}
-          />
-        </div>
-        <div style={{ marginBottom: '10px' }}>
-          <label>Password:</label><br />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px' }}
-          />
-        </div>
-        <button type="submit" style={{ padding: '10px 15px' }}>Login</button>
-      </form>
-      {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
+    // --- THIS IS THE UPDATED PART FOR THE BACKGROUND ---
+    <div 
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 to-indigo-900"
+      style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M0 0h30v30H0V0zm30 30h30v30H30V30z\'/%3E%3C/g%3E%3C/svg%3E")',
+        backgroundSize: '30px 30px'
+      }}
+    >
+      
+      {/* The login card */}
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
+          BuildWise Login
+        </h2>
+        
+        <form onSubmit={handleLogin}>
+          
+          {/* Email Input */}
+          <div className="mb-6">
+            <label htmlFor="email" className="block mb-2 text-sm font-bold text-gray-700 text-left">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          {/* Password Input */}
+          <div className="mb-6">
+            <label htmlFor="password" className="block mb-2 text-sm font-bold text-gray-700 text-left">
+              Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300"
+          >
+            Login
+          </button>
+        </form>
+
+        {/* Display error message if it exists */}
+        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
+
+        {/* Link to Register Page */}
+        <p className="text-center text-gray-600 mt-6">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-blue-600 hover:underline">
+            Register here
+          </Link>
+        </p>
+
+      </div>
     </div>
   );
 }

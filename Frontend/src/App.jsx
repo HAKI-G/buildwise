@@ -1,15 +1,15 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
-// Your existing page imports
+// Page Imports
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-
-// --- 1. IMPORT YOUR NEW PAGES ---
 import StatisticsPage from './pages/StatisticsPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
@@ -21,12 +21,12 @@ function App() {
       
       {/* Protected Routes */}
       <Route path="/dashboard" element={<DashboardPage />} />
-      
-      {/* --- 2. ADD THE NEW ROUTES FOR YOUR PAGES --- */}
       <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
-
+      <Route path="/project/:projectId" element={<ProjectDetailPage />} /> 
+      <Route path="/settings" element={<SettingsPage />} />
     </Routes>
+    
   );
 }
 

@@ -1,20 +1,26 @@
 import express from 'express';
-import { registerUser, loginUser } from '../controller/userController.js';
+// 1. Import ALL the functions you need
+import { 
+    registerUser, 
+    loginUser,
+    getUserProfile,
+    updateUserProfile 
+} from '../controller/userController.js';
+
+// 2. Import the protect middleware
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
-  res.status(200).json({ message: "User API is working!" });
-});
-
-// --- User API Endpoints ---
-
-// POST /api/users/register
-// Register a new user
+// --- Public Routes ---
 router.post('/register', registerUser);
-
-// POST /api/users/login
-// Log in an existing user
 router.post('/login', loginUser);
+
+// --- Protected Routes ---
+// The 'protect' middleware will run first. If the token is valid,
+// it will then call getUserProfile or updateUserProfile.
+router.route('/profile')
+  .get(protect, getUserProfile)
+  .put(protect, updateUserProfile);
 
 export default router;

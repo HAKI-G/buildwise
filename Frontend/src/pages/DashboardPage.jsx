@@ -1,54 +1,97 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Layout from '../components/Layout';
 
+// Helper function to get the token
+const getToken = () => localStorage.getItem('token');
+
+// Reusable component for a single project row
 const ProjectRow = ({ project }) => (
-    <div className="flex items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
-        <img src={project.image} alt={project.name} className="w-12 h-12 rounded-lg mr-4" />
-        <div className="flex-1">
-            <div className="font-bold">{project.name}</div>
-        </div>
-        <div className="w-1/4 mx-4">
-            <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Task</span>
-                <span>{project.taskProgress}%</span>
+    <Link to={`/project/${project.projectId}`} className="block hover:bg-gray-50 transition duration-300">
+        <div className="flex items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
+            
+            {/* Main project image placeholder */}
+            <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200"></div>
+            
+            <div className="flex-1">
+                <div className="font-bold">{project.name}</div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${project.taskProgress}%` }}></div>
+            
+            {/* Placeholder sections for Task and Budget */}
+            <div className="w-1/4 mx-4">
+                <div className="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Task</span>
+                    <span>90%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `90%` }}></div>
+                </div>
             </div>
-        </div>
-        <div className="w-1/4 mx-4">
-            <div className="flex justify-between text-sm text-gray-500 mb-1">
-                <span>Budget</span>
-                <span>${project.budget}m</span>
+            <div className="w-1/4 mx-4">
+                <div className="flex justify-between text-sm text-gray-500 mb-1">
+                    <span>Budget</span>
+                    <span>${project.budget}m</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `100%` }}></div>
+                </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${project.budgetProgress}%` }}></div>
+            <div className="w-48 text-center bg-stone-100 p-2 rounded-lg mx-4">
+                Due to {new Date(project.createdAt).toLocaleDateString()}
             </div>
+            
+            {/* --- THIS IS THE CHANGE --- */}
+            {/* The team member images have been removed and replaced with an empty div */}
+            {/* to maintain spacing. You can also remove this div entirely if you prefer. */}
+            <div className="w-20 h-8"></div>
+
         </div>
-        <div className="w-48 text-center bg-stone-100 p-2 rounded-lg mx-4">
-            Due to {project.dueDate}
-        </div>
-        <div className="flex -space-x-2">
-            {project.team.map(memberImg => <img key={memberImg} className="inline-block h-8 w-8 rounded-full ring-2 ring-white" src={memberImg} alt="Team member" />)}
-        </div>
-    </div>
+    </Link>
 );
 
 function DashboardPage() {
-    // This would come from your API call
-    const projectsData = [
-        { name: 'Victoria de Morato', image: 'https://placekitten.com/g/100/100', taskProgress: 90, budget: 100, budgetProgress: 100, dueDate: '28 Feb 2023', team: ['https://i.pravatar.cc/32?img=1', 'https://i.pravatar.cc/32?img=2', 'https://i.pravatar.cc/32?img=3'] },
-        { name: 'Victoria de Hidalgo', image: 'https://placekitten.com/g/101/101', taskProgress: 90, budget: 100, budgetProgress: 100, dueDate: '28 Feb 2023', team: ['https://i.pravatar.cc/32?img=4', 'https://i.pravatar.cc/32?img=5', 'https://i.pravatar.cc/32?img=6'] },
-        { name: 'Fort Victoria', image: 'https://placekitten.com/g/102/102', taskProgress: 90, budget: 100, budgetProgress: 100, dueDate: '28 Feb 2023', team: ['https://i.pravatar.cc/32?img=7', 'https://i.pravatar.cc/32?img=8', 'https://i.pravatar.cc/32?img=9'] },
-        { name: 'Philippine Arena', image: 'https://placekitten.com/g/103/103', taskProgress: 90, budget: 100, budgetProgress: 100, dueDate: '28 Feb 2023', team: ['https://i.pravatar.cc/32?img=10', 'https://i.pravatar.cc/32?img=11', 'https://i.pravatar.cc/32?img=12'] },
-        { name: 'Las Casas', image: 'https://placekitten.com/g/104/104', taskProgress: 90, budget: 100, budgetProgress: 100, dueDate: '28 Feb 2023', team: ['https://i.pravatar.cc/32?img=13', 'https://i.pravatar.cc/32?img=14', 'https://i.pravatar.cc/32?img=15'] },
-    ];
+    // ... the rest of your component remains exactly the same
+    const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchProjects = async () => {
+            const token = getToken();
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            try {
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                const response = await axios.get('http://localhost:5001/api/projects', config);
+                setProjects(response.data);
+            } catch (err) {
+                setError('Failed to fetch projects. Your session may have expired.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProjects();
+    }, [navigate]);
 
     return (
         <Layout title="Dashboard">
             <div>
-                <p className="text-gray-500 font-semibold mb-4">ACTIVE PROJECTS 5</p>
-                {projectsData.map(project => <ProjectRow key={project.name} project={project} />)}
+                <p className="text-gray-500 font-semibold mb-4">ACTIVE PROJECTS {projects.length}</p>
+                {loading && <p>Loading projects...</p>}
+                {error && <p className="text-red-500">{error}</p>}
+                {!loading && !error && (
+                    <div>
+                        {projects.length > 0 ? (
+                            projects.map(project => <ProjectRow key={project.projectId} project={project} />)
+                        ) : (
+                            <p>No projects found. Create your first project on the 'Projects' page!</p>
+                        )}
+                    </div>
+                )}
             </div>
         </Layout>
     );
