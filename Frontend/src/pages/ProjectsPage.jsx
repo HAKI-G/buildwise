@@ -22,7 +22,6 @@ const ProjectListItem = ({ project, onDelete }) => (
     </div>
 );
 
-
 function ProjectsPage() {
     const [projects, setProjects] = useState([]);
     const [error, setError] = useState('');
@@ -76,7 +75,17 @@ function ProjectsPage() {
         setError('');
         setIsSubmitting(true);
         const token = getToken();
-        const newProjectData = { name: projectName, location, contractor, dateStarted, contractCompletionDate, contractCost: Number(contractCost), constructionConsultant, implementingOffice, sourcesOfFund };
+        const newProjectData = { 
+            name: projectName, 
+            location, 
+            contractor, 
+            dateStarted, 
+            contractCompletionDate, 
+            contractCost: Number(contractCost), 
+            constructionConsultant, 
+            implementingOffice, 
+            sourcesOfFund 
+        };
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.post('http://localhost:5001/api/projects', newProjectData, config);
@@ -84,9 +93,15 @@ function ProjectsPage() {
             setProjects(prevProjects => [response.data.project, ...prevProjects]);
             
             // Clear the form
-            setProjectName(''); setLocation(''); setContractor(''); setDateStarted('');
-            setContractCompletionDate(''); setContractCost(''); setConstructionConsultant('');
-            setImplementingOffice(''); setSourcesOfFund('');
+            setProjectName(''); 
+            setLocation(''); 
+            setContractor(''); 
+            setDateStarted('');
+            setContractCompletionDate(''); 
+            setContractCost(''); 
+            setConstructionConsultant('');
+            setImplementingOffice(''); 
+            setSourcesOfFund('');
         } catch (err) {
             setError(err.response ? err.response.data.message : 'Failed to create project.');
         } finally {
@@ -99,19 +114,31 @@ function ProjectsPage() {
             <div className="flex flex-col lg:flex-row gap-8">
                 <div className="w-full lg:w-2/3">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Active Projects ({projects.length})</h2>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                            Active Projects ({projects.length})
+                        </h2>
                         <div className="max-h-[80vh] overflow-y-auto pr-2">
                             {projects.length > 0 ? (
-                                projects.map(project => <ProjectListItem key={project.projectId} project={project} onDelete={handleDelete} />)
+                                projects.map(project => (
+                                    <ProjectListItem 
+                                        key={project.projectId} 
+                                        project={project} 
+                                        onDelete={handleDelete} 
+                                    />
+                                ))
                             ) : (
-                                <p className="text-gray-500 p-4 text-center">No projects found. Add one to get started!</p>
+                                <p className="text-gray-500 p-4 text-center">
+                                    No projects found. Add one to get started!
+                                </p>
                             )}
                         </div>
                     </div>
                 </div>
                 <div className="w-full lg:w-1/3">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Add a New Project</h2>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">
+                            Add a New Project
+                        </h2>
                         <form onSubmit={handleCreateProject} className="space-y-4">
                             <div>
                                 <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">Project Name</label>

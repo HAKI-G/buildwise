@@ -38,59 +38,55 @@ export const getAllProjects = async (req, res) => {
  * @route    POST /api/projects
  */
 export const createProject = async (req, res) => {
-    // 1. Get ALL the new fields from the request body
-    const { 
-        name, 
-        location, 
-        contractor, 
-        dateStarted, 
-        contractCompletionDate, 
-        contractCost,
-        constructionConsultant,
-        implementingOffice,
-        sourcesOfFund 
-    } = req.body;
+  const { 
+    name, 
+    location, 
+    contractor, 
+    dateStarted, 
+    contractCompletionDate, 
+    contractCost,
+    constructionConsultant,
+    implementingOffice,
+    sourcesOfFund 
+  } = req.body;
+  
+  if (!name || !location) {
+    return res.status(400).json({ message: "Please provide at least a project name and location." });
+  }
+
+  try {
+    const projectId = uuidv4();
     
-    if (!name || !location) {
-        return res.status(400).json({ message: "Please provide at least a project name and location." });
-    }
+    const projectItem = {
+      projectId,
+      name,
+      location,
+      contractor,
+      dateStarted,
+      contractCompletionDate,
+      contractCost,
+      constructionConsultant,
+      implementingOffice,
+      sourcesOfFund,
+      status: "Not Started", // Default status
+      createdAt: new Date().toISOString(),
+    };
 
-    try {
-        const projectId = uuidv4();
-        
-        // 2. Include ALL new fields in the Item to be saved to the database
-        const projectItem = {
-            projectId,
-            name,
-            location,
-            contractor,
-            dateStarted,
-            contractCompletionDate,
-            contractCost,
-            constructionConsultant,
-            implementingOffice,
-            sourcesOfFund,
-            status: "Not Started", // Default status
-            createdAt: new Date().toISOString(),
-        };
+    const putParams = {
+      TableName: tableName,
+      Item: projectItem,
+    };
 
-        const putParams = {
-            TableName: tableName,
-            Item: projectItem,
-        };
+    await docClient.send(new PutCommand(putParams));
 
-        await docClient.send(new PutCommand(putParams));
-
-        // 3. IMPORTANT: Send the complete projectItem back to the frontend
-        res.status(201).json({
-            message: "Project created successfully!",
-            project: projectItem, // Send the full object back
-        });
-
-    } catch (error) {
-        console.error("❌ Error creating project:", error);
-        res.status(500).json({ message: "Failed to create project", error: error.message });
-    }
+    res.status(201).json({
+      message: "Project created successfully!",
+      project: projectItem,
+    });
+  } catch (error) {
+    console.error("❌ Error creating project:", error);
+    res.status(500).json({ message: "Failed to create project", error: error.message });
+  }
 };
 
 /**
@@ -121,7 +117,6 @@ export const getProjectById = async (req, res) => {
  * @route    PUT /api/projects/:id
  */
 export const updateProject = async (req, res) => {
-  // This function can be expanded later to update all the new fields
   const { id } = req.params;
   const { name, status } = req.body;
 
@@ -133,9 +128,13 @@ export const updateProject = async (req, res) => {
     ExpressionAttributeValues: { ":n": name, ":s": status },
     ReturnValues: "ALL_NEW",
   };
+
   try {
     const data = await docClient.send(new UpdateCommand(params));
-    res.status(200).json({ message: `Project ${id} updated successfully!`, updatedProject: data.Attributes });
+    res.status(200).json({ 
+      message: `Project ${id} updated successfully!`, 
+      updatedProject: data.Attributes 
+    });
   } catch (error) {
     console.error(`❌ Error updating project with ID ${id}:`, error);
     res.status(500).json({ message: "Failed to update project", error: error.message });

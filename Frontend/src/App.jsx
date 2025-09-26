@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import StatisticsPage from './pages/StatisticsPage';
 import ProjectsPage from './pages/ProjectsPage';
 // Add any other page imports you need, like ProjectDetailPage or EditProjectPage
+import ProjectDetailPage from './pages/ProjectDetailPage';
 
 function App() {
   return (
@@ -21,11 +22,8 @@ function App() {
       {/* Protected Routes */}
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
-
-      {/* --- THIS IS THE CHANGE --- */}
-      {/* The route now accepts a dynamic projectId */}
       <Route path="/statistics/:projectId" element={<StatisticsPage />} /> 
-
+      <Route path="/project/:projectId" element={<ProjectDetailPage />} />
       {/* Add your other dynamic routes here if you bring them back */}
       {/* <Route path="/project/:projectId" element={<ProjectDetailPage />} /> */}
       {/* <Route path="/project/edit/:projectId" element={<EditProjectPage />} /> */}
