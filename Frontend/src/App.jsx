@@ -10,6 +10,7 @@ import StatisticsPage from './pages/StatisticsPage';
 import ProjectsPage from './pages/ProjectsPage';
 // Add any other page imports you need, like ProjectDetailPage or EditProjectPage
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import SettingsPage from './pages/SettingsPage'; 
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/statistics/:projectId" element={<StatisticsPage />} /> 
       <Route path="/project/:projectId" element={<ProjectDetailPage />} />
+      <Route path="/settings" element={<SettingsPage />} /> {/* <-- Add the new route */}
       {/* Add your other dynamic routes here if you bring them back */}
       {/* <Route path="/project/:projectId" element={<ProjectDetailPage />} /> */}
       {/* <Route path="/project/edit/:projectId" element={<EditProjectPage />} /> */}

@@ -11,7 +11,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 // --- AWS DynamoDB Client Setup ---
-// This setup should be at the top level so all functions can use it.
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = 'BuildWiseUsers';
@@ -19,10 +18,6 @@ const JWT_SECRET = 'your-super-secret-key-for-now';
 
 // --- Controller Functions ---
 
-/**
- * @desc     Get all users (for admin purposes)
- * @route    GET /api/users
- */
 export const getAllUsers = async (req, res) => {
     const params = { TableName: tableName };
     try {
@@ -38,10 +33,6 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
-/**
- * @desc     Register a new user
- * @route    POST /api/users/register
- */
 export const registerUser = async (req, res) => {
     const { name, email, password, role } = req.body;
     if (!name || !email || !password || !role) {
@@ -78,10 +69,6 @@ export const registerUser = async (req, res) => {
     }
 };
 
-/**
- * @desc     Authenticate a user and get a token
- * @route    POST /api/users/login
- */
 export const loginUser = async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -121,18 +108,21 @@ export const loginUser = async (req, res) => {
  * @access   Private
  */
 export const getUserProfile = async (req, res) => {
+  // The user ID comes from the 'protect' middleware
   const userId = req.user.id; 
   try {
     const params = { TableName: 'BuildWiseUsers', Key: { userId } };
     const { Item } = await docClient.send(new GetCommand(params));
     if (Item) {
+      // Don't send the password back to the client
       const { password, ...userProfile } = Item;
       res.json(userProfile);
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error("Error fetching profile:", error);
+    res.status(500).json({ message: 'Server error fetching profile' });
   }
 };
 
@@ -154,8 +144,12 @@ export const updateUserProfile = async (req, res) => {
       ReturnValues: 'ALL_NEW',
     };
     const { Attributes } = await docClient.send(new UpdateCommand(params));
-    res.json(Attributes);
+    // Don't send the password back
+    const { password, ...updatedProfile } = Attributes;
+    res.json(updatedProfile);
   } catch (error) {
+    console.error("Error updating profile:", error);
     res.status(500).json({ message: 'Server error while updating profile' });
   }
 };
+
