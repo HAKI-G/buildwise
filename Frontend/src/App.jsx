@@ -8,8 +8,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import StatisticsPage from './pages/StatisticsPage';
 import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import SettingsPage from './pages/SettingsPage';
+// Add any other page imports you need, like ProjectDetailPage or EditProjectPage
 
 function App() {
   return (
@@ -21,12 +20,16 @@ function App() {
       
       {/* Protected Routes */}
       <Route path="/dashboard" element={<DashboardPage />} />
-      <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
-      <Route path="/project/:projectId" element={<ProjectDetailPage />} /> 
-      <Route path="/settings" element={<SettingsPage />} />
+
+      {/* --- THIS IS THE CHANGE --- */}
+      {/* The route now accepts a dynamic projectId */}
+      <Route path="/statistics/:projectId" element={<StatisticsPage />} /> 
+
+      {/* Add your other dynamic routes here if you bring them back */}
+      {/* <Route path="/project/:projectId" element={<ProjectDetailPage />} /> */}
+      {/* <Route path="/project/edit/:projectId" element={<EditProjectPage />} /> */}
     </Routes>
-    
   );
 }
 

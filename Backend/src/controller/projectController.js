@@ -14,8 +14,6 @@ const client = new DynamoDBClient({
   region: "ap-southeast-1",
 });
 const docClient = DynamoDBDocumentClient.from(client);
-
-// IMPORTANT: DynamoDB table names are case-sensitive!
 const tableName = "buildwiseProjects";
 
 // --- Controller Functions ---
@@ -23,7 +21,6 @@ const tableName = "buildwiseProjects";
 /**
  * @desc     Get all projects
  * @route    GET /api/projects
- * @access   Private
  */
 export const getAllProjects = async (req, res) => {
   const params = { TableName: tableName };
@@ -39,40 +36,66 @@ export const getAllProjects = async (req, res) => {
 /**
  * @desc     Create a new project
  * @route    POST /api/projects
- * @access   Private
  */
 export const createProject = async (req, res) => {
-  const { name, location, budget } = req.body;
-  const projectId = uuidv4();
+    // 1. Get ALL the new fields from the request body
+    const { 
+        name, 
+        location, 
+        contractor, 
+        dateStarted, 
+        contractCompletionDate, 
+        contractCost,
+        constructionConsultant,
+        implementingOffice,
+        sourcesOfFund 
+    } = req.body;
+    
+    if (!name || !location) {
+        return res.status(400).json({ message: "Please provide at least a project name and location." });
+    }
 
-  const params = {
-    TableName: tableName,
-    Item: {
-      projectId,
-      name,
-      location,
-      budget,
-      status: "Not Started",
-      createdAt: new Date().toISOString(),
-    },
-  };
+    try {
+        const projectId = uuidv4();
+        
+        // 2. Include ALL new fields in the Item to be saved to the database
+        const projectItem = {
+            projectId,
+            name,
+            location,
+            contractor,
+            dateStarted,
+            contractCompletionDate,
+            contractCost,
+            constructionConsultant,
+            implementingOffice,
+            sourcesOfFund,
+            status: "Not Started", // Default status
+            createdAt: new Date().toISOString(),
+        };
 
-  try {
-    await docClient.send(new PutCommand(params));
-    res.status(201).json({
-      message: "Project created successfully!",
-      project: params.Item,
-    });
-  } catch (error) {
-    console.error("❌ Error creating project:", error);
-    res.status(500).json({ message: "Failed to create project", error: error.message });
-  }
+        const putParams = {
+            TableName: tableName,
+            Item: projectItem,
+        };
+
+        await docClient.send(new PutCommand(putParams));
+
+        // 3. IMPORTANT: Send the complete projectItem back to the frontend
+        res.status(201).json({
+            message: "Project created successfully!",
+            project: projectItem, // Send the full object back
+        });
+
+    } catch (error) {
+        console.error("❌ Error creating project:", error);
+        res.status(500).json({ message: "Failed to create project", error: error.message });
+    }
 };
 
 /**
  * @desc     Get a single project by its ID
  * @route    GET /api/projects/:id
- * @access   Private
  */
 export const getProjectById = async (req, res) => {
   const { id } = req.params;
@@ -80,7 +103,6 @@ export const getProjectById = async (req, res) => {
     TableName: tableName,
     Key: { projectId: id },
   };
-
   try {
     const data = await docClient.send(new GetCommand(params));
     if (data.Item) {
@@ -97,9 +119,9 @@ export const getProjectById = async (req, res) => {
 /**
  * @desc     Update an existing project
  * @route    PUT /api/projects/:id
- * @access   Private
  */
 export const updateProject = async (req, res) => {
+  // This function can be expanded later to update all the new fields
   const { id } = req.params;
   const { name, status } = req.body;
 
@@ -107,23 +129,13 @@ export const updateProject = async (req, res) => {
     TableName: tableName,
     Key: { projectId: id },
     UpdateExpression: "set #name = :n, #status = :s",
-    ExpressionAttributeNames: {
-      "#name": "name",
-      "#status": "status",
-    },
-    ExpressionAttributeValues: {
-      ":n": name,
-      ":s": status,
-    },
+    ExpressionAttributeNames: { "#name": "name", "#status": "status" },
+    ExpressionAttributeValues: { ":n": name, ":s": status },
     ReturnValues: "ALL_NEW",
   };
-
   try {
     const data = await docClient.send(new UpdateCommand(params));
-    res.status(200).json({
-      message: `Project ${id} updated successfully!`,
-      updatedProject: data.Attributes,
-    });
+    res.status(200).json({ message: `Project ${id} updated successfully!`, updatedProject: data.Attributes });
   } catch (error) {
     console.error(`❌ Error updating project with ID ${id}:`, error);
     res.status(500).json({ message: "Failed to update project", error: error.message });
@@ -133,7 +145,6 @@ export const updateProject = async (req, res) => {
 /**
  * @desc     Delete a project
  * @route    DELETE /api/projects/:id
- * @access   Private
  */
 export const deleteProject = async (req, res) => {
   const { id } = req.params;
@@ -141,7 +152,6 @@ export const deleteProject = async (req, res) => {
     TableName: tableName,
     Key: { projectId: id },
   };
-
   try {
     await docClient.send(new DeleteCommand(params));
     res.status(200).json({ message: `Project ${id} deleted successfully.` });
