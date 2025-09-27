@@ -8,8 +8,8 @@ import milestoneRoutes from './routes/milestoneRoutes.js';
 import progressUpdateRoutes from './routes/progressUpdateRoutes.js';
 import photoRoutes from './routes/photoRoutes.js';
 import commentRoutes from './routes/commentRoutes.js'; 
-import documentRoutes from './routes/documentRoutes.js'; 
-
+import documentRoutes from './routes/documentRoutes.js';
+import expenseRoutes from './routes/expenseRoutes.js'; // ADD THIS LINE
 
 const app = express();
 const port = 5001;
@@ -26,8 +26,8 @@ app.use('/api/milestones', milestoneRoutes);
 app.use('/api/updates', progressUpdateRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/comments', commentRoutes); 
-app.use('/api/documents', documentRoutes); 
-
+app.use('/api/documents', documentRoutes);
+app.use('/api/expenses', expenseRoutes); // ADD THIS LINE
 
 // --- Server Start ---
 app.listen(port, () => {

@@ -1,16 +1,16 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
-// Page Imports
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import StatisticsPage from './pages/StatisticsPage';
-import ProjectsPage from './pages/ProjectsPage';
-// Add any other page imports you need, like ProjectDetailPage or EditProjectPage
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import SettingsPage from './pages/SettingsPage'; 
+// Page Imports - Added .jsx extension to fix path resolution
+import HomePage from './pages/HomePage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
+import StatisticsPage from './pages/StatisticsPage.jsx';
+import ProjectsPage from './pages/ProjectsPage.jsx';
+import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
+import UpdateProjectPage from './pages/UpdateProjectPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx'; 
 
 function App() {
   return (
@@ -25,12 +25,13 @@ function App() {
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/statistics/:projectId" element={<StatisticsPage />} /> 
       <Route path="/project/:projectId" element={<ProjectDetailPage />} />
-      <Route path="/settings" element={<SettingsPage />} /> {/* <-- Add the new route */}
-      {/* Add your other dynamic routes here if you bring them back */}
-      {/* <Route path="/project/:projectId" element={<ProjectDetailPage />} /> */}
-      {/* <Route path="/project/edit/:projectId" element={<EditProjectPage />} /> */}
+      {/* This new route fixes the "Update Project" error */}
+      <Route path="/project/edit/:projectId" element={<UpdateProjectPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+
     </Routes>
   );
 }
 
 export default App;
+

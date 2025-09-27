@@ -1,14 +1,17 @@
 import express from 'express';
 import { createMilestone, getMilestonesForProject } from '../controller/milestoneController.js';
+import { protect } from '../middleware/authMiddleware.js'; // Assuming you have an auth middleware
 
 const router = express.Router();
 
-// Route to get all milestones for a specific project
-// Example: GET http://localhost:5001/api/milestones/project-123
-router.get('/:projectId', getMilestonesForProject);
+// @desc    Get all milestones for a specific project
+// @route   GET /api/milestones/project/:projectId
+// @access  Private
+router.get('/project/:projectId', protect, getMilestonesForProject);
 
-// Route to create a new milestone for a specific project
-// Example: POST http://localhost:5001/api/milestones/project-123
-router.post('/:projectId', createMilestone);
+// @desc    Create a new milestone for a project
+// @route   POST /api/milestones/:projectId
+// @access  Private
+router.post('/:projectId', protect, createMilestone);
 
 export default router;

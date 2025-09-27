@@ -1,8 +1,11 @@
- import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { 
+    PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid 
+} from 'recharts';
 
 // Helper function to get the token
 const getToken = () => localStorage.getItem('token');
@@ -49,31 +52,51 @@ function StatisticsPage() {
         if (projectId) {
             fetchProjectStats();
         }
-    }, [projectId, navigate]); // This effect runs every time the projectId in the URL changes
+    }, [projectId, navigate]);
 
-    // 4. Process the data for the charts (Example for milestone status)
+    // 4. Process the data for the charts (Using placeholder data for now)
     const milestoneStatusData = useMemo(() => {
-        // This is placeholder data until you fetch real milestones from your backend.
-        // Once you fetch real milestones, this chart will become dynamic.
-        if (milestones.length === 0) {
-            return [
-                { name: 'Completed', value: 2 },
-                { name: 'In Progress', value: 3 },
-                { name: 'Not Started', value: 5 },
-            ];
+        if (milestones.length > 0) {
+            const statusCounts = milestones.reduce((acc, milestone) => {
+                const status = milestone.status || 'Unknown';
+                acc[status] = (acc[status] || 0) + 1;
+                return acc;
+            }, {});
+            return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
         }
-        
-        // This is the logic that will run when you have real milestone data
-        const statusCounts = milestones.reduce((acc, milestone) => {
-            const status = milestone.status || 'Unknown';
-            acc[status] = (acc[status] || 0) + 1;
-            return acc;
-        }, {});
-
-        return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+        // Placeholder data
+        return [
+            { name: 'Completed', value: 2 },
+            { name: 'In Progress', value: 3 },
+            { name: 'Not Started', value: 5 },
+        ];
     }, [milestones]);
+
+    // Placeholder data for Task Priority
+    const taskPriorityData = useMemo(() => [
+        { name: 'High', value: 5 },
+        { name: 'Medium', value: 8 },
+        { name: 'Low', value: 12 },
+    ], []);
     
-    const COLORS = ['#22c55e', '#f59e0b', '#6b7280'];
+    // Placeholder data for Pending Items
+    const pendingItemsData = useMemo(() => [
+        { name: 'Approvals', value: 4 },
+        { name: 'Invoices', value: 2 },
+        { name: 'Documents', value: 7 },
+    ], []);
+
+    // Placeholder data for Budget Overview
+    const budgetData = useMemo(() => {
+        const total = project?.contractCost || 1000000;
+        const spent = 650000; // This would come from your backend
+        return [
+            { name: 'Budget', spent, remaining: total - spent, total }
+        ];
+    }, [project]);
+
+    const PIE_COLORS_STATUS = ['#22c55e', '#f59e0b', '#6b7280'];
+    const PIE_COLORS_PRIORITY = ['#ef4444', '#f59e0b', '#22c55e'];
 
     if (loading) return <Layout title="Loading..."><p className="text-center p-8">Loading project statistics...</p></Layout>;
     if (error) return <Layout title="Error"><p className="text-center p-8 text-red-500">{error}</p></Layout>;
@@ -81,14 +104,16 @@ function StatisticsPage() {
 
     return (
         <Layout title={`Statistics: ${project.name}`}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+                {/* Milestone Status Chart */}
                 <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h2 className="text-xl font-bold text-center mb-4">MILESTONE STATUS</h2>
+                    <h2 className="text-lg font-bold text-center mb-4">MILESTONE STATUS</h2>
                     <div className="w-full h-64">
                          <ResponsiveContainer>
                             <PieChart>
                                 <Pie data={milestoneStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {milestoneStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    {milestoneStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_STATUS[index % PIE_COLORS_STATUS.length]} />)}
                                 </Pie>
                                 <Tooltip />
                                 <Legend />
@@ -97,15 +122,64 @@ function StatisticsPage() {
                     </div>
                 </div>
 
+                {/* Task Priority Chart */}
                 <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h2 className="text-xl font-bold text-center mb-4">BUDGET OVERVIEW</h2>
-                    <div className="flex flex-col items-center justify-center h-64">
-                        <p className="text-4xl font-bold text-green-600">
-                            {project.contractCost ? `₱${project.contractCost.toLocaleString()}` : 'N/A'}
-                        </p>
-                        <p className="text-gray-500 mt-2">Total Contract Cost</p>
+                    <h2 className="text-lg font-bold text-center mb-4">TASK PRIORITY</h2>
+                    <div className="w-full h-64">
+                         <ResponsiveContainer>
+                            <PieChart>
+                                <Pie data={taskPriorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                    {taskPriorityData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_PRIORITY[index % PIE_COLORS_PRIORITY.length]} />)}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
+
+                {/* Pending Items Chart */}
+                <div className="bg-white p-6 rounded-xl border shadow-sm">
+                     <h2 className="text-lg font-bold text-center mb-4">PENDING ITEMS</h2>
+                    <div className="w-full h-64">
+                        <ResponsiveContainer>
+                            <BarChart data={pendingItemsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="value" fill="#3b82f6" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Budget Overview Chart */}
+                <div className="bg-white p-6 rounded-xl border shadow-sm md:col-span-2 xl:col-span-3">
+                    <h2 className="text-lg font-bold text-center mb-4">BUDGET OVERVIEW</h2>
+                    <div className="w-full h-48">
+                        <ResponsiveContainer>
+                            <BarChart data={budgetData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" hide />
+                                <YAxis type="category" dataKey="name" hide/>
+                                <Tooltip formatter={(value, name) => [`₱${value.toLocaleString()}`, name]} />
+                                <Legend />
+                                <Bar dataKey="spent" stackId="a" fill="#ef4444" name="Spent" />
+                                <Bar dataKey="remaining" stackId="a" fill="#22c55e" name="Remaining" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Task Timeline - Placeholder */}
+                <div className="bg-white p-6 rounded-xl border shadow-sm md:col-span-2 xl:col-span-3">
+                    <h2 className="text-lg font-bold text-center mb-4">TASK TIMELINE</h2>
+                    <div className="w-full h-64 flex items-center justify-center text-gray-400">
+                        <p>Gantt chart component will go here.</p>
+                    </div>
+                </div>
+
             </div>
         </Layout>
     );
