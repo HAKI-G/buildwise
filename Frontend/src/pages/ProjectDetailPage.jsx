@@ -87,7 +87,7 @@ function ProjectDetailPage() {
                 <ProfileItem label="Construction Consultant" value={project?.constructionConsultant || 'N/A'} />
                 <ProfileItem label="Implementing Office" value={project?.implementingOffice || 'N/A'} />
                 <ProfileItem label="Sources of Fund" value={project?.sourcesOfFund || 'N/A'} />
-                <ProfileItem label="Project Manager" value="Juan dela Cruz" /> {/* Placeholder */}
+                <ProfileItem label="Project Manager" value={project?.projectManager || 'N/A'} />
             </div>
 
             {/* --- Interactive Tabs Section --- */}

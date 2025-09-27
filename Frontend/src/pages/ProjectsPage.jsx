@@ -14,10 +14,10 @@ const ProjectListItem = ({ project, onDelete }) => (
             <p className="text-sm text-gray-500 mt-1">{project.location}</p>
         </div>
         <div className="flex items-center gap-4 text-sm font-semibold">
-            <Link to={`/statistics/${project.projectId}`} className="text-green-600 hover:underline">view progress</Link>
-            <Link to={`/project/${project.projectId}`} className="text-blue-600 hover:underline">view details</Link>
-            <Link to={`/project/edit/${project.projectId}`} className="text-gray-600 hover:underline">update</Link>
-            <button onClick={() => onDelete(project.projectId)} className="text-red-600 hover:underline">delete</button>
+            <Link to={`/statistics/${project.projectId}`} className="text-green-600 hover:underline">View Progress</Link>
+            <Link to={`/project/${project.projectId}`} className="text-blue-600 hover:underline">View Details</Link>
+            <Link to={`/project/edit/${project.projectId}`} className="text-gray-600 hover:underline">Update Project</Link>
+            <button onClick={() => onDelete(project.projectId)} className="text-red-600 hover:underline">Delete Project</button>
         </div>
     </div>
 );
@@ -37,6 +37,7 @@ function ProjectsPage() {
     const [constructionConsultant, setConstructionConsultant] = useState('');
     const [implementingOffice, setImplementingOffice] = useState('');
     const [sourcesOfFund, setSourcesOfFund] = useState('');
+    const [projectManager, setProjectManager] = useState(''); // ✅ NEW FIELD
 
     const navigate = useNavigate();
 
@@ -84,7 +85,8 @@ function ProjectsPage() {
             contractCost: Number(contractCost), 
             constructionConsultant, 
             implementingOffice, 
-            sourcesOfFund 
+            sourcesOfFund,
+            projectManager // ✅ include in payload
         };
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -102,6 +104,7 @@ function ProjectsPage() {
             setConstructionConsultant('');
             setImplementingOffice(''); 
             setSourcesOfFund('');
+            setProjectManager(''); // ✅ clear new field
         } catch (err) {
             setError(err.response ? err.response.data.message : 'Failed to create project.');
         } finally {
@@ -175,6 +178,11 @@ function ProjectsPage() {
                             <div>
                                 <label htmlFor="sourcesOfFund" className="block text-sm font-medium text-gray-700">Sources of Fund</label>
                                 <input type="text" id="sourcesOfFund" value={sourcesOfFund} onChange={(e) => setSourcesOfFund(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+                            </div>
+                            {/* ✅ New Project Manager field */}
+                            <div>
+                                <label htmlFor="projectManager" className="block text-sm font-medium text-gray-700">Project Manager</label>
+                                <input type="text" id="projectManager" value={projectManager} onChange={(e) => setProjectManager(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
                             </div>
                             <div className="flex justify-end pt-2">
                                 <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 transition duration-300">

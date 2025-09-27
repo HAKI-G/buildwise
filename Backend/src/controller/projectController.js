@@ -38,6 +38,7 @@ export const getAllProjects = async (req, res) => {
  * @route    POST /api/projects
  */
 export const createProject = async (req, res) => {
+  console.log("📦 Incoming request body:", req.body); 
   const { 
     name, 
     location, 
@@ -47,7 +48,8 @@ export const createProject = async (req, res) => {
     contractCost,
     constructionConsultant,
     implementingOffice,
-    sourcesOfFund 
+    sourcesOfFund,
+    projectManager
   } = req.body;
   
   if (!name || !location) {
@@ -68,7 +70,10 @@ export const createProject = async (req, res) => {
       constructionConsultant,
       implementingOffice,
       sourcesOfFund,
-      status: "Not Started", // Default status
+      projectManager: projectManager && projectManager.trim() !== "" 
+        ? projectManager.trim() 
+        : "Juan Dela Cruz",   // ✅ only fallback if actually empty/missing
+      status: "Not Started",
       createdAt: new Date().toISOString(),
     };
 
@@ -117,23 +122,69 @@ export const getProjectById = async (req, res) => {
  * @route    PUT /api/projects/:id
  */
 export const updateProject = async (req, res) => {
+  console.log("📦 Incoming request body:", req.body); 
   const { id } = req.params;
-  const { name, status } = req.body;
+  const {
+    name,
+    location,
+    contractor,
+    dateStarted,
+    contractCompletionDate,
+    contractCost,
+    constructionConsultant,
+    implementingOffice,
+    sourcesOfFund,
+    projectManager,
+    status
+  } = req.body;
+
+  // Build update expression dynamically (only update provided fields)
+  let updateExp = "set";
+  const expAttrNames = {};
+  const expAttrValues = {};
+
+  const addUpdateField = (field, value) => {
+    if (value !== undefined) {
+      const placeholder = `#${field}`;
+      const valuePlaceholder = `:${field}`;
+      if (updateExp !== "set") updateExp += ",";
+      updateExp += ` ${placeholder} = ${valuePlaceholder}`;
+      expAttrNames[placeholder] = field;
+      expAttrValues[valuePlaceholder] = value;
+    }
+  };
+
+  addUpdateField("name", name);
+  addUpdateField("location", location);
+  addUpdateField("contractor", contractor);
+  addUpdateField("dateStarted", dateStarted);
+  addUpdateField("contractCompletionDate", contractCompletionDate);
+  addUpdateField("contractCost", contractCost);
+  addUpdateField("constructionConsultant", constructionConsultant);
+  addUpdateField("implementingOffice", implementingOffice);
+  addUpdateField("sourcesOfFund", sourcesOfFund);
+
+  // ✅ Only update projectManager if provided and not blank
+  if (projectManager && projectManager.trim() !== "") {
+    addUpdateField("projectManager", projectManager.trim());
+  }
+
+  addUpdateField("status", status);
 
   const params = {
     TableName: tableName,
     Key: { projectId: id },
-    UpdateExpression: "set #name = :n, #status = :s",
-    ExpressionAttributeNames: { "#name": "name", "#status": "status" },
-    ExpressionAttributeValues: { ":n": name, ":s": status },
+    UpdateExpression: updateExp,
+    ExpressionAttributeNames: expAttrNames,
+    ExpressionAttributeValues: expAttrValues,
     ReturnValues: "ALL_NEW",
   };
 
   try {
     const data = await docClient.send(new UpdateCommand(params));
-    res.status(200).json({ 
-      message: `Project ${id} updated successfully!`, 
-      updatedProject: data.Attributes 
+    res.status(200).json({
+      message: `Project ${id} updated successfully!`,
+      updatedProject: data.Attributes,
     });
   } catch (error) {
     console.error(`❌ Error updating project with ID ${id}:`, error);
