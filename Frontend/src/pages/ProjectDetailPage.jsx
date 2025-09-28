@@ -3,6 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout.jsx';
 
+// Import the separate tab components
+import Milestones from '../components/Milestones.jsx';
+import Updates from '../components/Updates.jsx';
+import Photos from '../components/Photos.jsx';
+import Comments from '../components/Comments.jsx';
+import Documents from '../components/Documents.jsx';
+
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
 
@@ -34,22 +41,9 @@ function ProjectDetailPage() {
 
     // --- State Management ---
     const [project, setProject] = useState(null);
-    const [milestones, setMilestones] = useState([]);
-    const [expenses, setExpenses] = useState([]); // State for expenses
-    // Placeholders for future data
-    const [updates, setUpdates] = useState([]);
-    const [photos, setPhotos] = useState([]);
-    const [documents, setDocuments] = useState([]);
-    const [comments, setComments] = useState([]);
-
     const [activeTab, setActiveTab] = useState('milestones');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
-    // State for the "Add Expense" form
-    const [expenseDescription, setExpenseDescription] = useState('');
-    const [expenseAmount, setExpenseAmount] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // --- Data Fetching ---
     const fetchProjectData = useCallback(async () => {
@@ -62,27 +56,9 @@ function ProjectDetailPage() {
 
         setLoading(true);
         try {
-            // Fetch project and milestones first (these are working)
-            const [projectRes, milestonesRes] = await Promise.all([
-                axios.get(`http://localhost:5001/api/projects/${projectId}`, config),
-                axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config),
-            ]);
-            
+            // Fetch project data
+            const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
             setProject(projectRes.data);
-            setMilestones(milestonesRes.data);
-            
-            // Try to fetch expenses, but handle 404 gracefully
-            try {
-                const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
-                setExpenses(expensesRes.data);
-            } catch (expenseError) {
-                if (expenseError.response?.status === 404) {
-                    console.warn('Expenses endpoint not found, setting empty array');
-                    setExpenses([]);
-                } else {
-                    throw expenseError; // Re-throw if it's not a 404
-                }
-            }
             
         } catch (err) {
             if (err.response && err.response.status === 401) {
@@ -100,41 +76,23 @@ function ProjectDetailPage() {
         fetchProjectData();
     }, [fetchProjectData]);
 
-    // --- Event Handler for Adding Expense ---
-    const handleAddExpense = async (e) => {
-        e.preventDefault();
-        if (!expenseDescription || !expenseAmount) {
-            alert('Please fill out both description and amount.');
-            return;
-        }
-
-        setIsSubmitting(true);
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const newExpense = {
-            description: expenseDescription,
-            amount: parseFloat(expenseAmount),
-        };
-
-        try {
-            // Use the exact endpoint structure from your backend
-            const response = await axios.post(`http://localhost:5001/api/expenses/${projectId}`, newExpense, config);
-            
-            setExpenseDescription('');
-            setExpenseAmount('');
-            await fetchProjectData(); // Re-fetch all data to show the new expense
-        } catch (err) {
-            console.error('Error adding expense:', err);
-            if (err.response?.status === 404) {
-                setError('Expense functionality is not yet implemented on the backend.');
-            } else {
-                setError('Failed to add expense. Please try again.');
-            }
-        } finally {
-            setIsSubmitting(false);
+    // --- Render Tab Content ---
+    const renderTabContent = () => {
+        switch(activeTab) {
+            case 'milestones':
+                return <Milestones />;
+            case 'updates':
+                return <Updates />;
+            case 'photos':
+                return <Photos />;
+            case 'comments':
+                return <Comments />;
+            case 'documents':
+                return <Documents />;
+            default:
+                return <Milestones />;
         }
     };
-
 
     // --- Render Logic ---
     if (loading) return <Layout title="Loading..."><p className="text-center p-8">Loading project details...</p></Layout>;
@@ -170,95 +128,7 @@ function ProjectDetailPage() {
                 </div>
 
                 <div className="py-6">
-                    {/* Milestones Content */}
-                    {activeTab === 'milestones' && (
-                        <div className="space-y-4">
-                            {milestones.length > 0 ? (
-                                milestones.map(m => (
-                                    <div key={m.milestoneId} className="bg-white p-4 rounded-lg border shadow-sm">
-                                        <h3 className="font-bold text-gray-800">{m.milestoneName} <span className="text-sm font-medium text-gray-500">({m.status})</span></h3>
-                                        <p className="text-gray-600 mt-1">{m.description}</p>
-                                    </div>
-                                ))
-                            ) : (<p className="text-center text-gray-500 py-8">No milestones for this project yet.</p>)}
-                        </div>
-                    )}
-
-                    {/* Updates Content - now includes expenses */}
-                    {activeTab === 'updates' && (
-                        <div className="space-y-8">
-                            {/* Progress Updates Section */}
-                            <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                <h2 className="text-xl font-bold mb-4">Progress Updates</h2>
-                                <div className="text-center text-gray-500 py-8">
-                                    <p>Progress updates will be shown here.</p>
-                                </div>
-                            </div>
-
-                            {/* Expenses Section */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                <div className="lg:col-span-1 bg-white p-6 rounded-xl border shadow-sm">
-                                    <h2 className="text-xl font-bold mb-4">Add New Expense</h2>
-                                    <form onSubmit={handleAddExpense}>
-                                        <div className="mb-4">
-                                            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-                                            <input
-                                                type="text" id="description" value={expenseDescription} onChange={(e) => setExpenseDescription(e.target.value)}
-                                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                                placeholder="e.g., Cement Purchase" />
-                                        </div>
-                                        <div className="mb-4">
-                                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount (PHP)</label>
-                                            <input
-                                                type="number" id="amount" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)}
-                                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                                placeholder="e.g., 50000" />
-                                        </div>
-                                        <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400">
-                                            {isSubmitting ? 'Adding...' : 'Add Expense'}
-                                        </button>
-                                    </form>
-                                    {error && error.includes('not yet implemented') && (
-                                        <div className="mt-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                                            <p className="text-sm">Note: Expense functionality needs to be implemented on the backend first.</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="lg:col-span-2 bg-white p-6 rounded-xl border shadow-sm">
-                                    <h2 className="text-xl font-bold mb-4">Expense Log</h2>
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {expenses.length > 0 ? (
-                                                    expenses.map((expense, index) => (
-                                                        <tr key={expense.expenseId || index}>
-                                                            <td className="px-6 py-4 whitespace-nowrap">{expense.description}</td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-right font-medium">₱{expense.amount.toLocaleString()}</td>
-                                                        </tr>
-                                                    ))
-                                                ) : (
-                                                    <tr>
-                                                        <td colSpan="2" className="text-center py-8 text-gray-500">No expenses logged yet.</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Placeholder Content */}
-                    {activeTab === 'photos' && ( <div className="text-center text-gray-500 py-8"><p>Photo Gallery will be shown here.</p></div> )}
-                    {activeTab === 'comments' && ( <div className="text-center text-gray-500 py-8"><p>Comments will be shown here.</p></div> )}
-                    {activeTab === 'documents' && ( <div className="text-center text-gray-500 py-8"><p>Project Documents will be shown here.</p></div> )}
+                    {renderTabContent()}
                 </div>
             </div>
         </Layout>
