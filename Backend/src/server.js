@@ -10,6 +10,7 @@ import photoRoutes from './routes/photoRoutes.js';
 import commentRoutes from './routes/commentRoutes.js'; 
 import documentRoutes from './routes/documentRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js'; // ADD THIS LINE
+import taskRoutes from './routes/taskRoutes.js';
 
 const app = express();
 const port = 5001;
@@ -27,8 +28,8 @@ app.use('/api/updates', progressUpdateRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/comments', commentRoutes); 
 app.use('/api/documents', documentRoutes);
-app.use('/api/expenses', expenseRoutes); // ADD THIS LINE
-
+app.use('/api/expenses', expenseRoutes); 
+app.use('/api/tasks', taskRoutes);
 // --- Server Start ---
 app.listen(port, () => {
   console.log(`BuildWise server started on port ${port}`);
