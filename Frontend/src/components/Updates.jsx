@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 
@@ -11,6 +11,7 @@ const Updates = () => {
     const [expenseAmount, setExpenseAmount] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     const fetchExpenses = async () => {
         const token = getToken();
@@ -20,11 +21,14 @@ const Updates = () => {
         
         try {
             const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
-            setExpenses(expensesRes.data);
+            setExpenses(expensesRes.data || []);
+            setError('');
         } catch (expenseError) {
             if (expenseError.response?.status === 404) {
                 console.warn('Expenses endpoint not found, setting empty array');
                 setExpenses([]);
+            } else {
+                console.error('Error fetching expenses:', expenseError);
             }
         }
     };
@@ -37,18 +41,26 @@ const Updates = () => {
         }
 
         setIsSubmitting(true);
+        setError('');
+        setSuccessMessage('');
+        
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
         const newExpense = {
             description: expenseDescription,
             amount: parseFloat(expenseAmount),
+            date: new Date().toISOString()
         };
 
         try {
             await axios.post(`http://localhost:5001/api/expenses/${projectId}`, newExpense, config);
             setExpenseDescription('');
             setExpenseAmount('');
+            setSuccessMessage('Expense added successfully!');
             await fetchExpenses();
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => setSuccessMessage(''), 3000);
         } catch (err) {
             console.error('Error adding expense:', err);
             if (err.response?.status === 404) {
@@ -61,7 +73,10 @@ const Updates = () => {
         }
     };
 
-    React.useEffect(() => {
+    // Calculate total expenses
+    const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
+
+    useEffect(() => {
         fetchExpenses();
     }, [projectId]);
 
@@ -69,64 +84,101 @@ const Updates = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1 bg-white p-6 rounded-xl border shadow-sm">
                 <h2 className="text-xl font-bold mb-4">Add New Expense</h2>
+                
+                {successMessage && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
+                        {successMessage}
+                    </div>
+                )}
+                
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
+                        {error}
+                    </div>
+                )}
+                
                 <form onSubmit={handleAddExpense}>
                     <div className="mb-4">
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
+                        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                            Description
+                        </label>
                         <input
                             type="text" 
                             id="description" 
                             value={expenseDescription} 
                             onChange={(e) => setExpenseDescription(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., Cement Purchase" 
                         />
                     </div>
                     <div className="mb-4">
-                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount (PHP)</label>
+                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                            Amount (PHP)
+                        </label>
                         <input
                             type="number" 
                             id="amount" 
                             value={expenseAmount} 
                             onChange={(e) => setExpenseAmount(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="e.g., 50000" 
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="e.g., 50000"
+                            step="0.01"
                         />
                     </div>
                     <button 
                         type="submit" 
                         disabled={isSubmitting} 
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
                     >
                         {isSubmitting ? 'Adding...' : 'Add Expense'}
                     </button>
                 </form>
-                {error && error.includes('not yet implemented') && (
-                    <div className="mt-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                        <p className="text-sm">Note: Expense functionality needs to be implemented on the backend first.</p>
-                    </div>
-                )}
             </div>
+
             <div className="lg:col-span-2 bg-white p-6 rounded-xl border shadow-sm">
-                <h2 className="text-xl font-bold mb-4">Expense Log</h2>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Expense Log</h2>
+                    <div className="text-right">
+                        <p className="text-sm text-gray-500">Total Expenses</p>
+                        <p className="text-2xl font-bold text-red-600">₱{totalExpenses.toLocaleString()}</p>
+                    </div>
+                </div>
+                
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Description
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Date
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Amount
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {expenses.length > 0 ? (
                                 expenses.map((expense, index) => (
-                                    <tr key={expense.expenseId || index}>
-                                        <td className="px-6 py-4 whitespace-nowrap">{expense.description}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right font-medium">₱{expense.amount.toLocaleString()}</td>
+                                    <tr key={expense.expenseId || index} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {expense.description}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {expense.date ? new Date(expense.date).toLocaleDateString() : 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                                            ₱{parseFloat(expense.amount).toLocaleString()}
+                                        </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="2" className="text-center py-8 text-gray-500">No expenses logged yet.</td>
+                                    <td colSpan="3" className="text-center py-8 text-gray-500">
+                                        No expenses logged yet.
+                                    </td>
                                 </tr>
                             )}
                         </tbody>

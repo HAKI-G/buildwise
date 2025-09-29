@@ -7,21 +7,18 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
 
-// Helper function to get the token
 const getToken = () => localStorage.getItem('token');
 
 function StatisticsPage() {
-    // 1. Get the specific projectId from the URL
     const { projectId } = useParams();
     const navigate = useNavigate();
 
-    // 2. State to hold the data for this ONE project
     const [project, setProject] = useState(null);
-    const [milestones, setMilestones] = useState([]); // State for the project's milestones
+    const [milestones, setMilestones] = useState([]);
+    const [expenses, setExpenses] = useState([]); // NEW: Add expenses state
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // 3. Fetch data for this specific project when the component loads
     useEffect(() => {
         const fetchProjectStats = async () => {
             setLoading(true);
@@ -32,14 +29,28 @@ function StatisticsPage() {
             }
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                // Fetch the main project details
+                
+                // Fetch project details
                 const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
                 setProject(projectRes.data);
 
-                // TODO: You will need to build this backend endpoint next
-                // For now, it's commented out to prevent errors.
-                // const milestonesRes = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
-                // setMilestones(milestonesRes.data);
+                // Fetch milestones
+                try {
+                    const milestonesRes = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
+                    setMilestones(milestonesRes.data || []);
+                } catch (err) {
+                    console.warn('Could not fetch milestones:', err);
+                    setMilestones([]);
+                }
+
+                // NEW: Fetch expenses
+                try {
+                    const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
+                    setExpenses(expensesRes.data || []);
+                } catch (err) {
+                    console.warn('Could not fetch expenses:', err);
+                    setExpenses([]);
+                }
 
             } catch (err) {
                 setError('Failed to fetch project statistics.');
@@ -54,7 +65,6 @@ function StatisticsPage() {
         }
     }, [projectId, navigate]);
 
-    // 4. Process the data for the charts (Using placeholder data for now)
     const milestoneStatusData = useMemo(() => {
         if (milestones.length > 0) {
             const statusCounts = milestones.reduce((acc, milestone) => {
@@ -64,7 +74,6 @@ function StatisticsPage() {
             }, {});
             return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
         }
-        // Placeholder data
         return [
             { name: 'Completed', value: 2 },
             { name: 'In Progress', value: 3 },
@@ -72,28 +81,37 @@ function StatisticsPage() {
         ];
     }, [milestones]);
 
-    // Placeholder data for Task Priority
     const taskPriorityData = useMemo(() => [
         { name: 'High', value: 5 },
         { name: 'Medium', value: 8 },
         { name: 'Low', value: 12 },
     ], []);
     
-    // Placeholder data for Pending Items
     const pendingItemsData = useMemo(() => [
         { name: 'Approvals', value: 4 },
         { name: 'Invoices', value: 2 },
         { name: 'Documents', value: 7 },
     ], []);
 
-    // Placeholder data for Budget Overview
+    // NEW: Calculate total spent from expenses
+    const totalSpent = useMemo(() => {
+        return expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+    }, [expenses]);
+
+    // NEW: Budget data now uses real expense totals
     const budgetData = useMemo(() => {
-        const total = project?.contractCost || 1000000;
-        const spent = 650000; // This would come from your backend
-        return [
-            { name: 'Budget', spent, remaining: total - spent, total }
-        ];
-    }, [project]);
+        const total = project?.contractCost || 0;
+        const spent = totalSpent;
+        const remaining = total - spent;
+        
+        return {
+            total,
+            spent,
+            remaining: remaining > 0 ? remaining : 0,
+            percentSpent: total > 0 ? ((spent / total) * 100).toFixed(1) : 0,
+            percentRemaining: total > 0 ? ((remaining / total) * 100).toFixed(1) : 0
+        };
+    }, [project, totalSpent]);
 
     const PIE_COLORS_STATUS = ['#22c55e', '#f59e0b', '#6b7280'];
     const PIE_COLORS_PRIORITY = ['#ef4444', '#f59e0b', '#22c55e'];
@@ -154,21 +172,63 @@ function StatisticsPage() {
                     </div>
                 </div>
 
-                {/* Budget Overview Chart */}
+                {/* NEW: Enhanced Budget Overview with Real Data */}
                 <div className="bg-white p-6 rounded-xl border shadow-sm md:col-span-2 xl:col-span-3">
                     <h2 className="text-lg font-bold text-center mb-4">BUDGET OVERVIEW</h2>
-                    <div className="w-full h-48">
-                        <ResponsiveContainer>
-                            <BarChart data={budgetData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" hide />
-                                <YAxis type="category" dataKey="name" hide/>
-                                <Tooltip formatter={(value, name) => [`₱${value.toLocaleString()}`, name]} />
-                                <Legend />
-                                <Bar dataKey="spent" stackId="a" fill="#ef4444" name="Spent" />
-                                <Bar dataKey="remaining" stackId="a" fill="#22c55e" name="Remaining" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    
+                    {/* Budget Summary Cards */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                            <p className="text-xs text-gray-600 mb-1">Total Budget</p>
+                            <p className="text-xl font-bold text-blue-900">₱{budgetData.total.toLocaleString()}</p>
+                        </div>
+                        <div className="text-center p-4 bg-red-50 rounded-lg">
+                            <p className="text-xs text-gray-600 mb-1">Spent ({budgetData.percentSpent}%)</p>
+                            <p className="text-xl font-bold text-red-900">₱{budgetData.spent.toLocaleString()}</p>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 rounded-lg">
+                            <p className="text-xs text-gray-600 mb-1">Remaining ({budgetData.percentRemaining}%)</p>
+                            <p className="text-xl font-bold text-green-900">₱{budgetData.remaining.toLocaleString()}</p>
+                        </div>
+                    </div>
+
+                    {/* Visual Budget Bar */}
+                    <div className="w-full h-16 bg-gray-200 rounded-lg overflow-hidden flex">
+                        {budgetData.spent > 0 && (
+                            <div 
+                                className="bg-red-500 flex items-center justify-center text-white text-sm font-medium"
+                                style={{ width: `${budgetData.percentSpent}%` }}
+                                title={`Spent: ₱${budgetData.spent.toLocaleString()}`}
+                            >
+                                {budgetData.percentSpent > 10 && `${budgetData.percentSpent}%`}
+                            </div>
+                        )}
+                        {budgetData.remaining > 0 && (
+                            <div 
+                                className="bg-green-500 flex items-center justify-center text-white text-sm font-medium"
+                                style={{ width: `${budgetData.percentRemaining}%` }}
+                                title={`Remaining: ₱${budgetData.remaining.toLocaleString()}`}
+                            >
+                                {budgetData.percentRemaining > 10 && `${budgetData.percentRemaining}%`}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex justify-center gap-6 mt-4">
+                        <div className="flex items-center">
+                            <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                            <span className="text-sm text-gray-600">Spent</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                            <span className="text-sm text-gray-600">Remaining</span>
+                        </div>
+                    </div>
+
+                    {/* Expense Count */}
+                    <div className="text-center mt-4 text-sm text-gray-500">
+                        Total Expenses Logged: {expenses.length}
                     </div>
                 </div>
 
