@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
 
 // Import all your route files
 import projectRoutes from './routes/projectRoutes.js';
@@ -9,18 +11,18 @@ import progressUpdateRoutes from './routes/progressUpdateRoutes.js';
 import photoRoutes from './routes/photoRoutes.js';
 import commentRoutes from './routes/commentRoutes.js'; 
 import documentRoutes from './routes/documentRoutes.js';
-import expenseRoutes from './routes/expenseRoutes.js'; // ADD THIS LINE
+import expenseRoutes from './routes/expenseRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import liquidationRoutes from './routes/liquidationRoutes.js'; // FIXED: ES6 import
 
 const app = express();
 const port = 5001;
-
+dotenv.config();
 // --- Middleware ---
 app.use(cors());
 app.use(express.json());
 
 // --- API Routes ---
-// This tells Express to use the correct route file for each base URL
 app.use('/api/projects', projectRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/milestones', milestoneRoutes); 
@@ -30,6 +32,9 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/expenses', expenseRoutes); 
 app.use('/api/tasks', taskRoutes);
+app.use('/api/projects', liquidationRoutes); // Liquidation routes
+app.use('/api/documents', documentRoutes);
+
 // --- Server Start ---
 app.listen(port, () => {
   console.log(`BuildWise server started on port ${port}`);

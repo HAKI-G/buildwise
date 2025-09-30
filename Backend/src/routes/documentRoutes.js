@@ -1,13 +1,28 @@
 import express from 'express';
-import { uploadDocument, uploadDocumentForProject, getDocumentsForProject } from '../controller/documentController.js';
+import * as documentController from '../controller/documentController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Route to upload a single document for a project.
-// The string 'document' must match the key name you use in Postman.
-router.post('/:projectId', uploadDocument.single('document'), uploadDocumentForProject);
+// View document - NO AUTH REQUIRED (uses presigned URL)
+router.get('/:documentId/view', documentController.viewDocument);
 
-// Route to get all documents for a specific project
-router.get('/:projectId', getDocumentsForProject);
+// All other routes require authentication
+router.use(protect);
+
+// Get all documents for a project
+router.get('/project/:projectId', documentController.getProjectDocuments);
+
+// Upload document
+router.post('/upload', documentController.upload.single('document'), documentController.uploadDocument);
+
+// Download document
+router.get('/:documentId/download', documentController.downloadDocument);
+
+// Update document status
+router.put('/:documentId/status', documentController.updateDocumentStatus);
+
+// Delete document
+router.delete('/:documentId', documentController.deleteDocument);
 
 export default router;

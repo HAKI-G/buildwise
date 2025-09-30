@@ -1,309 +1,456 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import axios from 'axios';
 
-const Documents = () => {
-    const [documents, setDocuments] = useState([
-        // Sample documents for demonstration
-        {
-            id: 1,
-            name: 'Project Contract.pdf',
-            type: 'Contract',
-            size: '2.4 MB',
-            uploadDate: '2025-01-10',
-            uploadedBy: 'Admin',
-            status: 'Approved',
-            description: 'Main project contract with all terms and conditions'
-        },
-        {
-            id: 2,
-            name: 'Site Plans.dwg',
-            type: 'Drawing',
-            size: '15.7 MB',
-            uploadDate: '2025-01-12',
-            uploadedBy: 'Architect',
-            status: 'Under Review',
-            description: 'Architectural drawings and site plans'
-        },
-        {
-            id: 3,
-            name: 'Material Specifications.xlsx',
-            type: 'Specification',
-            size: '890 KB',
-            uploadDate: '2025-01-14',
-            uploadedBy: 'Engineer',
-            status: 'Approved',
-            description: 'Detailed material specifications and requirements'
-        }
-    ]);
+const getToken = () => localStorage.getItem('token');
 
+function Documents() {
+    const { projectId } = useParams();
+    const [documents, setDocuments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const [filterType, setFilterType] = useState('All Types');
     const [showUploadModal, setShowUploadModal] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [documentForm, setDocumentForm] = useState({
-        name: '',
-        type: 'Contract',
+
+    // Upload form state
+    const [uploadData, setUploadData] = useState({
+        file: null,
+        documentType: 'Contract',
         description: ''
     });
-    const [isUploading, setIsUploading] = useState(false);
-    const [filterType, setFilterType] = useState('All');
 
-    const documentTypes = ['Contract', 'Drawing', 'Specification', 'Report', 'Permit', 'Other'];
-    const statusColors = {
-        'Approved': 'bg-green-100 text-green-800',
-        'Under Review': 'bg-yellow-100 text-yellow-800',
-        'Rejected': 'bg-red-100 text-red-800',
-        'Draft': 'bg-gray-100 text-gray-800'
-    };
+    useEffect(() => {
+        fetchDocuments();
+    }, [projectId]);
 
-    const getFileIcon = (fileName) => {
-        const extension = fileName.split('.').pop().toLowerCase();
-        switch (extension) {
-            case 'pdf':
-                return (
-                    <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                );
-            case 'dwg':
-            case 'dxf':
-                return (
-                    <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                );
-            case 'xlsx':
-            case 'xls':
-                return (
-                    <svg className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                );
-            default:
-                return (
-                    <svg className="w-8 h-8 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                    </svg>
-                );
+    const fetchDocuments = async () => {
+        try {
+            const token = getToken();
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const res = await axios.get(`http://localhost:5001/api/documents/project/${projectId}`, config);
+            setDocuments(res.data);
+        } catch (error) {
+            console.error('Error fetching documents:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleFileSelect = (event) => {
-        const file = event.target.files[0];
-        setSelectedFile(file);
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
         if (file) {
-            setDocumentForm(prev => ({ ...prev, name: file.name }));
+            if (file.size > 50 * 1024 * 1024) {
+                alert('File size must be less than 50MB');
+                e.target.value = '';
+                return;
+            }
+
+            const allowedTypes = [
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'image/jpeg',
+                'image/png',
+                'image/jpg',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'text/plain'
+            ];
+
+            if (!allowedTypes.includes(file.type)) {
+                alert('File type not supported. Please upload PDF, Word, Excel, PowerPoint, Text, or Image files.');
+                e.target.value = '';
+                return;
+            }
+
+            setUploadData(prev => ({ ...prev, file }));
         }
     };
 
-    const handleUpload = async () => {
-        if (!selectedFile || !documentForm.name || !documentForm.description) {
-            alert('Please fill in all required fields.');
+    const handleUpload = async (e) => {
+        e.preventDefault();
+
+        if (!uploadData.file) {
+            alert('Please select a file');
             return;
         }
 
-        setIsUploading(true);
-        // Simulate upload process
-        setTimeout(() => {
-            const newDocument = {
-                id: Date.now(),
-                name: documentForm.name,
-                type: documentForm.type,
-                size: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-                uploadDate: new Date().toISOString().split('T')[0],
-                uploadedBy: 'Current User',
-                status: 'Under Review',
-                description: documentForm.description
-            };
-            setDocuments([...documents, newDocument]);
-            setShowUploadModal(false);
-            setSelectedFile(null);
-            setDocumentForm({ name: '', type: 'Contract', description: '' });
-            setIsUploading(false);
-        }, 2000);
-    };
+        setUploading(true);
 
-    const handleDeleteDocument = (documentId) => {
-        if (window.confirm('Are you sure you want to delete this document?')) {
-            setDocuments(documents.filter(doc => doc.id !== documentId));
+        try {
+            const token = getToken();
+            const formData = new FormData();
+            formData.append('document', uploadData.file);
+            formData.append('projectId', projectId);
+            formData.append('documentType', uploadData.documentType);
+            formData.append('description', uploadData.description);
+
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            };
+
+            await axios.post('http://localhost:5001/api/documents/upload', formData, config);
+            
+            setUploadData({
+                file: null,
+                documentType: 'Contract',
+                description: ''
+            });
+            
+            // Reset file input
+            const fileInput = document.querySelector('input[type="file"]');
+            if (fileInput) fileInput.value = '';
+            
+            setShowUploadModal(false);
+            fetchDocuments();
+            
+            alert('Document uploaded successfully!');
+        } catch (error) {
+            console.error('Error uploading document:', error);
+            alert(error.response?.data?.message || 'Failed to upload document');
+        } finally {
+            setUploading(false);
         }
     };
 
-    const filteredDocuments = filterType === 'All' 
+    const handleDownload = async (documentId, filename) => {
+        try {
+            const token = getToken();
+            const config = {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { projectId }
+            };
+
+            const res = await axios.get(
+                `http://localhost:5001/api/documents/${documentId}/download`,
+                config
+            );
+            
+            if (res.data.downloadUrl) {
+                // Create a temporary link and click it
+                const link = document.createElement('a');
+                link.href = res.data.downloadUrl;
+                link.download = filename;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } catch (error) {
+            console.error('Error downloading document:', error);
+            alert(error.response?.data?.message || 'Failed to download document');
+        }
+    };
+
+    const handleView = (documentId) => {
+        // Open view endpoint without token - it will redirect to presigned URL
+        window.open(
+            `http://localhost:5001/api/documents/${documentId}/view?projectId=${projectId}`,
+            '_blank'
+        );
+    };
+
+    const handleDelete = async (documentId) => {
+        if (!window.confirm('Are you sure you want to delete this document?')) return;
+
+        try {
+            const token = getToken();
+            const config = {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { projectId }
+            };
+            
+            await axios.delete(`http://localhost:5001/api/documents/${documentId}`, config);
+            fetchDocuments();
+            alert('Document deleted successfully');
+        } catch (error) {
+            console.error('Error deleting document:', error);
+            alert(error.response?.data?.message || 'Failed to delete document');
+        }
+    };
+
+    const updateStatus = async (documentId, newStatus) => {
+        try {
+            const token = getToken();
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            
+            await axios.put(
+                `http://localhost:5001/api/documents/${documentId}/status`,
+                { status: newStatus, projectId },
+                config
+            );
+            
+            fetchDocuments();
+        } catch (error) {
+            console.error('Error updating status:', error);
+            alert(error.response?.data?.message || 'Failed to update status');
+        }
+    };
+
+    const getFileIcon = (filename) => {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+            pdf: '📄',
+            doc: '📘',
+            docx: '📘',
+            xls: '📗',
+            xlsx: '📗',
+            ppt: '📙',
+            pptx: '📙',
+            jpg: '🖼️',
+            jpeg: '🖼️',
+            png: '🖼️',
+            txt: '📝'
+        };
+        return icons[ext] || '📎';
+    };
+
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const getStatusColor = (status) => {
+        const colors = {
+            'Approved': 'bg-green-100 text-green-800',
+            'Under Review': 'bg-yellow-100 text-yellow-800',
+            'Rejected': 'bg-red-100 text-red-800',
+            'Pending': 'bg-gray-100 text-gray-800'
+        };
+        return colors[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const filteredDocuments = filterType === 'All Types' 
         ? documents 
-        : documents.filter(doc => doc.type === filterType);
+        : documents.filter(doc => doc.documentType === filterType);
+
+    if (loading) {
+        return <div className="text-center p-8">Loading documents...</div>;
+    }
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold">Project Documents</h2>
-                    <p className="text-gray-500 text-sm">{documents.length} documents total</p>
+                    <h2 className="text-2xl font-bold text-gray-800">Project Documents</h2>
+                    <p className="text-sm text-gray-600">{documents.length} documents total</p>
                 </div>
                 <button
                     onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     Upload Document
                 </button>
             </div>
 
             {/* Filter */}
-            <div className="flex space-x-4 items-center">
+            <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-700">Filter by type:</span>
                 <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-1 text-sm"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                    <option value="All">All Types</option>
-                    {documentTypes.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                    ))}
+                    <option>All Types</option>
+                    <option>Contract</option>
+                    <option>Drawing</option>
+                    <option>Specification</option>
+                    <option>Report</option>
+                    <option>Permit</option>
+                    <option>Photo</option>
+                    <option>Other</option>
                 </select>
             </div>
 
-            {/* Documents List */}
-            <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+            {/* Upload Modal */}
+            {showUploadModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Upload Document</h3>
+                        <form onSubmit={handleUpload} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Document Type
+                                </label>
+                                <select
+                                    value={uploadData.documentType}
+                                    onChange={(e) => setUploadData(prev => ({ ...prev, documentType: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                >
+                                    <option>Contract</option>
+                                    <option>Drawing</option>
+                                    <option>Specification</option>
+                                    <option>Report</option>
+                                    <option>Permit</option>
+                                    <option>Photo</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Description
+                                </label>
+                                <input
+                                    type="text"
+                                    value={uploadData.description}
+                                    onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Brief description of the document"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    File (PDF, Word, Excel, Image - Max 50MB)
+                                </label>
+                                <input
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt"
+                                    required
+                                />
+                                {uploadData.file && (
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        Selected: {uploadData.file.name} ({formatFileSize(uploadData.file.size)})
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowUploadModal(false);
+                                        setUploadData({ file: null, documentType: 'Contract', description: '' });
+                                        const fileInput = document.querySelector('input[type="file"]');
+                                        if (fileInput) fileInput.value = '';
+                                    }}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    disabled={uploading}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                    disabled={uploading}
+                                >
+                                    {uploading ? 'Uploading...' : 'Upload'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Documents Table */}
+            {filteredDocuments.length === 0 ? (
+                <div className="text-center p-8 bg-white border border-gray-200 rounded-lg">
+                    <p className="text-gray-500">No documents uploaded yet.</p>
+                </div>
+            ) : (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Document
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Type
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Size
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Uploaded
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredDocuments.map((document) => (
-                                <tr key={document.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                            {filteredDocuments.map((doc) => (
+                                <tr key={doc.documentId} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
                                         <div className="flex items-center">
-                                            <div className="mr-3">
-                                                {getFileIcon(document.name)}
-                                            </div>
+                                            <span className="text-2xl mr-3">{getFileIcon(doc.filename)}</span>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">{document.name}</div>
-                                                <div className="text-sm text-gray-500">{document.description}</div>
+                                                <div className="text-sm font-medium text-gray-900">{doc.filename}</div>
+                                                <div className="text-sm text-gray-500">{doc.description}</div>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.type}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.size}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <div>{new Date(document.uploadDate).toLocaleDateString()}</div>
-                                        <div className="text-gray-500">by {document.uploadedBy}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColors[document.status]}`}>
-                                            {document.status}
-                                        </span>
+                                        <span className="text-sm text-gray-900">{doc.documentType}</span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <div className="flex space-x-2">
-                                            <button className="text-blue-600 hover:text-blue-800">View</button>
-                                            <button className="text-green-600 hover:text-green-800">Download</button>
-                                            <button 
-                                                onClick={() => handleDeleteDocument(document.id)}
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                Delete
-                                            </button>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className="text-sm text-gray-900">{formatFileSize(doc.fileSize)}</span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900">
+                                            {new Date(doc.uploadedAt).toLocaleDateString()}
                                         </div>
+                                        <div className="text-sm text-gray-500">
+                                            by {doc.uploadedBy?.name || 'Unknown'}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            value={doc.status}
+                                            onChange={(e) => updateStatus(doc.documentId, e.target.value)}
+                                            className={`text-sm px-2 py-1 rounded-full ${getStatusColor(doc.status)}`}
+                                        >
+                                            <option>Approved</option>
+                                            <option>Under Review</option>
+                                            <option>Rejected</option>
+                                            <option>Pending</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button
+                                            onClick={() => handleView(doc.documentId)}
+                                            className="text-blue-600 hover:text-blue-900 mr-3"
+                                        >
+                                            View
+                                        </button>
+                                        <button
+                                            onClick={() => handleDownload(doc.documentId, doc.filename)}
+                                            className="text-green-600 hover:text-green-900 mr-3"
+                                        >
+                                            Download
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(doc.documentId)}
+                                            className="text-red-600 hover:text-red-900"
+                                        >
+                                            Delete
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            {filteredDocuments.length === 0 && (
-                <div className="text-center py-12">
-                    <div className="text-gray-400 mb-4">
-                        <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <p className="text-gray-500">No documents uploaded yet</p>
-                    <p className="text-gray-400 text-sm">Upload your first project document to get started</p>
-                </div>
-            )}
-
-            {/* Upload Modal */}
-            {showUploadModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-                        <h3 className="text-lg font-bold mb-4">Upload Document</h3>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Select File</label>
-                                <input
-                                    type="file"
-                                    onChange={handleFileSelect}
-                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Document Name</label>
-                                <input
-                                    type="text"
-                                    value={documentForm.name}
-                                    onChange={(e) => setDocumentForm({...documentForm, name: e.target.value})}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-                                <select
-                                    value={documentForm.type}
-                                    onChange={(e) => setDocumentForm({...documentForm, type: e.target.value})}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    {documentTypes.map(type => (
-                                        <option key={type} value={type}>{type}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                                <textarea
-                                    value={documentForm.description}
-                                    onChange={(e) => setDocumentForm({...documentForm, description: e.target.value})}
-                                    placeholder="Brief description of the document..."
-                                    rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => setShowUploadModal(false)}
-                                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleUpload}
-                                disabled={isUploading}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-                            >
-                                {isUploading ? 'Uploading...' : 'Upload'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
         </div>
     );
-};
-
-
+}
 
 export default Documents;

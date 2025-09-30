@@ -9,6 +9,8 @@ import Updates from '../components/Updates.jsx';
 import Photos from '../components/Photos.jsx';
 import Comments from '../components/Comments.jsx';
 import Documents from '../components/Documents.jsx';
+import Liquidation from '../components/Liquidation.jsx'; 
+import Maps from '../components/Maps.jsx';
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -34,6 +36,7 @@ const TabButton = ({ label, activeTab, setActiveTab }) => (
         {label}
     </button>
 );
+
 
 function ProjectDetailPage() {
     const { projectId } = useParams();
@@ -89,6 +92,10 @@ function ProjectDetailPage() {
                 return <Comments />;
             case 'documents':
                 return <Documents />;
+            case 'liquidation':
+                return <Liquidation />;
+            case 'maps': 
+                return <Maps />;
             default:
                 return <Milestones />;
         }
@@ -124,6 +131,8 @@ function ProjectDetailPage() {
                         <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />
+                        <TabButton label="Liquidation" activeTab={activeTab} setActiveTab={setActiveTab} /> {/* NEW TAB */}
+                        <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} /> {/* NEW TAB */}
                     </nav>
                 </div>
 
