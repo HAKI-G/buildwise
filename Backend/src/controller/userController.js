@@ -13,7 +13,7 @@ import jwt from 'jsonwebtoken';
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = 'BuildWiseUsers';
-const JWT_SECRET = 'your-super-secret-key-for-now';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-for-now';
 
 export const getAllUsers = async (req, res) => {
     const params = { TableName: tableName };

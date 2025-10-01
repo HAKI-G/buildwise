@@ -1,33 +1,38 @@
 import jwt from 'jsonwebtoken';
 
-// Make sure to use the same secret key as in your userController
-const JWT_SECRET = 'your-super-secret-key-for-now';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-for-now';
 
 export const protect = (req, res, next) => {
   let token;
 
-  // Check if the authorization header exists and starts with 'Bearer'
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      // Get token from the 'Bearer [token]' header
       token = req.headers.authorization.split(' ')[1];
-
-      // Verify the token is valid
       const decoded = jwt.verify(token, JWT_SECRET);
       
-      // Attach the user's ID from the token to the request object
-      // so the next function (the controller) can use it.
-      req.user = { id: decoded.id };
-
-      // Move on to the next function in the chain
+      req.user = { id: decoded.id, role: decoded.role };
+      
       next();
     } catch (error) {
       console.error('Token verification failed:', error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      return res.status(401).json({ message: 'Not authorized, token failed' });
     }
+  } else {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
+};
+
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
   }
 
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ 
+      message: 'Access denied. Admin privileges required.',
+      userRole: req.user.role
+    });
   }
+
+  next();
 };
