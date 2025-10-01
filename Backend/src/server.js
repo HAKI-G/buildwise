@@ -13,7 +13,9 @@ import commentRoutes from './routes/commentRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
-import liquidationRoutes from './routes/liquidationRoutes.js'; // FIXED: ES6 import
+import liquidationRoutes from './routes/liquidationRoutes.js'; 
+import authRoutes from './routes/authRoutes.js';        
+import adminRoutes from './routes/adminRoutes.js';
 
 const app = express();
 const port = 5001;
@@ -23,6 +25,8 @@ app.use(cors());
 app.use(express.json());
 
 // --- API Routes ---
+app.use('/api/auth', authRoutes);           
+app.use('/api/admin', adminRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/milestones', milestoneRoutes); 
