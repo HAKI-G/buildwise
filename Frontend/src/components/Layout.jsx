@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
+import { Settings, Moon, Sun } from 'lucide-react';
 
 const DashboardIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -32,8 +34,9 @@ const LogoutIcon = () => (
   </svg>
 );
 
-function Layout({ title, children }) {
+function Layout({ title, children, headerContent }) {
     const navigate = useNavigate();
+    const { theme, toggleTheme } = useTheme();
     
     const [userInfo, setUserInfo] = useState({
         name: 'User',
@@ -74,22 +77,24 @@ function Layout({ title, children }) {
         navigate('/login');
     };
 
-    const getAvatarUrl = () => {
-        if (userInfo.avatar && userInfo.avatar.trim() !== '') {
-            return userInfo.avatar;
-        }
-        const name = userInfo.name || 'User';
-        return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&size=128&bold=true`;
+    const getInitials = (name) => {
+        if (!name) return 'U';
+        return name
+            .split(' ')
+            .map(word => word[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
     };
 
-    const navLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors";
-    const activeNavLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg font-bold bg-white text-black shadow-sm";
+    const navLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors";
+    const activeNavLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg font-bold bg-white dark:bg-slate-700 text-black dark:text-white shadow-sm";
 
     return (
-        <div className="flex h-screen bg-gray-50 text-gray-800">
-            <aside className="w-64 bg-stone-100 p-6 flex flex-col justify-between">
+        <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white transition-colors duration-200">
+            <aside className="w-64 bg-stone-100 dark:bg-slate-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-slate-700 transition-colors">
                 <div>
-                    <div className="text-3xl font-bold mb-12 text-gray-800">demo</div>
+                    <div className="text-3xl font-bold mb-12 text-gray-800 dark:text-white">BuildWise</div>
                     <nav className="space-y-4">
                         <NavLink 
                             to="/dashboard" 
@@ -129,27 +134,64 @@ function Layout({ title, children }) {
                 </div>
             </aside>
 
-            <main className="flex-1 p-8 overflow-y-auto">
-                <header className="flex justify-between items-center pb-8">
-                    <h1 className="text-3xl font-bold text-gray-800">{title || 'BuildWise'}</h1>
-                    
-                    <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                            <div className="font-bold text-gray-800">{userInfo.name}</div>
-                            <div className="text-sm text-gray-500">{userInfo.role}</div>
+            <main className="flex-1 flex flex-col overflow-hidden">
+                {/* Top Header Bar */}
+                <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-8 py-4 transition-colors">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center flex-1">
+                            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{title || 'BuildWise'}</h1>
+                            
+                            {/* Header Content (like search bar) */}
+                            {headerContent && (
+                                <div className="flex-1">
+                                    {headerContent}
+                                </div>
+                            )}
                         </div>
-                        <img 
-                            src={getAvatarUrl()} 
-                            alt={`${userInfo.name} Avatar`} 
-                            className="w-12 h-12 rounded-full border-2 border-gray-200 object-cover shadow-sm"
-                            onError={(e) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userInfo.name)}&background=3b82f6&color=fff&size=128&bold=true`;
-                            }}
-                        />
+                        
+                        <div className="flex items-center space-x-4">
+                            {/* Theme Toggle Button */}
+                            <button 
+                                onClick={toggleTheme}
+                                className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                aria-label="Toggle theme"
+                                title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                            >
+                                {theme === 'light' ? (
+                                    <Moon className="w-5 h-5" />
+                                ) : (
+                                    <Sun className="w-5 h-5" />
+                                )}
+                            </button>
+
+                            {/* Settings Button */}
+                            <button 
+                                onClick={() => navigate('/settings')}
+                                className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                aria-label="Settings"
+                                title="Settings"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+
+                            {/* User Info */}
+                            <div className="flex items-center space-x-4">
+                                <div className="text-right">
+                                    <div className="font-bold text-gray-800 dark:text-white">{userInfo.name}</div>
+                                    <div className="text-sm text-gray-500 dark:text-slate-400">{userInfo.role}</div>
+                                </div>
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                                    {getInitials(userInfo.name)}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </header>
-                
-                {children}
+
+                {/* Main Content Area */}
+                <div className="flex-1 p-8 overflow-y-auto">
+                    {children}
+                </div>
             </main>
         </div>
     );

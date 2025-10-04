@@ -59,7 +59,6 @@ const Updates = () => {
             setSuccessMessage('Expense added successfully!');
             await fetchExpenses();
             
-            // Clear success message after 3 seconds
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (err) {
             console.error('Error adding expense:', err);
@@ -73,7 +72,6 @@ const Updates = () => {
         }
     };
 
-    // Calculate total expenses
     const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
 
     useEffect(() => {
@@ -82,24 +80,24 @@ const Updates = () => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white p-6 rounded-xl border shadow-sm">
-                <h2 className="text-xl font-bold mb-4">Add New Expense</h2>
+            <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add New Expense</h2>
                 
                 {successMessage && (
-                    <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
+                    <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 rounded-lg text-sm">
                         {successMessage}
                     </div>
                 )}
                 
                 {error && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
+                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded-lg text-sm">
                         {error}
                     </div>
                 )}
                 
                 <form onSubmit={handleAddExpense}>
                     <div className="mb-4">
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                             Description
                         </label>
                         <input
@@ -107,12 +105,12 @@ const Updates = () => {
                             id="description" 
                             value={expenseDescription} 
                             onChange={(e) => setExpenseDescription(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., Cement Purchase" 
                         />
                     </div>
                     <div className="mb-4">
-                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                             Amount (PHP)
                         </label>
                         <input
@@ -120,7 +118,7 @@ const Updates = () => {
                             id="amount" 
                             value={expenseAmount} 
                             onChange={(e) => setExpenseAmount(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., 50000"
                             step="0.01"
                         />
@@ -135,48 +133,48 @@ const Updates = () => {
                 </form>
             </div>
 
-            <div className="lg:col-span-2 bg-white p-6 rounded-xl border shadow-sm">
+            <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Expense Log</h2>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Expense Log</h2>
                     <div className="text-right">
-                        <p className="text-sm text-gray-500">Total Expenses</p>
-                        <p className="text-2xl font-bold text-red-600">₱{totalExpenses.toLocaleString()}</p>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Total Expenses</p>
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">₱{totalExpenses.toLocaleString()}</p>
                     </div>
                 </div>
                 
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead className="bg-gray-50 dark:bg-slate-900/50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                                     Description
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                                     Date
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                                     Amount
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                             {expenses.length > 0 ? (
                                 expenses.map((expense, index) => (
-                                    <tr key={expense.expenseId || index} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <tr key={expense.expenseId || index} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                             {expense.description}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
                                             {expense.date ? new Date(expense.date).toLocaleDateString() : 'N/A'}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
                                             ₱{parseFloat(expense.amount).toLocaleString()}
                                         </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="3" className="text-center py-8 text-gray-500">
+                                    <td colSpan="3" className="text-center py-8 text-gray-500 dark:text-slate-400">
                                         No expenses logged yet.
                                     </td>
                                 </tr>

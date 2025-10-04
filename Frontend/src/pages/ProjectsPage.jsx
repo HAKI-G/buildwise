@@ -9,11 +9,11 @@ const getToken = () => localStorage.getItem('token');
 
 // Enhanced responsive project list item component
 const ProjectListItem = ({ project, onDelete }) => (
-    <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 shadow-sm mb-3 hover:shadow-md transition-shadow duration-200">
+    <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm mb-3 hover:shadow-md transition-shadow duration-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm sm:text-base text-blue-800 truncate">{project.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{project.location}</p>
+                <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-400 truncate">{project.name}</h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5 truncate">{project.location}</p>
             </div>
             
             {/* Action buttons - responsive */}
@@ -113,12 +113,12 @@ function ProjectsPage() {
     };
 
     return (
-        <Layout title="BuildWise">
+        <Layout title="Projects">
             <div className="flex flex-col xl:grid xl:grid-cols-5 gap-4 sm:gap-6">
                 {/* Left Side - Active Projects List (responsive width) */}
                 <div className="xl:col-span-3">
-                    <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
+                    <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-3 sm:mb-4">
                             Active Projects ({projects.length})
                         </h2>
                         <div className="max-h-[70vh] sm:max-h-[80vh] overflow-y-auto pr-1 sm:pr-2">
@@ -132,7 +132,7 @@ function ProjectsPage() {
                                 ))
                             ) : (
                                 <div className="text-center py-8 sm:py-12">
-                                    <p className="text-sm sm:text-base text-gray-500">
+                                    <p className="text-sm sm:text-base text-gray-500 dark:text-slate-400">
                                         No projects found. Add one to get started!
                                     </p>
                                 </div>
@@ -143,13 +143,13 @@ function ProjectsPage() {
 
                 {/* Right Side - Add New Project Form (responsive width) */}
                 <div className="xl:col-span-2">
-                    <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm sticky top-4">
-                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 sm:mb-6">
+                    <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm sticky top-4 transition-colors">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-4 sm:mb-6">
                             Add a New Project
                         </h2>
                         <form onSubmit={handleCreateProject} className="space-y-3 sm:space-y-4">
                             <div>
-                                <label htmlFor="projectName" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="projectName" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Project Name
                                 </label>
                                 <input 
@@ -158,12 +158,12 @@ function ProjectsPage() {
                                     value={projectName} 
                                     onChange={(e) => setProjectName(e.target.value)} 
                                     required 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="location" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="location" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Location
                                 </label>
                                 <input 
@@ -172,12 +172,12 @@ function ProjectsPage() {
                                     value={location} 
                                     onChange={(e) => setLocation(e.target.value)} 
                                     required 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="contractor" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="contractor" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Contractor
                                 </label>
                                 <input 
@@ -185,13 +185,13 @@ function ProjectsPage() {
                                     id="contractor" 
                                     value={contractor} 
                                     onChange={(e) => setContractor(e.target.value)} 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label htmlFor="dateStarted" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                    <label htmlFor="dateStarted" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                         Date Started
                                     </label>
                                     <input 
@@ -199,12 +199,12 @@ function ProjectsPage() {
                                         id="dateStarted" 
                                         value={dateStarted} 
                                         onChange={(e) => setDateStarted(e.target.value)} 
-                                        className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
                                 
                                 <div>
-                                    <label htmlFor="contractCompletionDate" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                    <label htmlFor="contractCompletionDate" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                         Completion Date
                                     </label>
                                     <input 
@@ -212,13 +212,13 @@ function ProjectsPage() {
                                         id="contractCompletionDate" 
                                         value={contractCompletionDate} 
                                         onChange={(e) => setContractCompletionDate(e.target.value)} 
-                                        className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
                             </div>
                             
                             <div>
-                                <label htmlFor="contractCost" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="contractCost" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Contract Cost (PHP)
                                 </label>
                                 <input 
@@ -227,12 +227,12 @@ function ProjectsPage() {
                                     value={contractCost} 
                                     onChange={(e) => setContractCost(e.target.value)} 
                                     placeholder="e.g., 1000000" 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="constructionConsultant" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="constructionConsultant" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Construction Consultant
                                 </label>
                                 <input 
@@ -240,12 +240,12 @@ function ProjectsPage() {
                                     id="constructionConsultant" 
                                     value={constructionConsultant} 
                                     onChange={(e) => setConstructionConsultant(e.target.value)} 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="implementingOffice" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="implementingOffice" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Implementing Office
                                 </label>
                                 <input 
@@ -253,12 +253,12 @@ function ProjectsPage() {
                                     id="implementingOffice" 
                                     value={implementingOffice} 
                                     onChange={(e) => setImplementingOffice(e.target.value)} 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="sourcesOfFund" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="sourcesOfFund" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Sources of Fund
                                 </label>
                                 <input 
@@ -266,12 +266,12 @@ function ProjectsPage() {
                                     id="sourcesOfFund" 
                                     value={sourcesOfFund} 
                                     onChange={(e) => setSourcesOfFund(e.target.value)} 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
                             <div>
-                                <label htmlFor="projectManager" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="projectManager" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Project Manager
                                 </label>
                                 <input 
@@ -279,7 +279,7 @@ function ProjectsPage() {
                                     id="projectManager" 
                                     value={projectManager} 
                                     onChange={(e) => setProjectManager(e.target.value)} 
-                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             
@@ -287,7 +287,7 @@ function ProjectsPage() {
                                 <button 
                                     type="submit" 
                                     disabled={isSubmitting} 
-                                    className="w-full px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-300"
+                                    className="w-full px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition duration-300"
                                 >
                                     {isSubmitting ? 'Creating...' : 'Create Project'}
                                 </button>
@@ -295,8 +295,8 @@ function ProjectsPage() {
                         </form>
                         
                         {error && (
-                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                                <p className="text-xs sm:text-sm text-red-600 font-medium text-center">{error}</p>
+                            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                                <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-medium text-center">{error}</p>
                             </div>
                         )}
                     </div>

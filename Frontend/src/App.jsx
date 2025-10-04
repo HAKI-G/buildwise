@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Page Imports
 import HomePage from './pages/HomePage.jsx';
@@ -14,24 +15,26 @@ import SettingsPage from './pages/SettingsPage.jsx';
 
 function App() {
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      
-      {/* Protected Routes */}
-      <Route path="/dashboard" element={<DashboardPage />} />
-      <Route path="/projects" element={<ProjectsPage />} />
-      
-      {/* Statistics Routes - both with and without project ID */}
-      <Route path="/statistics" element={<StatisticsPage />} />
-      <Route path="/statistics/:projectId" element={<StatisticsPage />} />
-      
-      <Route path="/project/:projectId" element={<ProjectDetailPage />} />
-      <Route path="/project/edit/:projectId" element={<UpdateProjectPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
-    </Routes>
+    <ThemeProvider>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        
+        {/* Statistics Routes - both with and without project ID */}
+        <Route path="/statistics" element={<StatisticsPage />} />
+        <Route path="/statistics/:projectId" element={<StatisticsPage />} />
+        
+        <Route path="/project/:projectId" element={<ProjectDetailPage />} />
+        <Route path="/project/edit/:projectId" element={<UpdateProjectPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+      </Routes>
+    </ThemeProvider>
   );
 }
 

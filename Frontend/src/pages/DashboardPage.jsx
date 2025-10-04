@@ -2,33 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
+import { Search } from 'lucide-react';
 
 const getToken = () => localStorage.getItem('token');
 
 // Enhanced ProjectRow component with real progress data
 const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
     <Link 
-      to="/statistics"  // Changed to just /statistics without projectId
-      className="block hover:bg-gray-50 transition duration-300"
+      to="/statistics"
+      className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300"
     >
-        <div className="flex items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
+        <div className="flex items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm mb-4">
             
             {/* Project Image Placeholder */}
-            <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200 flex-shrink-0"></div>
+            <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200 dark:bg-slate-600 flex-shrink-0"></div>
             
             {/* Project Name and Location */}
             <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-800 truncate">{project.name}</p>
-                <p className="text-sm text-gray-500 truncate">{project.location}</p>
+                <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
             </div>
             
             {/* Task Progress - Real Data */}
             <div className="w-1/4 mx-4 hidden md:block">
-                <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <div className="flex justify-between text-sm text-gray-500 dark:text-slate-400 mb-1">
                     <span>Task</span>
                     <span>{taskProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                     <div 
                         className="bg-green-500 h-2 rounded-full transition-all duration-500" 
                         style={{ width: `${taskProgress}%` }}
@@ -38,11 +39,11 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
             
             {/* Budget Progress - Real Data */}
             <div className="w-1/4 mx-4 hidden md:block">
-                <div className="flex justify-between text-sm text-gray-500 mb-1">
+                <div className="flex justify-between text-sm text-gray-500 dark:text-slate-400 mb-1">
                     <span>Budget</span>
                     <span>{project.contractCost ? `₱${(project.contractCost / 1000000).toFixed(1)}m` : 'N/A'}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                     <div 
                         className={`h-2 rounded-full transition-all duration-500 ${
                             budgetProgress > 90 ? 'bg-red-500' : 
@@ -55,16 +56,18 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
             </div>
             
             {/* Due Date Display */}
-            <div className="w-48 text-center bg-stone-100 p-2 rounded-lg mx-4 hidden lg:block">
-                Due to {new Date(project.contractCompletionDate || project.createdAt).toLocaleDateString()}
+            <div className="w-48 text-center bg-stone-100 dark:bg-slate-700 p-2 rounded-lg mx-4 hidden lg:block">
+                <span className="text-gray-800 dark:text-white">
+                    Due to {new Date(project.contractCompletionDate || project.createdAt).toLocaleDateString()}
+                </span>
             </div>
             
             {/* Status Indicator */}
             <div className="w-20 hidden sm:block">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    project.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                    project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
+                    project.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                    project.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
                 }`}>
                     {project.status || 'Not Started'}
                 </span>
@@ -76,6 +79,8 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
 function DashboardPage() {
     const [projects, setProjects] = useState([]);
     const [projectsWithProgress, setProjectsWithProgress] = useState([]);
+    const [filteredProjects, setFilteredProjects] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -145,6 +150,7 @@ function DashboardPage() {
                 );
                 
                 setProjectsWithProgress(projectsWithProgressData);
+                setFilteredProjects(projectsWithProgressData);
             } catch (err) {
                 console.error('Error fetching projects:', err);
                 setError('Failed to fetch projects. Your session may have expired.');
@@ -155,6 +161,22 @@ function DashboardPage() {
         
         fetchProjectsWithProgress();
     }, [navigate]);
+
+    // Handle search
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredProjects(projectsWithProgress);
+            return;
+        }
+
+        const searchLower = searchQuery.toLowerCase();
+        const filtered = projectsWithProgress.filter(project =>
+            project.name?.toLowerCase().includes(searchLower) ||
+            project.location?.toLowerCase().includes(searchLower) ||
+            project.status?.toLowerCase().includes(searchLower)
+        );
+        setFilteredProjects(filtered);
+    }, [searchQuery, projectsWithProgress]);
 
     // Calculate summary statistics
     const stats = {
@@ -167,38 +189,58 @@ function DashboardPage() {
     };
 
     return (
-        <Layout title="Dashboard">
+        <Layout 
+            title="Dashboard"
+            headerContent={
+                <div className="relative flex-1 max-w-xl ml-8">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-gray-100 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                </div>
+            }
+        >
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <p className="text-sm text-gray-500 mb-1">Total Projects</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.totalProjects}</p>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Total Projects</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalProjects}</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <p className="text-sm text-gray-500 mb-1">Active Projects</p>
-                    <p className="text-2xl font-bold text-blue-600">{stats.activeProjects}</p>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Active Projects</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.activeProjects}</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <p className="text-sm text-gray-500 mb-1">Total Budget</p>
-                    <p className="text-2xl font-bold text-green-600">₱{(stats.totalBudget / 1000000).toFixed(1)}M</p>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Total Budget</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">₱{(stats.totalBudget / 1000000).toFixed(1)}M</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <p className="text-sm text-gray-500 mb-1">Avg. Completion</p>
-                    <p className="text-2xl font-bold text-purple-600">{stats.avgCompletion}%</p>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Avg. Completion</p>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.avgCompletion}%</p>
                 </div>
             </div>
 
             {/* Projects List */}
             <div>
-                <p className="text-gray-500 font-semibold mb-4">ACTIVE PROJECTS {projects.length}</p>
+                <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
+                    {searchQuery ? `SEARCH RESULTS (${filteredProjects.length})` : `ACTIVE PROJECTS (${projects.length})`}
+                </p>
                 
-                {loading && <p className="text-center py-8 text-gray-500">Loading projects...</p>}
-                {error && <p className="text-center py-8 text-red-500">{error}</p>}
+                {loading && (
+                    <p className="text-center py-8 text-gray-500 dark:text-slate-400">Loading projects...</p>
+                )}
+                {error && (
+                    <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
+                )}
                 
                 {!loading && !error && (
                     <div>
-                        {projectsWithProgress.length > 0 ? (
-                            projectsWithProgress.map(project => (
+                        {filteredProjects.length > 0 ? (
+                            filteredProjects.map(project => (
                                 <ProjectRow 
                                     key={project.projectId} 
                                     project={project}
@@ -207,14 +249,18 @@ function DashboardPage() {
                                 />
                             ))
                         ) : (
-                            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                                <p className="text-gray-500 mb-4">No projects found. Create one on the 'Projects' page!</p>
-                                <button 
-                                    onClick={() => navigate('/projects')}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                >
-                                    Create Your First Project
-                                </button>
+                            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
+                                <p className="text-gray-500 dark:text-slate-400 mb-4">
+                                    {searchQuery ? 'No projects match your search.' : 'No projects found. Create one on the "Projects" page!'}
+                                </p>
+                                {!searchQuery && (
+                                    <button 
+                                        onClick={() => navigate('/projects')}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        Create Your First Project
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

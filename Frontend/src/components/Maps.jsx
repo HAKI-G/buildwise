@@ -49,56 +49,38 @@ function Maps() {
     };
 
     const geocodeLocation = async (address) => {
-    setGeocoding(true);
-    try {
-        // Add more context to help OSM find the right location
-        const searchQuery = `${address}, Quezon City, Metro Manila, Philippines`;
-        
-        const response = await axios.get(
-            `https://nominatim.openstreetmap.org/search`,
-            {
-                params: {
-                    q: searchQuery,
-                    format: 'json',
-                    limit: 1,
-                    countrycodes: 'ph', // Restrict to Philippines
-                    addressdetails: 1
+        setGeocoding(true);
+        try {
+            // Add more context to help OSM find the right location
+            const searchQuery = `${address}, Quezon City, Metro Manila, Philippines`;
+            
+            const response = await axios.get(
+                `https://nominatim.openstreetmap.org/search`,
+                {
+                    params: {
+                        q: searchQuery,
+                        format: 'json',
+                        limit: 1,
+                        countrycodes: 'ph', // Restrict to Philippines
+                        addressdetails: 1
+                    }
                 }
+            );
+            
+            if (response.data && response.data.length > 0) {
+                const { lat, lon } = response.data[0];
+                setCoordinates([parseFloat(lat), parseFloat(lon)]);
+            } else {
+                // Default to the general area if exact address not found
+                setCoordinates([14.6760, 121.0437]); // Quezon City center
             }
-        );
-        
-        if (response.data && response.data.length > 0) {
-            const { lat, lon } = response.data[0];
-            setCoordinates([parseFloat(lat), parseFloat(lon)]);
-        } else {
-            // Default to the general area if exact address not found
-            setCoordinates([14.6760, 121.0437]); // Quezon City center
-        }
-    } catch (error) {
-        console.error('Error geocoding location:', error);
-        setCoordinates([14.6760, 121.0437]);
-    } finally {
-        setGeocoding(false);
-    }
-};
-const fallbackToOSM = async (address) => {
-    try {
-        const response = await axios.get(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Philippines')}`
-        );
-        
-        if (response.data && response.data.length > 0) {
-            const { lat, lon } = response.data[0];
-            setCoordinates([parseFloat(lat), parseFloat(lon)]);
-        } else {
-            // Default to Quezon City if nothing found
+        } catch (error) {
+            console.error('Error geocoding location:', error);
             setCoordinates([14.6760, 121.0437]);
+        } finally {
+            setGeocoding(false);
         }
-    } catch (error) {
-        console.error('Error with OSM fallback:', error);
-        setCoordinates([14.6760, 121.0437]);
-    }
-};
+    };
 
     const openInGoogleMaps = () => {
         if (project?.location) {
@@ -121,13 +103,19 @@ const fallbackToOSM = async (address) => {
     };
 
     if (loading) {
-        return <div className="text-center p-8">Loading map...</div>;
+        return (
+            <div className="text-center p-8 text-gray-500 dark:text-slate-400">
+                Loading map...
+            </div>
+        );
     }
 
     if (!project?.location) {
         return (
-            <div className="text-center p-8 bg-white border border-gray-200 rounded-lg">
-                <p className="text-gray-500">No location data available for this project.</p>
+            <div className="text-center p-8 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg">
+                <p className="text-gray-500 dark:text-slate-400">
+                    No location data available for this project.
+                </p>
             </div>
         );
     }
@@ -135,21 +123,33 @@ const fallbackToOSM = async (address) => {
     return (
         <div className="space-y-6">
             {/* Project Location Info */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Project Location</h3>
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 shadow-sm transition-colors">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+                    Project Location
+                </h3>
                 <div className="space-y-3">
                     <div>
-                        <span className="text-sm font-medium text-gray-500">Address:</span>
-                        <p className="text-lg text-gray-800">{project.location}</p>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">
+                            Address:
+                        </span>
+                        <p className="text-lg text-gray-800 dark:text-white">
+                            {project.location}
+                        </p>
                     </div>
                     <div>
-                        <span className="text-sm font-medium text-gray-500">Project Name:</span>
-                        <p className="text-base text-gray-800">{project.name}</p>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">
+                            Project Name:
+                        </span>
+                        <p className="text-base text-gray-800 dark:text-white">
+                            {project.name}
+                        </p>
                     </div>
                     {coordinates && (
                         <div>
-                            <span className="text-sm font-medium text-gray-500">Coordinates:</span>
-                            <p className="text-sm text-gray-600">
+                            <span className="text-sm font-medium text-gray-500 dark:text-slate-400">
+                                Coordinates:
+                            </span>
+                            <p className="text-sm text-gray-600 dark:text-slate-300">
                                 Lat: {coordinates[0].toFixed(6)}, Lon: {coordinates[1].toFixed(6)}
                             </p>
                         </div>
@@ -158,8 +158,10 @@ const fallbackToOSM = async (address) => {
             </div>
 
             {/* Map Actions */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Map Actions</h3>
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 shadow-sm transition-colors">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                    Map Actions
+                </h3>
                 <div className="flex flex-wrap gap-3">
                     <button
                         onClick={openInGoogleMaps}
@@ -193,14 +195,18 @@ const fallbackToOSM = async (address) => {
             </div>
 
             {/* Interactive Map */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Interactive Map</h3>
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 shadow-sm transition-colors">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                    Interactive Map
+                </h3>
                 {geocoding ? (
-                    <div className="w-full h-96 rounded-lg border border-gray-300 flex items-center justify-center bg-gray-50">
-                        <p className="text-gray-500">Finding location on map...</p>
+                    <div className="w-full h-96 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center justify-center bg-gray-50 dark:bg-slate-700">
+                        <p className="text-gray-500 dark:text-slate-400">
+                            Finding location on map...
+                        </p>
                     </div>
                 ) : coordinates ? (
-                    <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-300">
+                    <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-300 dark:border-slate-600">
                         <MapContainer
                             center={coordinates}
                             zoom={15}
@@ -223,19 +229,21 @@ const fallbackToOSM = async (address) => {
                         </MapContainer>
                     </div>
                 ) : (
-                    <div className="w-full h-96 rounded-lg border border-gray-300 flex items-center justify-center bg-gray-50">
-                        <p className="text-gray-500">Unable to locate address on map</p>
+                    <div className="w-full h-96 rounded-lg border border-gray-300 dark:border-slate-600 flex items-center justify-center bg-gray-50 dark:bg-slate-700">
+                        <p className="text-gray-500 dark:text-slate-400">
+                            Unable to locate address on map
+                        </p>
                     </div>
                 )}
-                <p className="text-xs text-gray-500 mt-3">
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-3">
                     <strong>Free Mapping:</strong> Powered by OpenStreetMap - No API fees or usage limits. 
                     Click and drag to pan, scroll to zoom.
                 </p>
             </div>
 
             {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
                     <strong>Navigation Options:</strong> Use "View on Google Maps" for detailed satellite imagery and street view, 
                     or "Get Directions" for turn-by-turn navigation from your current location.
                 </p>
