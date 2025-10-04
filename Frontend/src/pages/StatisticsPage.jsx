@@ -11,7 +11,7 @@ const getToken = () => localStorage.getItem('token');
 
 function StatisticsPage() {
     const navigate = useNavigate();
-    const { projectId } = useParams(); // Get projectId from URL
+    const { projectId } = useParams();
 
     const [projects, setProjects] = useState([]);
     const [selectedProjectId, setSelectedProjectId] = useState(projectId || null);
@@ -92,14 +92,12 @@ function StatisticsPage() {
 
     // Handle project selection
     const handleProjectSelect = (projectId) => {
-        // Navigate to the new URL with the selected project ID
         navigate(`/statistics/${projectId}`);
         setSelectedProjectId(projectId);
     };
 
     // Handle back to project list
     const handleBackToList = () => {
-        // Navigate to statistics page without a project ID
         navigate('/statistics');
         setSelectedProjectId(null);
         setProject(null);
@@ -158,17 +156,17 @@ function StatisticsPage() {
     if (!selectedProjectId) {
         return (
             <Layout title="Statistics">
-                <div className="bg-white rounded-xl shadow-sm p-8">
-                    <h2 className="text-2xl font-bold mb-2 text-gray-800">Select a Project</h2>
-                    <p className="text-gray-600 mb-8">Choose a project to view its statistics and insights.</p>
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-slate-700 transition-colors">
+                    <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Select a Project</h2>
+                    <p className="text-gray-600 dark:text-slate-400 mb-8">Choose a project to view its statistics and insights.</p>
                     
                     {loading ? (
-                        <p className="text-center py-8 text-gray-500">Loading projects...</p>
+                        <p className="text-center py-8 text-gray-500 dark:text-slate-400">Loading projects...</p>
                     ) : error ? (
-                        <p className="text-center py-8 text-red-500">{error}</p>
+                        <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
                     ) : projects.length === 0 ? (
                         <div className="text-center py-12">
-                            <p className="text-gray-500 mb-4">No projects found.</p>
+                            <p className="text-gray-500 dark:text-slate-400 mb-4">No projects found.</p>
                             <button 
                                 onClick={() => navigate('/projects')}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -182,11 +180,11 @@ function StatisticsPage() {
                                 <button
                                     key={proj.projectId}
                                     onClick={() => handleProjectSelect(proj.projectId)}
-                                    className="bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all duration-200 overflow-hidden text-left"
+                                    className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-200 overflow-hidden text-left"
                                 >
                                     <div className="p-6">
-                                        <h3 className="font-bold text-xl text-gray-800 mb-4">{proj.name}</h3>
-                                        <div className="text-sm text-gray-600 space-y-2">
+                                        <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-4">{proj.name}</h3>
+                                        <div className="text-sm text-gray-600 dark:text-slate-400 space-y-2">
                                             <div className="flex justify-between">
                                                 <span className="font-medium">Location:</span>
                                                 <span className="text-right">{proj.location}</span>
@@ -198,9 +196,9 @@ function StatisticsPage() {
                                             <div className="flex justify-between items-center pt-2">
                                                 <span className="font-medium">Status:</span>
                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                    proj.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                    proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-gray-100 text-gray-800'
+                                                    proj.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                    proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
                                                 }`}>{proj.status || 'Not Started'}</span>
                                             </div>
                                         </div>
@@ -215,9 +213,9 @@ function StatisticsPage() {
     }
 
     // STATISTICS VIEW
-    if (loading) return <Layout title="Loading..."><p className="text-center p-8">Loading project statistics...</p></Layout>;
-    if (error) return <Layout title="Error"><p className="text-center p-8 text-red-500">{error}</p></Layout>;
-    if (!project) return <Layout title="No Project"><p className="text-center p-8">Project data could not be found.</p></Layout>;
+    if (loading) return <Layout title="Loading..."><p className="text-center p-8 text-gray-500 dark:text-slate-400">Loading project statistics...</p></Layout>;
+    if (error) return <Layout title="Error"><p className="text-center p-8 text-red-500 dark:text-red-400">{error}</p></Layout>;
+    if (!project) return <Layout title="No Project"><p className="text-center p-8 text-gray-500 dark:text-slate-400">Project data could not be found.</p></Layout>;
 
     return (
         <Layout title={`Statistics: ${project.name}`}>
@@ -225,20 +223,20 @@ function StatisticsPage() {
             <div className="mb-6 flex items-center justify-between">
                 <button
                     onClick={handleBackToList}
-                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium flex items-center gap-2"
                 >
                     ← Back to Project Selection
                 </button>
                 
-                <div className="text-sm text-gray-600">
-                    Viewing: <span className="font-semibold">{project.name}</span>
+                <div className="text-sm text-gray-600 dark:text-slate-400">
+                    Viewing: <span className="font-semibold text-gray-800 dark:text-white">{project.name}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {/* Milestone Status Chart */}
-                <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h2 className="text-lg font-bold text-center mb-4">MILESTONE STATUS</h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">MILESTONE STATUS</h2>
                     <div className="w-full h-64">
                          <ResponsiveContainer>
                             <PieChart>
@@ -253,8 +251,8 @@ function StatisticsPage() {
                 </div>
 
                 {/* Task Priority Chart */}
-                <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h2 className="text-lg font-bold text-center mb-4">TASK PRIORITY</h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK PRIORITY</h2>
                     <div className="w-full h-64">
                          <ResponsiveContainer>
                             <PieChart>
@@ -269,8 +267,8 @@ function StatisticsPage() {
                 </div>
 
                 {/* Pending Items Chart */}
-                <div className="bg-white p-6 rounded-xl border shadow-sm">
-                     <h2 className="text-lg font-bold text-center mb-4">PENDING ITEMS</h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING ITEMS</h2>
                     <div className="w-full h-64">
                         <ResponsiveContainer>
                             <BarChart data={pendingItemsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
@@ -285,25 +283,25 @@ function StatisticsPage() {
                 </div>
 
                 {/* Budget Overview */}
-                <div className="bg-white p-6 rounded-xl border shadow-sm md:col-span-2 xl:col-span-3">
-                    <h2 className="text-lg font-bold text-center mb-4">BUDGET OVERVIEW</h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors">
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">BUDGET OVERVIEW</h2>
                     
                     <div className="grid grid-cols-3 gap-4 mb-6">
-                        <div className="text-center p-4 bg-blue-50 rounded-lg">
-                            <p className="text-xs text-gray-600 mb-1">Total Budget</p>
-                            <p className="text-xl font-bold text-blue-900">₱{budgetData.total.toLocaleString()}</p>
+                        <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Total Budget</p>
+                            <p className="text-xl font-bold text-blue-900 dark:text-blue-300">₱{budgetData.total.toLocaleString()}</p>
                         </div>
-                        <div className="text-center p-4 bg-red-50 rounded-lg">
-                            <p className="text-xs text-gray-600 mb-1">Spent ({budgetData.percentSpent}%)</p>
-                            <p className="text-xl font-bold text-red-900">₱{budgetData.spent.toLocaleString()}</p>
+                        <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800">
+                            <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Spent ({budgetData.percentSpent}%)</p>
+                            <p className="text-xl font-bold text-red-900 dark:text-red-300">₱{budgetData.spent.toLocaleString()}</p>
                         </div>
-                        <div className="text-center p-4 bg-green-50 rounded-lg">
-                            <p className="text-xs text-gray-600 mb-1">Remaining ({budgetData.percentRemaining}%)</p>
-                            <p className="text-xl font-bold text-green-900">₱{budgetData.remaining.toLocaleString()}</p>
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
+                            <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Remaining ({budgetData.percentRemaining}%)</p>
+                            <p className="text-xl font-bold text-green-900 dark:text-green-300">₱{budgetData.remaining.toLocaleString()}</p>
                         </div>
                     </div>
 
-                    <div className="w-full h-16 bg-gray-200 rounded-lg overflow-hidden flex">
+                    <div className="w-full h-16 bg-gray-200 dark:bg-slate-700 rounded-lg overflow-hidden flex">
                         {budgetData.spent > 0 && (
                             <div 
                                 className="bg-red-500 flex items-center justify-center text-white text-sm font-medium"
@@ -327,24 +325,23 @@ function StatisticsPage() {
                     <div className="flex justify-center gap-6 mt-4">
                         <div className="flex items-center">
                             <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
-                            <span className="text-sm text-gray-600">Spent</span>
+                            <span className="text-sm text-gray-600 dark:text-slate-400">Spent</span>
                         </div>
                         <div className="flex items-center">
                             <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
-                            <span className="text-sm text-gray-600">Remaining</span>
+                            <span className="text-sm text-gray-600 dark:text-slate-400">Remaining</span>
                         </div>
                     </div>
 
-                    <div className="text-center mt-4 text-sm text-gray-500">
+                    <div className="text-center mt-4 text-sm text-gray-500 dark:text-slate-400">
                         Total Expenses Logged: {expenses.length}
                     </div>
                 </div>
 
                 {/* Task Timeline - Gantt Chart */}
-                <div className="bg-white p-6 rounded-xl border shadow-sm md:col-span-2 xl:col-span-3">
-                    <h2 className="text-lg font-bold text-center mb-4">TASK TIMELINE - GANTT CHART</h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors">
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK TIMELINE - GANTT CHART</h2>
                     {(() => {
-                        // Filter milestones with valid dates and exclude phases
                         const tasksWithDates = milestones.filter(m => 
                             !m.isPhase && 
                             m.startDate && 
@@ -354,17 +351,14 @@ function StatisticsPage() {
 
                         if (tasksWithDates.length === 0) {
                             return (
-                                <div className="text-center py-12 text-gray-400">
+                                <div className="text-center py-12 text-gray-400 dark:text-slate-500">
                                     <p>No tasks to display in Gantt chart.</p>
                                     <p className="text-sm mt-2">Add tasks with start and end dates in the project detail view.</p>
                                 </div>
                             );
                         }
 
-                        // Get phases for color coding
                         const phases = milestones.filter(m => m.isPhase === true);
-                        
-                        // Calculate date range
                         const allDates = tasksWithDates.flatMap(task => [
                             new Date(task.startDate),
                             new Date(task.endDate || task.targetDate || task.dueDate)
@@ -372,11 +366,9 @@ function StatisticsPage() {
                         
                         const minDate = new Date(Math.min(...allDates));
                         const maxDate = new Date(Math.max(...allDates));
-                        
                         const startYear = minDate.getFullYear();
                         const endYear = maxDate.getFullYear();
                         
-                        // Generate month headers
                         const months = [];
                         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                         
@@ -389,7 +381,7 @@ function StatisticsPage() {
                                     name: monthNames[month],
                                     year: year,
                                     date: new Date(year, month, 1),
-                                    fullDate: new Date(year, month + 1, 0) // Last day of month
+                                    fullDate: new Date(year, month + 1, 0)
                                 });
                             }
                         }
@@ -397,44 +389,33 @@ function StatisticsPage() {
                         return (
                             <div className="overflow-x-auto">
                                 <div style={{ minWidth: `${Math.max(800, months.length * 100 + 200)}px` }}>
-                                    {/* Timeline Header */}
                                     <div className="grid gap-0 mb-2" style={{ gridTemplateColumns: `200px repeat(${months.length}, 100px)` }}>
-                                        <div className="bg-teal-500 text-white text-center py-2 text-xs font-medium sticky left-0 z-10">Task</div>
+                                        <div className="bg-teal-500 dark:bg-teal-600 text-white text-center py-2 text-xs font-medium sticky left-0 z-10">Task</div>
                                         {months.map((month, index) => (
-                                            <div key={index} className="bg-teal-500 text-white text-center py-2 text-xs font-medium border-l border-teal-400">
+                                            <div key={index} className="bg-teal-500 dark:bg-teal-600 text-white text-center py-2 text-xs font-medium border-l border-teal-400 dark:border-teal-700">
                                                 <div>{month.name}</div>
-                                                {(index === 0 || month.name === 'Jan') && (
-                                                    <div className="text-xs opacity-75">{month.year}</div>
-                                                )}
+                                                {(index === 0 || month.name === 'Jan') && <div className="text-xs opacity-75">{month.year}</div>}
                                             </div>
                                         ))}
                                     </div>
                                     
-                                    {/* Timeline Rows */}
                                     {tasksWithDates.map((task) => {
                                         const taskStart = new Date(task.startDate);
                                         const taskEnd = new Date(task.endDate || task.targetDate || task.dueDate);
-                                        
-                                        // Get parent phase color or use default
                                         const parentPhase = phases.find(p => p.milestoneId === task.parentPhase);
                                         const taskColor = parentPhase?.phaseColor || '#6B7280';
                                         
-                                        // Calculate which months this task spans
                                         const taskMonths = months.map((month, index) => {
                                             const monthStart = month.date;
                                             const monthEnd = month.fullDate;
                                             
-                                            // Check if task overlaps with this month
                                             if (taskStart > monthEnd || taskEnd < monthStart) return null;
                                             
-                                            // Calculate overlap percentages
                                             const overlapStart = new Date(Math.max(taskStart, monthStart));
                                             const overlapEnd = new Date(Math.min(taskEnd, monthEnd));
-                                            
                                             const monthDays = monthEnd.getDate();
                                             const startDay = overlapStart.getMonth() === month.date.getMonth() ? overlapStart.getDate() : 1;
                                             const endDay = overlapEnd.getMonth() === month.date.getMonth() ? overlapEnd.getDate() : monthDays;
-                                            
                                             const leftOffset = ((startDay - 1) / monthDays) * 100;
                                             const rightOffset = ((monthDays - endDay) / monthDays) * 100;
                                             
@@ -449,10 +430,7 @@ function StatisticsPage() {
                                         
                                         return (
                                             <div key={task.milestoneId} className="grid gap-0 mb-1" style={{ gridTemplateColumns: `200px repeat(${months.length}, 100px)` }}>
-                                                <div 
-                                                    className="text-white px-2 py-2 text-xs font-medium flex items-center sticky left-0 z-10"
-                                                    style={{ backgroundColor: taskColor }}
-                                                >
+                                                <div className="text-white px-2 py-2 text-xs font-medium flex items-center sticky left-0 z-10" style={{ backgroundColor: taskColor }}>
                                                     <div className="flex items-center w-full min-w-0">
                                                         {task.isKeyMilestone && <span className="mr-1 text-yellow-300 flex-shrink-0">♦</span>}
                                                         <span className="truncate">{task.milestoneName || task.title || task.name}</span>
@@ -461,16 +439,9 @@ function StatisticsPage() {
                                                 {months.map((month, monthIndex) => {
                                                     const taskMonth = taskMonths.find(tm => tm.index === monthIndex);
                                                     return (
-                                                        <div key={monthIndex} className="bg-gray-200 relative h-8 border-l border-gray-300">
+                                                        <div key={monthIndex} className="bg-gray-200 dark:bg-slate-700 relative h-8 border-l border-gray-300 dark:border-slate-600">
                                                             {taskMonth && (
-                                                                <div 
-                                                                    className="absolute h-4 top-2 opacity-80 rounded-sm"
-                                                                    style={{ 
-                                                                        backgroundColor: taskColor,
-                                                                        left: `${taskMonth.leftOffset}%`,
-                                                                        right: `${taskMonth.rightOffset}%`
-                                                                    }}
-                                                                />
+                                                                <div className="absolute h-4 top-2 opacity-80 rounded-sm" style={{ backgroundColor: taskColor, left: `${taskMonth.leftOffset}%`, right: `${taskMonth.rightOffset}%` }} />
                                                             )}
                                                             {task.isKeyMilestone && taskMonth?.isStart && (
                                                                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
@@ -485,26 +456,14 @@ function StatisticsPage() {
                                     })}
                                 </div>
                                 
-                                {/* Phase Legend */}
                                 {phases.length > 0 && (
                                     <div className="mt-4 flex flex-wrap gap-3 justify-center">
                                         {phases.map(phase => (
                                             <div key={phase.milestoneId} className="flex items-center">
-                                                <div 
-                                                    className="w-3 h-3 rounded mr-2"
-                                                    style={{ backgroundColor: phase.phaseColor || '#6B7280' }}
-                                                ></div>
-                                                <span className="text-xs text-gray-600">
-                                                    {phase.milestoneName || phase.title || phase.name || 'Unnamed Phase'}
-                                                </span>
+                                                <div className="w-3 h-3 rounded mr-2" style={{ backgroundColor: phase.phaseColor || '#6B7280' }}></div>
+                                                <span className="text-xs text-gray-600 dark:text-slate-400">{phase.milestoneName || phase.title || phase.name || 'Unnamed Phase'}</span>
                                             </div>
                                         ))}
-                                        {phases.length === 0 && (
-                                            <div className="flex items-center">
-                                                <div className="w-3 h-3 rounded mr-2 bg-gray-500"></div>
-                                                <span className="text-xs text-gray-600">Unassigned Tasks</span>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                             </div>

@@ -11,7 +11,6 @@ function Liquidation() {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
-    // Form state
     const [formData, setFormData] = useState({
         name: '',
         purpose: '',
@@ -59,7 +58,6 @@ function Liquidation() {
         const newExpenses = [...formData.expenses];
         newExpenses[index][field] = value;
 
-        // Auto-calculate amount if quantity and itemPrice are present
         if (field === 'quantity' || field === 'itemPrice') {
             const qty = parseFloat(newExpenses[index].quantity) || 0;
             const price = parseFloat(newExpenses[index].itemPrice) || 0;
@@ -156,7 +154,7 @@ function Liquidation() {
             expensePeriodTo: liquidation.expensePeriodTo?.split('T')[0] || '',
             expenses: liquidation.expenses
         });
-        setEditingId(liquidation.liquidationId); // CHANGED: _id to liquidationId
+        setEditingId(liquidation.liquidationId);
         setShowForm(true);
     };
 
@@ -208,7 +206,6 @@ function Liquidation() {
                 config
             );
             
-            // Create download link
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -225,14 +222,14 @@ function Liquidation() {
     const totals = calculateTotals();
 
     if (loading) {
-        return <div className="text-center p-8">Loading liquidation reports...</div>;
+        return <div className="text-center p-8 text-gray-900 dark:text-white">Loading liquidation reports...</div>;
     }
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Liquidation Reports</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Liquidation Reports</h2>
                 <button
                     onClick={() => {
                         resetForm();
@@ -246,32 +243,32 @@ function Liquidation() {
 
             {/* Form */}
             {showForm && (
-                <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm space-y-6">
+                <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 shadow-sm space-y-6 transition-colors">
                     <div className="text-center mb-4">
-                        <h2 className="text-xl font-bold text-gray-800">Liquidation Report</h2>
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Liquidation Report</h2>
                     </div>
 
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Name</label>
                             <input
                                 type="text"
                                 name="name"
                                 value={formData.name}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Purpose</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Purpose</label>
                             <input
                                 type="text"
                                 name="purpose"
                                 value={formData.purpose}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
                         </div>
@@ -280,7 +277,7 @@ function Liquidation() {
                     {/* Budget & Period */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                 Budget Amount (₱)
                             </label>
                             <input
@@ -289,12 +286,12 @@ function Liquidation() {
                                 value={formData.budgetAmount}
                                 onChange={handleInputChange}
                                 step="0.01"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                 Period From
                             </label>
                             <input
@@ -302,12 +299,12 @@ function Liquidation() {
                                 name="expensePeriodFrom"
                                 value={formData.expensePeriodFrom}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                 Period To
                             </label>
                             <input
@@ -315,7 +312,7 @@ function Liquidation() {
                                 name="expensePeriodTo"
                                 value={formData.expensePeriodTo}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
                         </div>
@@ -323,19 +320,19 @@ function Liquidation() {
 
                     {/* Expense Table */}
                     <div className="overflow-x-auto">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">Expense Report</h3>
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-blue-50">
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Expense Report</h3>
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead className="bg-blue-50 dark:bg-blue-900/20">
                                 <tr>
-                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Particulars</th>
-                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
-                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Quantity</th>
-                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Item Price (₱)</th>
-                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount (₱)</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Particulars</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Type</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Quantity</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Item Price (₱)</th>
+                                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Amount (₱)</th>
                                     <th className="px-3 py-3"></th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                                 {formData.expenses.map((expense, index) => (
                                     <tr key={index}>
                                         <td className="px-3 py-2">
@@ -343,21 +340,15 @@ function Liquidation() {
                                                 type="text"
                                                 value={expense.unit || ''}
                                                 onChange={(e) => handleExpenseChange(index, 'unit', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded"
-                                                placeholder={
-                                                    expense.expenseType === 'Labor' ? 'days' :
-                                                    expense.expenseType === 'Materials' ? 'pcs/bags/m' :
-                                                    expense.expenseType === 'Transportation' ? 'trip' :
-                                                    expense.expenseType === 'Equipment' ? 'hours/days' :
-                                                    'unit'
-                                                }
+                                                className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                                                placeholder="unit"
                                             />
                                         </td>
                                         <td className="px-3 py-2">
                                             <select
                                                 value={expense.expenseType}
                                                 onChange={(e) => handleExpenseChange(index, 'expenseType', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded"
+                                                className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                                                 required
                                             >
                                                 <option value="">Select</option>
@@ -373,7 +364,7 @@ function Liquidation() {
                                                 type="number"
                                                 value={expense.quantity}
                                                 onChange={(e) => handleExpenseChange(index, 'quantity', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded"
+                                                className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                                                 step="0.01"
                                                 placeholder="0"
                                                 required
@@ -384,7 +375,7 @@ function Liquidation() {
                                                 type="number"
                                                 value={expense.itemPrice}
                                                 onChange={(e) => handleExpenseChange(index, 'itemPrice', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded"
+                                                className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                                                 step="0.01"
                                                 placeholder="0.00"
                                                 required
@@ -395,7 +386,7 @@ function Liquidation() {
                                                 type="number"
                                                 value={expense.amount}
                                                 readOnly
-                                                className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-50"
+                                                className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white"
                                                 placeholder="0.00"
                                             />
                                         </td>
@@ -404,7 +395,7 @@ function Liquidation() {
                                                 <button
                                                     type="button"
                                                     onClick={() => removeExpenseRow(index)}
-                                                    className="text-red-600 hover:text-red-800"
+                                                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                                                 >
                                                     ✕
                                                 </button>
@@ -417,27 +408,27 @@ function Liquidation() {
                         <button
                             type="button"
                             onClick={addExpenseRow}
-                            className="mt-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-800"
+                            className="mt-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                         >
                             + Add Expense Row
                         </button>
                     </div>
 
                     {/* Summary */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">Summary</h3>
+                    <div className="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Summary</h3>
                         <div className="space-y-2">
                             <div className="flex justify-between">
-                                <span className="font-medium">Amount of Cash Advance:</span>
-                                <span className="font-bold">₱{totals.cashAdvance}</span>
+                                <span className="font-medium text-gray-700 dark:text-slate-300">Amount of Cash Advance:</span>
+                                <span className="font-bold text-gray-900 dark:text-white">₱{totals.cashAdvance}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="font-medium">Total Amount Spent:</span>
-                                <span className="font-bold">₱{totals.totalSpent}</span>
+                                <span className="font-medium text-gray-700 dark:text-slate-300">Total Amount Spent:</span>
+                                <span className="font-bold text-gray-900 dark:text-white">₱{totals.totalSpent}</span>
                             </div>
-                            <div className="flex justify-between border-t pt-2">
-                                <span className="font-medium">Disbursement:</span>
-                                <span className={`font-bold ${parseFloat(totals.disbursement) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            <div className="flex justify-between border-t dark:border-slate-700 pt-2">
+                                <span className="font-medium text-gray-700 dark:text-slate-300">Disbursement:</span>
+                                <span className={`font-bold ${parseFloat(totals.disbursement) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                     ₱{totals.disbursement}
                                 </span>
                             </div>
@@ -452,7 +443,7 @@ function Liquidation() {
                                 resetForm();
                                 setShowForm(false);
                             }}
-                            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
                         >
                             Cancel
                         </button>
@@ -469,36 +460,36 @@ function Liquidation() {
             {/* List of Liquidations */}
             <div className="space-y-4">
                 {liquidations.length === 0 ? (
-                    <div className="text-center p-8 bg-white border border-gray-200 rounded-lg">
-                        <p className="text-gray-500">No liquidation reports yet. Click "New Liquidation Report" to create one.</p>
+                    <div className="text-center p-8 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg">
+                        <p className="text-gray-500 dark:text-slate-400">No liquidation reports yet. Click "New Liquidation Report" to create one.</p>
                     </div>
                 ) : (
                     liquidations.map((liquidation) => (
-                        <div key={liquidation.liquidationId} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <div key={liquidation.liquidationId} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 shadow-sm transition-colors">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-800">{liquidation.name}</h3>
-                                    <p className="text-sm text-gray-600">{liquidation.purpose}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{liquidation.name}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-slate-400">{liquidation.purpose}</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                                         Period: {new Date(liquidation.expensePeriodFrom).toLocaleDateString()} - {new Date(liquidation.expensePeriodTo).toLocaleDateString()}
                                     </p>
                                 </div>
                                 <div className="flex space-x-2">
                                     <button
                                         onClick={() => handleDownloadPDF(liquidation.liquidationId, liquidation.name)}
-                                        className="px-3 py-1 text-sm text-green-600 hover:bg-green-50 rounded"
+                                        className="px-3 py-1 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
                                     >
                                         Download PDF
                                     </button>
                                     <button
                                         onClick={() => handleEdit(liquidation)}
-                                        className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+                                        className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
                                     >
                                         Edit
                                     </button>
                                     <button
                                         onClick={() => handleDelete(liquidation.liquidationId)}
-                                        className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                                        className="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                                     >
                                         Delete
                                     </button>
@@ -506,17 +497,17 @@ function Liquidation() {
                             </div>
 
                             <div className="grid grid-cols-3 gap-4 mb-4">
-                                <div className="bg-blue-50 p-3 rounded">
-                                    <p className="text-xs text-gray-600">Cash Advance</p>
-                                    <p className="text-lg font-bold text-gray-800">₱{liquidation.budgetAmount.toLocaleString()}</p>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                                    <p className="text-xs text-gray-600 dark:text-slate-400">Cash Advance</p>
+                                    <p className="text-lg font-bold text-gray-800 dark:text-white">₱{liquidation.budgetAmount.toLocaleString()}</p>
                                 </div>
-                                <div className="bg-green-50 p-3 rounded">
-                                    <p className="text-xs text-gray-600">Total Spent</p>
-                                    <p className="text-lg font-bold text-gray-800">₱{liquidation.totalSpent.toLocaleString()}</p>
+                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded">
+                                    <p className="text-xs text-gray-600 dark:text-slate-400">Total Spent</p>
+                                    <p className="text-lg font-bold text-gray-800 dark:text-white">₱{liquidation.totalSpent.toLocaleString()}</p>
                                 </div>
-                                <div className={`p-3 rounded ${liquidation.disbursement < 0 ? 'bg-red-50' : 'bg-green-50'}`}>
-                                    <p className="text-xs text-gray-600">Disbursement</p>
-                                    <p className={`text-lg font-bold ${liquidation.disbursement < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                <div className={`p-3 rounded ${liquidation.disbursement < 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-green-50 dark:bg-green-900/20'}`}>
+                                    <p className="text-xs text-gray-600 dark:text-slate-400">Disbursement</p>
+                                    <p className={`text-lg font-bold ${liquidation.disbursement < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                         ₱{liquidation.disbursement.toLocaleString()}
                                     </p>
                                 </div>
@@ -524,20 +515,19 @@ function Liquidation() {
 
                             <div className="overflow-x-auto">
                                 <table className="min-w-full text-sm">
-                                    <thead className="bg-blue-50">
+                                    <thead className="bg-blue-50 dark:bg-blue-900/20">
                                         <tr>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Particulars</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Quantity</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Unit</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Item Price (₱)</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase">Amount (₱)</th>
-                                            <th className="px-3 py-3"></th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Particulars</th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Type</th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Quantity</th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Unit</th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Item Price (₱)</th>
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-slate-300 uppercase">Amount (₱)</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                                     {liquidation.expenses.map((expense, idx) => (
-                                        <tr key={idx}>
+                                        <tr key={idx} className="dark:text-slate-300">
                                             <td className="px-3 py-2">{expense.particulars}</td>
                                             <td className="px-3 py-2">{expense.expenseType}</td>
                                             <td className="px-3 py-2 text-right">{expense.quantity} {expense.unit || ''}</td>

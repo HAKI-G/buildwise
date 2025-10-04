@@ -18,8 +18,8 @@ const getToken = () => localStorage.getItem('token');
 // Reusable component for the key-value pairs in the project profile
 const ProfileItem = ({ label, value }) => (
     <div>
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</div>
-        <div className="text-lg font-medium text-gray-800 truncate">{value}</div>
+        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">{label}</div>
+        <div className="text-lg font-medium text-gray-800 dark:text-white truncate">{value}</div>
     </div>
 );
 
@@ -29,8 +29,8 @@ const TabButton = ({ label, activeTab, setActiveTab }) => (
         onClick={() => setActiveTab(label.toLowerCase())}
         className={`px-4 py-2 font-semibold text-sm rounded-t-lg focus:outline-none transition-colors duration-200 ${
             activeTab === label.toLowerCase()
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300'
+                ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-slate-600'
         }`}
     >
         {label}
@@ -102,14 +102,14 @@ function ProjectDetailPage() {
     };
 
     // --- Render Logic ---
-    if (loading) return <Layout title="Loading..."><p className="text-center p-8">Loading project details...</p></Layout>;
-    if (error) return <Layout title="Error"><p className="text-center text-red-500 p-8">{error}</p></Layout>;
+    if (loading) return <Layout title="Loading..."><p className="text-center p-8 text-gray-500 dark:text-slate-400">Loading project details...</p></Layout>;
+    if (error) return <Layout title="Error"><p className="text-center text-red-500 dark:text-red-400 p-8">{error}</p></Layout>;
 
     return (
         <Layout title={project ? project.name : 'Project Details'}>
             
             {/* --- Project Profile Section --- */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-8 gap-y-6 shadow-sm">
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-8 gap-y-6 shadow-sm transition-colors">
                 <ProfileItem label="Project Name" value={project?.name || 'N/A'} />
                 <ProfileItem label="Location" value={project?.location || 'N/A'} />
                 <ProfileItem label="Contractor" value={project?.contractor || 'N/A'} />
@@ -124,15 +124,15 @@ function ProjectDetailPage() {
 
             {/* --- Interactive Tabs Section --- */}
             <div>
-                <div className="border-b border-gray-200">
+                <div className="border-b border-gray-200 dark:border-slate-700">
                     <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                         <TabButton label="Milestones" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Updates" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Liquidation" activeTab={activeTab} setActiveTab={setActiveTab} /> {/* NEW TAB */}
-                        <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} /> {/* NEW TAB */}
+                        <TabButton label="Liquidation" activeTab={activeTab} setActiveTab={setActiveTab} />
+                        <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} />
                     </nav>
                 </div>
 
