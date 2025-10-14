@@ -13,7 +13,6 @@ import commentRoutes from './routes/commentRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
-import liquidationRoutes from './routes/liquidationRoutes.js'; 
 import authRoutes from './routes/authRoutes.js';        
 import adminRoutes from './routes/adminRoutes.js';
 
@@ -36,7 +35,6 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/expenses', expenseRoutes); 
 app.use('/api/tasks', taskRoutes);
-app.use('/api/projects', liquidationRoutes); // Liquidation routes
 app.use('/api/documents', documentRoutes);
 
 // --- Server Start ---

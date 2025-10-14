@@ -9,7 +9,6 @@ import Updates from '../components/Updates.jsx';
 import Photos from '../components/Photos.jsx';
 import Comments from '../components/Comments.jsx';
 import Documents from '../components/Documents.jsx';
-import Liquidation from '../components/Liquidation.jsx'; 
 import Maps from '../components/Maps.jsx';
 
 // Helper to get token
@@ -92,8 +91,6 @@ function ProjectDetailPage() {
                 return <Comments />;
             case 'documents':
                 return <Documents />;
-            case 'liquidation':
-                return <Liquidation />;
             case 'maps': 
                 return <Maps />;
             default:
@@ -131,7 +128,6 @@ function ProjectDetailPage() {
                         <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Liquidation" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} />
                     </nav>
                 </div>
