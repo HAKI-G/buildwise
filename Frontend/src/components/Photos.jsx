@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import axios from 'axios';
 
 const Photos = () => {
+    const { projectId } = useParams();
     const [photos, setPhotos] = useState([]);
+    const [milestones, setMilestones] = useState([]);
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [photoCaption, setPhotoCaption] = useState('');
+    const [selectedMilestone, setSelectedMilestone] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedUpdateId, setSelectedUpdateId] = useState('');
@@ -14,6 +19,7 @@ const Photos = () => {
 
     useEffect(() => {
         loadAllPhotos();
+        loadMilestones();
     }, []);
 
     const loadAllPhotos = async () => {
@@ -35,6 +41,24 @@ const Photos = () => {
             setPhotos([]);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadMilestones = async () => {
+        if (!projectId) return;
+        
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(`${API_URL}/milestones/project/${projectId}`, config);
+            
+            // Get only tasks (not phases)
+            const tasks = response.data.filter(item => !item.isPhase);
+            setMilestones(tasks);
+        } catch (error) {
+            console.error('Error loading milestones:', error);
         }
     };
 
@@ -66,6 +90,9 @@ const Photos = () => {
             const formData = new FormData();
             formData.append('photo', selectedFile);
             formData.append('caption', photoCaption || 'No caption');
+            if (selectedMilestone) {
+                formData.append('milestoneId', selectedMilestone);
+            }
             
             const response = await fetch(`${API_URL}/photos/${selectedUpdateId}`, {
                 method: 'POST',
@@ -83,8 +110,9 @@ const Photos = () => {
             setSelectedFile(null);
             setPhotoCaption('');
             setSelectedUpdateId('');
+            setSelectedMilestone('');
             
-            alert('Photo uploaded successfully!');
+            alert('Photo uploaded and analyzed successfully!');
             
         } catch (error) {
             console.error('Upload error:', error);
@@ -191,6 +219,14 @@ const Photos = () => {
                                         <span className="text-gray-500 dark:text-slate-400 text-sm">No preview</span>
                                     </div>
                                 )}
+                                {/* AI Status Badge */}
+                                {photo.aiProcessed && (
+                                    <div className="absolute top-2 right-2">
+                                        <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                                            ✓ AI Analyzed
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                             <div className="p-4">
                                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
@@ -199,6 +235,9 @@ const Photos = () => {
                                 <div className="text-xs text-gray-500 dark:text-slate-400 space-y-1">
                                     <p><span className="font-medium">Update:</span> {photo.updateId}</p>
                                     <p><span className="font-medium">Uploaded:</span> {new Date(photo.uploadedAt).toLocaleDateString()}</p>
+                                    {photo.aiSuggestion && (
+                                        <p><span className="font-medium">AI Detected:</span> {photo.aiSuggestion.milestone}</p>
+                                    )}
                                 </div>
                                 <div className="mt-4 flex justify-end gap-2">
                                     <button 
@@ -227,7 +266,7 @@ const Photos = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No photos uploaded yet</h3>
-                    <p className="text-gray-500 dark:text-slate-400 mb-6">Upload your first project photo to get started</p>
+                    <p className="text-gray-500 dark:text-slate-400 mb-6">Upload your first project photo to get AI analysis</p>
                     <button
                         onClick={() => setShowUploadModal(true)}
                         className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -240,7 +279,7 @@ const Photos = () => {
             {/* Upload Modal */}
             {showUploadModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">Upload Photo</h3>
                             <button
@@ -249,6 +288,7 @@ const Photos = () => {
                                     setSelectedFile(null);
                                     setPhotoCaption('');
                                     setSelectedUpdateId('');
+                                    setSelectedMilestone('');
                                 }}
                                 disabled={isUploading}
                                 className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
@@ -272,6 +312,29 @@ const Photos = () => {
                                     className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     disabled={isUploading}
                                 />
+                            </div>
+
+                            {/* NEW: Milestone Dropdown */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                                    Related Task/Milestone (Optional)
+                                </label>
+                                <select
+                                    value={selectedMilestone}
+                                    onChange={(e) => setSelectedMilestone(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    disabled={isUploading}
+                                >
+                                    <option value="">Select a task...</option>
+                                    {milestones.map((milestone) => (
+                                        <option key={milestone.milestoneId} value={milestone.milestoneId}>
+                                            {milestone.milestoneName || milestone.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                                    Link this photo to a specific task for better organization
+                                </p>
                             </div>
                             
                             <div>
@@ -317,6 +380,7 @@ const Photos = () => {
                                     setSelectedFile(null);
                                     setPhotoCaption('');
                                     setSelectedUpdateId('');
+                                    setSelectedMilestone('');
                                 }}
                                 disabled={isUploading}
                                 className="px-6 py-2 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50"
@@ -326,9 +390,12 @@ const Photos = () => {
                             <button
                                 onClick={handleUpload}
                                 disabled={isUploading || !selectedFile || !selectedUpdateId}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
-                                {isUploading ? 'Uploading...' : 'Upload Photo'}
+                                {isUploading && (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                )}
+                                {isUploading ? 'Uploading & Analyzing...' : 'Upload Photo'}
                             </button>
                         </div>
                     </div>

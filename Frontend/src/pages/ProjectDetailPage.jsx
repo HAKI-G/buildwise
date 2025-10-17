@@ -9,8 +9,8 @@ import Updates from '../components/Updates.jsx';
 import Photos from '../components/Photos.jsx';
 import Comments from '../components/Comments.jsx';
 import Documents from '../components/Documents.jsx';
-import Liquidation from '../components/Liquidation.jsx'; 
 import Maps from '../components/Maps.jsx';
+import Reports from '../components/Reports.jsx'; // ✅ NEW: Import Reports
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -36,7 +36,6 @@ const TabButton = ({ label, activeTab, setActiveTab }) => (
         {label}
     </button>
 );
-
 
 function ProjectDetailPage() {
     const { projectId } = useParams();
@@ -88,12 +87,12 @@ function ProjectDetailPage() {
                 return <Updates />;
             case 'photos':
                 return <Photos />;
+            case 'reports': // ✅ NEW: Add Reports case
+                return <Reports />;
             case 'comments':
                 return <Comments />;
             case 'documents':
                 return <Documents />;
-            case 'liquidation':
-                return <Liquidation />;
             case 'maps': 
                 return <Maps />;
             default:
@@ -129,9 +128,10 @@ function ProjectDetailPage() {
                         <TabButton label="Milestones" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Updates" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
+                        {/* ✅ NEW: Add Reports Tab */}
+                        <TabButton label="Reports" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Liquidation" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} />
                     </nav>
                 </div>
