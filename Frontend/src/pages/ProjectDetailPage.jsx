@@ -10,7 +10,7 @@ import Photos from '../components/Photos.jsx';
 import Comments from '../components/Comments.jsx';
 import Documents from '../components/Documents.jsx';
 import Maps from '../components/Maps.jsx';
-import Reports from '../components/Reports.jsx'; // ✅ NEW: Import Reports
+import Reports from '../components/Reports.jsx';
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -38,7 +38,7 @@ const TabButton = ({ label, activeTab, setActiveTab }) => (
 );
 
 function ProjectDetailPage() {
-    const { projectId } = useParams();
+    const { projectId } = useParams(); // ✅ Get projectId from URL
     const navigate = useNavigate();
 
     // --- State Management ---
@@ -46,6 +46,12 @@ function ProjectDetailPage() {
     const [activeTab, setActiveTab] = useState('milestones');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    // ✅ Debug: Log projectId to console
+    useEffect(() => {
+        console.log('🔍 ProjectDetailPage loaded');
+        console.log('📁 projectId from URL:', projectId);
+    }, [projectId]);
 
     // --- Data Fetching ---
     const fetchProjectData = useCallback(async () => {
@@ -61,6 +67,7 @@ function ProjectDetailPage() {
             // Fetch project data
             const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
             setProject(projectRes.data);
+            console.log('✅ Project data loaded:', projectRes.data);
             
         } catch (err) {
             if (err.response && err.response.status === 401) {
@@ -79,24 +86,27 @@ function ProjectDetailPage() {
     }, [fetchProjectData]);
 
     // --- Render Tab Content ---
+    // ✅ CRITICAL: Pass projectId to ALL components
     const renderTabContent = () => {
+        console.log('🎯 Rendering tab:', activeTab, 'with projectId:', projectId);
+        
         switch(activeTab) {
             case 'milestones':
-                return <Milestones />;
+                return <Milestones projectId={projectId} />;
             case 'updates':
-                return <Updates />;
+                return <Updates projectId={projectId} />;
             case 'photos':
-                return <Photos />;
-            case 'reports': // ✅ NEW: Add Reports case
-                return <Reports />;
+                return <Photos projectId={projectId} />; // ✅ CRITICAL LINE
+            case 'reports':
+                return <Reports projectId={projectId} />;
             case 'comments':
-                return <Comments />;
+                return <Comments projectId={projectId} />;
             case 'documents':
-                return <Documents />;
+                return <Documents projectId={projectId} />;
             case 'maps': 
-                return <Maps />;
+                return <Maps projectId={projectId} />;
             default:
-                return <Milestones />;
+                return <Milestones projectId={projectId} />;
         }
     };
 
@@ -128,7 +138,6 @@ function ProjectDetailPage() {
                         <TabButton label="Milestones" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Updates" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        {/* ✅ NEW: Add Reports Tab */}
                         <TabButton label="Reports" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
                         <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />

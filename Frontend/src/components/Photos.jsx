@@ -1,408 +1,422 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import { useState, useEffect } from "react";
+import { Upload, Trash2, Eye, CheckCircle, Image as ImageIcon } from "lucide-react";
+import axios from "axios";
 
-const Photos = () => {
-    const { projectId } = useParams();
-    const [photos, setPhotos] = useState([]);
-    const [milestones, setMilestones] = useState([]);
-    const [showUploadModal, setShowUploadModal] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [photoCaption, setPhotoCaption] = useState('');
-    const [selectedMilestone, setSelectedMilestone] = useState('');
-    const [isUploading, setIsUploading] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [selectedUpdateId, setSelectedUpdateId] = useState('');
-    const [error, setError] = useState(null);
-    
-    const API_URL = 'http://localhost:5001/api';
+const API_URL = "http://localhost:5001/api";
+const getToken = () => localStorage.getItem("token");
 
-    useEffect(() => {
-        loadAllPhotos();
-        loadMilestones();
-    }, []);
+const Photos = ({ projectId }) => {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [caption, setCaption] = useState("");
+  const [selectedMilestone, setSelectedMilestone] = useState(""); // ✅ NEW: Milestone selection
+  const [viewModal, setViewModal] = useState(null);
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
-    const loadAllPhotos = async () => {
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const response = await fetch(`${API_URL}/photos/all/list`);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to load photos: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            setPhotos(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Error loading all photos:', error);
-            setError(error.message);
-            setPhotos([]);
-        } finally {
-            setIsLoading(false);
+  // ✅ Milestone options (matching your dataset)
+  const MILESTONES = [
+    { value: "", label: "Select Milestone" },
+    { value: "excavation_earthwork", label: "Excavation/Earthwork" },
+    { value: "foundation", label: "Foundation" },
+    { value: "rebar_installation", label: "Rebar Installation" },
+    { value: "structural_frame", label: "Structural Frame" },
+    { value: "roofing", label: "Roofing" },
+    { value: "drywall_interior_walls", label: "Drywall/Interior Walls" },
+    { value: "hvac_systems", label: "HVAC Systems" },
+    { value: "electrical_conduits_wiring", label: "Electrical Conduits/Wiring" },
+    { value: "piping_plumbing", label: "Piping/Plumbing" }
+  ];
+
+  // ✅ Fetch only CONFIRMED photos when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      fetchConfirmedPhotosForProject();
+    }
+  }, [projectId]);
+
+  // ✅ Fetch ONLY confirmed photos for this specific project
+  const fetchConfirmedPhotosForProject = async () => {
+    if (!projectId) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${API_URL}/photos/project/${projectId}`,
+        {
+          headers: { Authorization: `Bearer ${getToken()}` },
         }
-    };
+      );
+      
+      // ✅ FILTER: Only show confirmed photos
+      const confirmedOnly = response.data.filter(
+        photo => photo.confirmationStatus === 'confirmed'
+      );
+      
+      setPhotos(confirmedOnly);
+      console.log(`✅ Loaded ${confirmedOnly.length} confirmed photos for project ${projectId}`);
+    } catch (err) {
+      console.error("Error fetching photos:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const loadMilestones = async () => {
-        if (!projectId) return;
-        
-        const token = localStorage.getItem('token');
-        if (!token) return;
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
 
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`${API_URL}/milestones/project/${projectId}`, config);
-            
-            // Get only tasks (not phases)
-            const tasks = response.data.filter(item => !item.isPhase);
-            setMilestones(tasks);
-        } catch (error) {
-            console.error('Error loading milestones:', error);
-        }
-    };
+  // ✅ NEW: Generate unique Update ID
+  const generateUpdateId = () => {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `UPD-${timestamp}-${random}`;
+  };
 
-    const handleFileSelect = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            if (!file.type.startsWith('image/')) {
-                alert('Please select an image file');
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
-                return;
-            }
-            setSelectedFile(file);
-        }
-    };
+  // Upload photo
+  const handleUpload = async () => {
+    if (!selectedFile || !projectId) {
+      alert("Please select a file");
+      return;
+    }
 
-    const handleUpload = async () => {
-        if (!selectedFile || !selectedUpdateId) {
-            alert('Please select a file and enter an update ID.');
-            return;
-        }
+    if (!selectedMilestone) {
+      alert("Please select a milestone");
+      return;
+    }
 
-        setIsUploading(true);
-        setError(null);
-        
-        try {
-            const formData = new FormData();
-            formData.append('photo', selectedFile);
-            formData.append('caption', photoCaption || 'No caption');
-            if (selectedMilestone) {
-                formData.append('milestoneId', selectedMilestone);
-            }
-            
-            const response = await fetch(`${API_URL}/photos/${selectedUpdateId}`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-            }
-            
-            await loadAllPhotos();
-            
-            setShowUploadModal(false);
-            setSelectedFile(null);
-            setPhotoCaption('');
-            setSelectedUpdateId('');
-            setSelectedMilestone('');
-            
-            alert('Photo uploaded and analyzed successfully!');
-            
-        } catch (error) {
-            console.error('Upload error:', error);
-            setError(error.message);
-            alert(`Failed to upload photo: ${error.message}`);
-        } finally {
-            setIsUploading(false);
-        }
-    };
+    setUploading(true);
 
-    const handleViewPhoto = (photo) => {
-        if (photo.fileURL) {
-            window.open(photo.fileURL, '_blank');
-        } else {
-            alert('Photo URL not available');
-        }
-    };
+    // ✅ Auto-generate Update ID
+    const updateId = generateUpdateId();
 
-    const handleDeletePhoto = async (photo) => {
-        if (!window.confirm(`Are you sure you want to delete this photo?\n\nCaption: ${photo.caption || 'No caption'}`)) {
-            return;
-        }
+    const formData = new FormData();
+    formData.append("photo", selectedFile);
+    formData.append("caption", caption);
+    formData.append("projectId", projectId);
+    formData.append("milestone", selectedMilestone); // ✅ Include milestone
 
-        try {
-            const response = await fetch(`${API_URL}/photos/${photo.photoId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    updateId: photo.updateId,
-                    s3Key: photo.s3Key
-                })
-            });
+    try {
+      const response = await axios.post(`${API_URL}/photos/${updateId}`, formData, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-            if (!response.ok) {
-                throw new Error('Failed to delete photo');
-            }
+      console.log("✅ Photo uploaded:", response.data);
 
-            setPhotos(photos.filter(p => p.photoId !== photo.photoId));
-            alert('Photo deleted successfully!');
-        } catch (error) {
-            console.error('Error deleting photo:', error);
-            alert('Failed to delete photo. Please try again.');
-        }
-    };
+      // Reset form
+      setSelectedFile(null);
+      setCaption("");
+      setSelectedMilestone("");
+      setShowUploadForm(false);
+      document.querySelector('input[type="file"]').value = "";
 
+      // ✅ Show success message with instructions
+      alert(`✅ Photo uploaded successfully!\n\nUpdate ID: ${updateId}\n\n📝 Go to the REPORTS tab to review and approve it before it appears here.`);
+      
+      // Don't refresh photos here - they won't show until approved
+    } catch (err) {
+      console.error("Error uploading photo:", err);
+      alert("❌ Upload failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Delete photo
+  const handleDelete = async (photo) => {
+    if (!confirm("Are you sure you want to delete this photo?")) return;
+
+    try {
+      await axios.delete(`${API_URL}/photos/${photo.photoId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+        data: {
+          updateId: photo.updateId,
+          s3Key: photo.s3Key,
+        },
+      });
+
+      await fetchConfirmedPhotosForProject();
+      alert("✅ Photo deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting photo:", err);
+      alert("❌ Failed to delete photo");
+    }
+  };
+
+  // View photo modal
+  const openViewModal = (photo) => {
+    setViewModal(photo);
+  };
+
+  const closeViewModal = () => {
+    setViewModal(null);
+  };
+
+  if (!projectId) {
     return (
-        <div className="space-y-6 p-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Project Photos</h2>
-                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                        {isLoading ? 'Loading...' : `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} available`}
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    Upload Photo
-                </button>
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg">
+        <p className="text-gray-500 dark:text-slate-400">No project selected.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Upload Form - Conditionally Rendered */}
+      {showUploadForm && (
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Upload Photo</h3>
+            <button
+              onClick={() => setShowUploadForm(false)}
+              className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 text-xl"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* ✅ NOTICE: Photos go to Reports first */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              ℹ️ <strong>Note:</strong> Uploaded photos will appear in the <strong>REPORTS tab</strong> for approval first. 
+              After approval, they will be visible here in the Photos tab.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {/* ✅ REMOVED: Update ID Input (now auto-generated) */}
+
+            {/* File Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                Select Photo
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              />
             </div>
 
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-                    <p className="font-medium">Error:</p>
-                    <p className="text-sm">{error}</p>
-                </div>
-            )}
+            {/* ✅ NEW: Milestone Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                Milestone <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedMilestone}
+                onChange={(e) => setSelectedMilestone(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {MILESTONES.map((milestone) => (
+                  <option key={milestone.value} value={milestone.value}>
+                    {milestone.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                Select the construction phase this photo represents
+              </p>
+            </div>
 
-            {/* Loading State */}
-            {isLoading && (
-                <div className="text-center py-12">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-                    <p className="mt-4 text-gray-500 dark:text-slate-400">Loading photos...</p>
-                </div>
-            )}
+            {/* Caption */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                Caption (optional)
+              </label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Add a caption..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
 
-            {/* Photos Grid */}
-            {!isLoading && photos.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {photos.map((photo) => (
-                        <div 
-                            key={photo.photoId} 
-                            className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all overflow-hidden"
-                        >
-                            <div className="relative aspect-w-16 aspect-h-12 bg-gray-100 dark:bg-slate-700">
-                                {photo.fileURL ? (
-                                    <img 
-                                        src={photo.fileURL} 
-                                        alt={photo.caption}
-                                        className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                        onClick={() => handleViewPhoto(photo)}
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.parentElement.innerHTML = '<div class="w-full h-48 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 flex items-center justify-center"><span class="text-red-600 dark:text-red-400 text-sm">Image failed to load</span></div>';
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="w-full h-48 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center">
-                                        <span className="text-gray-500 dark:text-slate-400 text-sm">No preview</span>
-                                    </div>
-                                )}
-                                {/* AI Status Badge */}
-                                {photo.aiProcessed && (
-                                    <div className="absolute top-2 right-2">
-                                        <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                                            ✓ AI Analyzed
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="p-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                                    {photo.caption || 'No caption'}
-                                </h3>
-                                <div className="text-xs text-gray-500 dark:text-slate-400 space-y-1">
-                                    <p><span className="font-medium">Update:</span> {photo.updateId}</p>
-                                    <p><span className="font-medium">Uploaded:</span> {new Date(photo.uploadedAt).toLocaleDateString()}</p>
-                                    {photo.aiSuggestion && (
-                                        <p><span className="font-medium">AI Detected:</span> {photo.aiSuggestion.milestone}</p>
-                                    )}
-                                </div>
-                                <div className="mt-4 flex justify-end gap-2">
-                                    <button 
-                                        onClick={() => handleViewPhoto(photo)}
-                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
-                                    >
-                                        View
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDeletePhoto(photo)}
-                                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Empty State */}
-            {!isLoading && photos.length === 0 && !error && (
-                <div className="text-center py-16 bg-gray-50 dark:bg-slate-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
-                    <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-slate-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No photos uploaded yet</h3>
-                    <p className="text-gray-500 dark:text-slate-400 mb-6">Upload your first project photo to get AI analysis</p>
-                    <button
-                        onClick={() => setShowUploadModal(true)}
-                        className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        Upload Photo
-                    </button>
-                </div>
-            )}
-
-            {/* Upload Modal */}
-            {showUploadModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Upload Photo</h3>
-                            <button
-                                onClick={() => {
-                                    setShowUploadModal(false);
-                                    setSelectedFile(null);
-                                    setPhotoCaption('');
-                                    setSelectedUpdateId('');
-                                    setSelectedMilestone('');
-                                }}
-                                disabled={isUploading}
-                                className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="px-6 py-4 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Update ID <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={selectedUpdateId}
-                                    onChange={(e) => setSelectedUpdateId(e.target.value)}
-                                    placeholder="e.g., AW"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    disabled={isUploading}
-                                />
-                            </div>
-
-                            {/* NEW: Milestone Dropdown */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Related Task/Milestone (Optional)
-                                </label>
-                                <select
-                                    value={selectedMilestone}
-                                    onChange={(e) => setSelectedMilestone(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    disabled={isUploading}
-                                >
-                                    <option value="">Select a task...</option>
-                                    {milestones.map((milestone) => (
-                                        <option key={milestone.milestoneId} value={milestone.milestoneId}>
-                                            {milestone.milestoneName || milestone.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                                    Link this photo to a specific task for better organization
-                                </p>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Select Photo <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleFileSelect}
-                                    className="block w-full text-sm text-gray-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900/30 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
-                                    disabled={isUploading}
-                                />
-                                {selectedFile && (
-                                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedFile.name}</p>
-                                        <p className="text-xs text-gray-600 dark:text-slate-400">
-                                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Caption (Optional)
-                                </label>
-                                <textarea
-                                    value={photoCaption}
-                                    onChange={(e) => setPhotoCaption(e.target.value)}
-                                    placeholder="Add a description..."
-                                    rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                    disabled={isUploading}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 rounded-b-xl">
-                            <button
-                                onClick={() => {
-                                    setShowUploadModal(false);
-                                    setSelectedFile(null);
-                                    setPhotoCaption('');
-                                    setSelectedUpdateId('');
-                                    setSelectedMilestone('');
-                                }}
-                                disabled={isUploading}
-                                className="px-6 py-2 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleUpload}
-                                disabled={isUploading || !selectedFile || !selectedUpdateId}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {isUploading && (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                )}
-                                {isUploading ? 'Uploading & Analyzing...' : 'Upload Photo'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Upload Button */}
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || !selectedMilestone || uploading}
+              className="w-full bg-gray-300 dark:bg-slate-600 text-gray-700 dark:text-slate-300 py-3 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-slate-500 disabled:bg-gray-200 dark:disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            >
+              {uploading ? (
+                <>Uploading...</>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload Photo
+                </>
+              )}
+            </button>
+          </div>
         </div>
-    );
+      )}
+
+      {/* Photos Grid Section - ONLY CONFIRMED PHOTOS */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <CheckCircle className="w-6 h-6 text-green-500" />
+              Approved Photos
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              {photos.length} confirmed photos available
+            </p>
+          </div>
+          <button
+            onClick={() => setShowUploadForm(!showUploadForm)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Photo
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12 text-gray-500 dark:text-slate-400">
+            Loading photos...
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 dark:text-slate-400">
+            <ImageIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <p className="mb-2">No approved photos yet for this project</p>
+            <p className="text-sm">Upload photos and approve them in the Reports tab</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {photos.map((photo) => (
+              <div
+                key={photo.photoId}
+                className="bg-slate-700 dark:bg-slate-900 rounded-lg overflow-hidden border-2 border-green-500"
+              >
+                {/* Photo Image */}
+                <div className="relative">
+                  <img
+                    src={photo.fileURL}
+                    alt={photo.caption}
+                    className="w-full h-48 object-cover"
+                  />
+                  {/* ✅ Approved Badge */}
+                  <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Approved
+                  </div>
+                </div>
+
+                {/* Photo Info */}
+                <div className="p-4">
+                  <h3 className="font-semibold text-white mb-1 truncate">
+                    {photo.caption || "No caption"}
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-1">
+                    Update: {photo.updateId}
+                  </p>
+                  <p className="text-xs text-slate-400 mb-1">
+                    Uploaded: {new Date(photo.uploadedAt).toLocaleDateString()}
+                  </p>
+                  {photo.userConfirmedMilestone && (
+                    <p className="text-xs text-blue-400 mb-1">
+                      Milestone: {photo.userConfirmedMilestone}
+                    </p>
+                  )}
+                  {photo.userInputPercentage && (
+                    <p className="text-xs text-green-400 mb-3">
+                      Completion: {photo.userInputPercentage}%
+                    </p>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openViewModal(photo)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleDelete(photo)}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* View Modal */}
+      {viewModal && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={closeViewModal}
+        >
+          <div
+            className="bg-slate-800 rounded-lg max-w-4xl w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-white">
+                {viewModal.caption || "Photo Details"}
+              </h3>
+              <button
+                onClick={closeViewModal}
+                className="text-white hover:text-gray-300 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <img
+              src={viewModal.fileURL}
+              alt={viewModal.caption}
+              className="w-full max-h-[60vh] object-contain rounded-lg mb-4"
+            />
+
+            <div className="space-y-2 text-sm text-slate-300">
+              <p><strong>Update ID:</strong> {viewModal.updateId}</p>
+              <p><strong>Uploaded:</strong> {new Date(viewModal.uploadedAt).toLocaleString()}</p>
+              {viewModal.userConfirmedMilestone && (
+                <p><strong>Confirmed Milestone:</strong> {viewModal.userConfirmedMilestone}</p>
+              )}
+              {viewModal.userInputPercentage && (
+                <p><strong>Completion:</strong> {viewModal.userInputPercentage}%</p>
+              )}
+              {viewModal.overallProgressPercent && (
+                <p className="text-green-400">
+                  <strong>Overall Progress:</strong> {viewModal.overallProgressPercent}%
+                </p>
+              )}
+              {viewModal.confirmedAt && (
+                <p><strong>Approved On:</strong> {new Date(viewModal.confirmedAt).toLocaleString()}</p>
+              )}
+            </div>
+
+            <button
+              onClick={closeViewModal}
+              className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default Photos;
