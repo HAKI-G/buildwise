@@ -12,7 +12,7 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
-const AI_API_URL = 'http://54.151.251.142:5000';
+const AI_API_URL = 'http://localhost:5000';  // ✅ Use local AI
 
 // --- Multer S3 Upload Middleware ---
 export const upload = multer({
@@ -30,17 +30,24 @@ export const upload = multer({
 
 export const uploadPhotoForUpdate = async (req, res) => {
   const { updateId } = req.params;
-  const { caption } = req.body;
+  const { caption, projectId, milestone } = req.body; // ✅ ADD milestone
   const photoId = uuidv4();
   
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
 
+  // ✅ VALIDATE projectId
+  if (!projectId) {
+    return res.status(400).json({ message: 'Project ID is required.' });
+  }
+
   const publicUrl = `https://${BUCKET_NAME}.s3.ap-southeast-1.amazonaws.com/${req.file.key}`;
   
   console.log('📸 Photo uploaded to S3:', req.file.originalname);
   console.log('🔗 Photo URL:', publicUrl);
+  console.log('📁 Project ID:', projectId);
+  console.log('🏗️  User-selected milestone:', milestone); // ✅ LOG milestone
 
   // AI Analysis
   let aiAnalysis = null;
@@ -81,7 +88,8 @@ export const uploadPhotoForUpdate = async (req, res) => {
     aiProcessed = aiAnalysis && aiAnalysis.success;
     
     console.log('✅ AI Analysis complete!');
-    console.log('   Milestone:', aiAnalysis.ai_suggestion?.milestone);
+    console.log('   AI detected milestone:', aiAnalysis.ai_suggestion?.milestone);
+    console.log('   User selected milestone:', milestone); // ✅ Compare
     console.log('   Confidence:', aiAnalysis.ai_suggestion?.confidence);
     console.log('   Objects detected:', aiAnalysis.total_objects);
     console.log('   Detections:', Object.keys(aiAnalysis.detections || {}).join(', '));
@@ -105,17 +113,21 @@ export const uploadPhotoForUpdate = async (req, res) => {
     aiProcessed = false;
   }
 
-  // Save to database
+  // ✅ Save to database with user-selected milestone
   const params = {
     TableName: 'BuildWisePhotos',
     Item: {
       updateId: updateId,
       photoId: photoId,
+      projectId: projectId,
       fileURL: publicUrl,
       s3Key: req.file.key,
       caption: caption || 'No caption',
       fileName: req.file.originalname,
       uploadedAt: new Date().toISOString(),
+      
+      // ✅ NEW: User-selected milestone
+      userSelectedMilestone: milestone || null,
       
       // AI analysis results
       aiAnalysis: aiAnalysis,
@@ -233,6 +245,37 @@ export const getPhotosForUpdate = async (req, res) => {
     }
 };
 
+// ✅ Get photos for a specific project
+export const getPhotosForProject = async (req, res) => {
+    const { projectId } = req.params;
+
+    console.log('📷 Fetching photos for project:', projectId);
+
+    try {
+        const scanCommand = new ScanCommand({
+            TableName: 'BuildWisePhotos',
+            FilterExpression: "projectId = :projectId",
+            ExpressionAttributeValues: {
+                ":projectId": projectId,
+            },
+        });
+        
+        const result = await docClient.send(scanCommand);
+        
+        // Sort by upload date (newest first)
+        const sortedPhotos = (result.Items || []).sort((a, b) => 
+            new Date(b.uploadedAt) - new Date(a.uploadedAt)
+        );
+        
+        console.log(`✅ Found ${sortedPhotos.length} photos for project ${projectId}`);
+        
+        res.status(200).json(sortedPhotos);
+    } catch (error) {
+        console.error(`Error fetching photos for project ${projectId}:`, error);
+        res.status(500).json({ message: "Failed to fetch photos", error: error.message });
+    }
+};
+
 export const getAllPhotos = async (req, res) => {
     try {
         const scanCommand = new ScanCommand({
@@ -272,6 +315,38 @@ export const getPendingPhotos = async (req, res) => {
         res.status(200).json(sortedPhotos);
     } catch (error) {
         console.error('Error fetching pending photos:', error);
+        res.status(500).json({ message: "Failed to fetch pending photos", error: error.message });
+    }
+};
+
+// ✅ Get pending photos for a specific project
+export const getPendingPhotosForProject = async (req, res) => {
+    const { projectId } = req.params;
+
+    console.log('📷 Fetching pending photos for project:', projectId);
+
+    try {
+        const scanCommand = new ScanCommand({
+            TableName: 'BuildWisePhotos',
+            FilterExpression: 'projectId = :projectId AND confirmationStatus = :status AND aiProcessed = :processed',
+            ExpressionAttributeValues: {
+                ':projectId': projectId,
+                ':status': 'pending',
+                ':processed': true
+            }
+        });
+        
+        const result = await docClient.send(scanCommand);
+        
+        const sortedPhotos = (result.Items || []).sort((a, b) => 
+            new Date(b.uploadedAt) - new Date(a.uploadedAt)
+        );
+        
+        console.log(`✅ Found ${sortedPhotos.length} pending photos for project ${projectId}`);
+        
+        res.status(200).json(sortedPhotos);
+    } catch (error) {
+        console.error(`Error fetching pending photos for project ${projectId}:`, error);
         res.status(500).json({ message: "Failed to fetch pending photos", error: error.message });
     }
 };
