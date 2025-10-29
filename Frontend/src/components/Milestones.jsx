@@ -36,6 +36,10 @@ const Milestones = () => {
     const [viewMode, setViewMode] = useState('table');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    // ✅ NEW: Phase completion states
+    const [completingPhase, setCompletingPhase] = useState(null);
+    const [phaseCompletionStatus, setPhaseCompletionStatus] = useState({});
+    
     const [taskForm, setTaskForm] = useState({
         name: '',
         startDate: '',
@@ -123,10 +127,15 @@ const Milestones = () => {
                 status: task.status || 'not started',
                 assignedTo: task.assignedTo || 'Unassigned',
                 plannedCost: task.plannedCost || 0,
-                isPhase: task.isPhase || false
+                isPhase: task.isPhase || false,
+                completedAt: task.completedAt || null // ✅ NEW
             }));
             
             setTasks(mappedTasks);
+            
+            // ✅ NEW: Check phase completion status for all phases
+            await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
+            
             setError('');
         } catch (err) {
             console.error('Error fetching tasks:', err);
@@ -141,9 +150,75 @@ const Milestones = () => {
         }
     };
 
+    // ✅ NEW: Check if phases can be completed
+    const checkAllPhasesCompletionStatus = async (phasesList, config) => {
+        const statusMap = {};
+        
+        for (const phase of phasesList) {
+            try {
+                const response = await axios.get(
+                    `http://localhost:5001/api/milestones/${projectId}/phase/${phase.milestoneId}/can-complete`,
+                    config
+                );
+                statusMap[phase.milestoneId] = response.data;
+            } catch (err) {
+                console.error(`Error checking phase ${phase.milestoneId}:`, err);
+                statusMap[phase.milestoneId] = { canComplete: false, totalTasks: 0, completedTasks: 0 };
+            }
+        }
+        
+        setPhaseCompletionStatus(statusMap);
+    };
+
     useEffect(() => {
         fetchProjectTasks();
     }, [projectId]);
+
+    // ✅ NEW: Quick complete task
+    const handleQuickCompleteTask = async (task) => {
+        const token = getToken();
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        
+        try {
+            const newStatus = task.status === 'completed' ? 'in progress' : 'completed';
+            
+            await axios.put(
+                `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
+                { status: newStatus },
+                config
+            );
+            
+            await fetchProjectTasks(); // Refresh to update phase status
+        } catch (err) {
+            console.error('Error updating task:', err);
+            alert('Failed to update task status');
+        }
+    };
+
+    // ✅ NEW: Complete phase with validation
+    const handleCompletePhase = async (phaseId) => {
+        const token = getToken();
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        
+        setCompletingPhase(phaseId);
+        
+        try {
+            await axios.post(
+                `http://localhost:5001/api/milestones/${projectId}/phase/${phaseId}/complete`,
+                {},
+                config
+            );
+            
+            alert('✅ Phase completed successfully!');
+            await fetchProjectTasks(); // Refresh
+        } catch (err) {
+            console.error('Error completing phase:', err);
+            const errorMsg = err.response?.data?.message || 'Failed to complete phase';
+            alert(`❌ ${errorMsg}`);
+        } finally {
+            setCompletingPhase(null);
+        }
+    };
 
     const openAddTaskModal = () => {
         setTaskForm({
@@ -282,97 +357,176 @@ const Milestones = () => {
 
         return (
             <div className="space-y-3">
-                <div className="text-xs text-gray-500 dark:text-slate-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-                    Debug: Found {tasks.length} total items, {phases.length} phases, {tasks.filter(t => !t.isPhase).length} tasks
-                </div>
-                
-                {sortedGroups.map(({ phase, tasks: phaseTasks }) => (
-                    <div key={phase.milestoneId} className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                        <div className="flex items-center p-3 border-l-4 bg-white dark:bg-slate-800" style={{ borderLeftColor: phase.phaseColor }}>
-                            <div className="w-6 h-3 mr-3 rounded" style={{ backgroundColor: phase.phaseColor }}></div>
-                            <span className="text-base font-bold text-gray-900 dark:text-white">
-                                {phase.milestoneName || phase.name || 'Unnamed Phase'}
-                            </span>
-                            <span className="text-xs text-gray-500 dark:text-slate-400 ml-2">
-                                (ID: {phase.milestoneId})
-                            </span>
-                            <div className="ml-auto flex space-x-2">
-                                {phase.milestoneId !== 'unassigned' && (
-                                    <>
-                                        <button 
-                                            onClick={() => openEditTaskModal(phase)}
-                                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-xs"
+                {sortedGroups.map(({ phase, tasks: phaseTasks }) => {
+                    const phaseStatus = phaseCompletionStatus[phase.milestoneId] || {};
+                    const isPhaseCompleted = phase.status === 'completed';
+                    
+                    return (
+                        <div key={phase.milestoneId} className={`border rounded-lg overflow-hidden ${
+                            isPhaseCompleted 
+                                ? 'border-green-500 dark:border-green-600' 
+                                : 'border-gray-200 dark:border-slate-700'
+                        }`}>
+                            {/* Phase Header */}
+                            <div className="flex items-center p-3 border-l-4 bg-white dark:bg-slate-800" 
+                                 style={{ borderLeftColor: phase.phaseColor }}>
+                                <div className="w-6 h-3 mr-3 rounded" style={{ backgroundColor: phase.phaseColor }}></div>
+                                
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base font-bold text-gray-900 dark:text-white">
+                                            {phase.milestoneName || phase.name || 'Unnamed Phase'}
+                                        </span>
+                                        
+                                        {/* ✅ Phase Completed Badge */}
+                                        {isPhaseCompleted && (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                                Completed
+                                            </span>
+                                        )}
+                                        
+                                        {/* Task Progress Indicator */}
+                                        {!isPhaseCompleted && phaseStatus.totalTasks > 0 && (
+                                            <span className="text-xs text-gray-500 dark:text-slate-400">
+                                                ({phaseStatus.completedTasks}/{phaseStatus.totalTasks} tasks)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="ml-auto flex items-center space-x-2">
+                                    {/* ✅ Complete Phase Button */}
+                                    {phase.milestoneId !== 'unassigned' && !isPhaseCompleted && (
+                                        <button
+                                            onClick={() => handleCompletePhase(phase.milestoneId)}
+                                            disabled={!phaseStatus.canComplete || completingPhase === phase.milestoneId}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                                phaseStatus.canComplete && completingPhase !== phase.milestoneId
+                                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                                    : 'bg-gray-300 dark:bg-slate-700 text-gray-500 dark:text-slate-500 cursor-not-allowed'
+                                            }`}
+                                            title={
+                                                phaseStatus.canComplete 
+                                                    ? 'Complete this phase' 
+                                                    : `Complete all ${phaseStatus.totalTasks} tasks first`
+                                            }
                                         >
-                                            edit
+                                            {completingPhase === phase.milestoneId ? 'Completing...' : '✓ Complete Phase'}
                                         </button>
-                                        <button 
-                                            onClick={() => confirmDelete(phase.milestoneId)}
-                                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs"
-                                        >
-                                            delete
-                                        </button>
-                                    </>
+                                    )}
+                                    
+                                    {phase.milestoneId !== 'unassigned' && (
+                                        <>
+                                            <button 
+                                                onClick={() => openEditTaskModal(phase)}
+                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium"
+                                            >
+                                                edit
+                                            </button>
+                                            <button 
+                                                onClick={() => confirmDelete(phase.milestoneId)}
+                                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs font-medium"
+                                            >
+                                                delete
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {/* Phase Tasks */}
+                            <div className="bg-gray-50 dark:bg-slate-900/50">
+                                {phaseTasks.map((task) => {
+                                    const isTaskCompleted = task.status === 'completed';
+                                    
+                                    return (
+                                        <div key={task.milestoneId} className={`flex items-center p-2 pl-12 border-b border-gray-200 dark:border-slate-700 last:border-b-0 ${
+                                            isTaskCompleted ? 'bg-green-50/50 dark:bg-green-900/10' : ''
+                                        }`}>
+                                            {/* ✅ Complete Task Checkbox */}
+                                            <button
+                                                onClick={() => handleQuickCompleteTask(task)}
+                                                className={`mr-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                                    isTaskCompleted
+                                                        ? 'bg-green-600 border-green-600'
+                                                        : 'border-gray-300 dark:border-slate-600 hover:border-green-500'
+                                                }`}
+                                                title={isTaskCompleted ? 'Mark as incomplete' : 'Mark as complete'}
+                                            >
+                                                {isTaskCompleted && (
+                                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                            
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center">
+                                                    {task.isKeyMilestone && (
+                                                        <span className="mr-2 text-yellow-500 text-sm">♦</span>
+                                                    )}
+                                                    <span className={`text-sm font-medium truncate ${
+                                                        isTaskCompleted 
+                                                            ? 'text-gray-500 dark:text-slate-500 line-through' 
+                                                            : 'text-gray-800 dark:text-white'
+                                                    }`}>
+                                                        {task.milestoneName || task.name || 'Unnamed Task'}
+                                                    </span>
+                                                    <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        task.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                        task.status === 'in progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                                        task.status === 'on hold' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                                        'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                                    }`}>
+                                                        {task.status}
+                                                    </span>
+                                                </div>
+                                                <div className="flex space-x-4 text-xs text-gray-500 dark:text-slate-400 mt-1">
+                                                    {task.assignedTo && task.assignedTo !== 'Unassigned' && (
+                                                        <span>Assigned: {task.assignedTo}</span>
+                                                    )}
+                                                    {task.endDate && (
+                                                        <span>Due: {new Date(task.endDate).toLocaleDateString()}</span>
+                                                    )}
+                                                    {task.plannedCost > 0 && (
+                                                        <span>Cost: ₱{formatCurrency(task.plannedCost)}</span>
+                                                    )}
+                                                    {task.completedAt && (
+                                                        <span className="text-green-600 dark:text-green-400">
+                                                            ✓ {new Date(task.completedAt).toLocaleDateString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex space-x-2 ml-2">
+                                                <button 
+                                                    onClick={() => openEditTaskModal(task)}
+                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium"
+                                                >
+                                                    edit
+                                                </button>
+                                                <button 
+                                                    onClick={() => confirmDelete(task.milestoneId)}
+                                                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs font-medium"
+                                                >
+                                                    delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {phaseTasks.length === 0 && (
+                                    <div className="p-3 pl-12 text-gray-500 dark:text-slate-400 text-xs">
+                                        No tasks in this phase yet.
+                                    </div>
                                 )}
                             </div>
                         </div>
-                        
-                        <div className="bg-gray-50 dark:bg-slate-900/50">
-                            {phaseTasks.map((task) => (
-                                <div key={task.milestoneId} className="flex items-center p-2 pl-12 border-b border-gray-200 dark:border-slate-700 last:border-b-0">
-                                    <span className="text-gray-600 dark:text-slate-400 mr-3 text-sm">•</span>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center">
-                                            {task.isKeyMilestone && (
-                                                <span className="mr-2 text-yellow-500 text-sm">♦</span>
-                                            )}
-                                            <span className="text-gray-800 dark:text-white font-medium text-sm truncate">
-                                                {task.milestoneName || task.name || 'Unnamed Task'}
-                                            </span>
-                                            <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                task.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                                task.status === 'in progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                                                task.status === 'on hold' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                            }`}>
-                                                {task.status}
-                                            </span>
-                                        </div>
-                                        <div className="flex space-x-4 text-xs text-gray-500 dark:text-slate-400 mt-1">
-                                            {task.assignedTo && task.assignedTo !== 'Unassigned' && (
-                                                <span>Assigned: {task.assignedTo}</span>
-                                            )}
-                                            {task.endDate && (
-                                                <span>Due: {new Date(task.endDate).toLocaleDateString()}</span>
-                                            )}
-                                            {task.plannedCost > 0 && (
-                                                <span>Cost: ₱{formatCurrency(task.plannedCost)}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex space-x-2 ml-2">
-                                        <button 
-                                            onClick={() => openEditTaskModal(task)}
-                                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-xs"
-                                        >
-                                            edit
-                                        </button>
-                                        <button 
-                                            onClick={() => confirmDelete(task.milestoneId)}
-                                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs"
-                                        >
-                                            delete
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {phaseTasks.length === 0 && (
-                                <div className="p-3 pl-12 text-gray-500 dark:text-slate-400 text-xs">
-                                    No tasks in this phase yet.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
                 
                 {Object.keys(groupedTasks).length === 0 && (
                     <div className="text-center py-8 text-gray-500 dark:text-slate-400">

@@ -18,6 +18,7 @@ function StatisticsPage() {
     const [project, setProject] = useState(null);
     const [milestones, setMilestones] = useState([]);
     const [expenses, setExpenses] = useState([]);
+    const [photos, setPhotos] = useState([]); // ✅ NEW: Added photos state
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -77,6 +78,16 @@ function StatisticsPage() {
                     setExpenses([]);
                 }
 
+                // ✅ NEW: Fetch photos for pending items calculation
+                try {
+                    const photosRes = await axios.get(`http://localhost:5001/api/photos/project/${selectedProjectId}`, config);
+                    setPhotos(photosRes.data || []);
+                    console.log('✅ Photos loaded:', photosRes.data?.length);
+                } catch (err) {
+                    console.warn('Could not fetch photos:', err);
+                    setPhotos([]);
+                }
+
             } catch (err) {
                 setError('Failed to fetch project statistics.');
                 console.error("Fetch Error:", err);
@@ -119,17 +130,42 @@ function StatisticsPage() {
         ];
     }, [milestones]);
 
-    const taskPriorityData = useMemo(() => [
-        { name: 'High', value: 5 },
-        { name: 'Medium', value: 8 },
-        { name: 'Low', value: 12 },
-    ], []);
+    const taskPriorityData = useMemo(() => {
+        if (milestones.length > 0) {
+            const priorityCounts = milestones.reduce((acc, milestone) => {
+                const priority = milestone.priority || 'Low';
+                acc[priority] = (acc[priority] || 0) + 1;
+                return acc;
+            }, {});
+            
+            return [
+                { name: 'High', value: priorityCounts['High'] || 0 },
+                { name: 'Medium', value: priorityCounts['Medium'] || 0 },
+                { name: 'Low', value: priorityCounts['Low'] || 0 },
+            ].filter(item => item.value > 0); // Only show priorities that exist
+        }
+        return [
+            { name: 'High', value: 5 },
+            { name: 'Medium', value: 8 },
+            { name: 'Low', value: 12 },
+        ];
+    }, [milestones]);
     
-    const pendingItemsData = useMemo(() => [
-        { name: 'Approvals', value: 4 },
-        { name: 'Invoices', value: 2 },
-        { name: 'Documents', value: 7 },
-    ], []);
+    // ✅ SIMPLIFIED: Only show Approvals from Reports.jsx
+    const pendingItemsData = useMemo(() => {
+        // ✅ Approvals - EXACT match with Reports.jsx
+        // Reports.jsx: const pending = photos.filter(p => p.confirmationStatus === 'pending' && p.aiProcessed);
+        const pendingApprovals = photos.filter(p => 
+            p.confirmationStatus === 'pending' && p.aiProcessed
+        ).length;
+        
+        console.log('📊 Pending Approvals:', pendingApprovals, '(matches Reports page)');
+        
+        // ✅ ONLY return Approvals
+        return [
+            { name: 'Approvals', value: pendingApprovals }
+        ];
+    }, [photos]);
 
     const totalSpent = useMemo(() => {
         return expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
