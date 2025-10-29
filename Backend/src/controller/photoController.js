@@ -12,7 +12,7 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
-const AI_API_URL = 'http://localhost:5000';  // ✅ Use local AI
+const AI_API_URL = 'http://52.77.238.176:5000';  
 
 // --- Multer S3 Upload Middleware ---
 export const upload = multer({

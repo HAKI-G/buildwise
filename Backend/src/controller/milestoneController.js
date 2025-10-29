@@ -29,7 +29,7 @@ export const createMilestone = async (req, res) => {
     resourceRequirements,
     isPhase,
     isKeyMilestone,
-    phaseColor // IMPORTANT: Add phaseColor support
+    phaseColor
   } = req.body;
   
   const milestoneId = uuidv4();
@@ -52,8 +52,9 @@ export const createMilestone = async (req, res) => {
       resourceRequirements: resourceRequirements || '',
       isPhase: isPhase || false,
       isKeyMilestone: isKeyMilestone || false,
-      phaseColor: phaseColor || '#3B82F6', // FIXED: Store phase color
-      createdAt: now, // CRITICAL: Use timestamp for ordering
+      phaseColor: phaseColor || '#3B82F6',
+      completedAt: null, // ✅ NEW: Track completion time
+      createdAt: now,
       updatedAt: now
     },
   };
@@ -73,7 +74,7 @@ export const createMilestone = async (req, res) => {
   }
 };
 
-// GET /api/milestones/:projectId - FIXED: Proper sorting
+// GET /api/milestones/:projectId
 export const getMilestonesForProject = async (req, res) => {
   const { projectId } = req.params;
   const params = {
@@ -87,18 +88,11 @@ export const getMilestonesForProject = async (req, res) => {
   try {
     const data = await docClient.send(new QueryCommand(params));
     
-    // FIXED: Sort by createdAt timestamp in ASCENDING order (oldest first)
     const sortedItems = (data.Items || []).sort((a, b) => {
       const dateA = new Date(a.createdAt || 0);
       const dateB = new Date(b.createdAt || 0);
-      return dateA - dateB; // Ascending order: oldest first
+      return dateA - dateB;
     });
-    
-    console.log('Fetched and sorted milestones:', sortedItems.map(item => ({
-      name: item.milestoneName,
-      createdAt: item.createdAt,
-      isPhase: item.isPhase
-    })));
     
     res.status(200).json(sortedItems);
   } catch (error) {
@@ -110,20 +104,136 @@ export const getMilestonesForProject = async (req, res) => {
   }
 };
 
+// ✅ NEW: Check if phase can be completed
+export const canCompletePhase = async (req, res) => {
+  const { projectId, phaseId } = req.params;
+  
+  try {
+    // Get all milestones for this project
+    const params = {
+      TableName: tableName,
+      KeyConditionExpression: "projectId = :pid",
+      ExpressionAttributeValues: {
+        ":pid": projectId,
+      },
+    };
+    
+    const data = await docClient.send(new QueryCommand(params));
+    const milestones = data.Items || [];
+    
+    // Find tasks in this phase
+    const tasksInPhase = milestones.filter(m => 
+      m.parentPhase === phaseId && m.isPhase !== true
+    );
+    
+    // Check if all tasks are completed
+    const allTasksCompleted = tasksInPhase.length > 0 && 
+      tasksInPhase.every(task => task.status === 'completed');
+    
+    const completedTasks = tasksInPhase.filter(t => t.status === 'completed').length;
+    
+    res.status(200).json({
+      canComplete: allTasksCompleted,
+      totalTasks: tasksInPhase.length,
+      completedTasks: completedTasks,
+      pendingTasks: tasksInPhase.length - completedTasks
+    });
+  } catch (error) {
+    console.error("Error checking phase completion:", error);
+    res.status(500).json({ 
+      message: "Failed to check phase status", 
+      error: error.message 
+    });
+  }
+};
+
+// ✅ NEW: Complete a phase (with validation)
+export const completePhase = async (req, res) => {
+  const { projectId, phaseId } = req.params;
+  
+  try {
+    // First, check if all tasks are completed
+    const params = {
+      TableName: tableName,
+      KeyConditionExpression: "projectId = :pid",
+      ExpressionAttributeValues: {
+        ":pid": projectId,
+      },
+    };
+    
+    const data = await docClient.send(new QueryCommand(params));
+    const milestones = data.Items || [];
+    
+    const tasksInPhase = milestones.filter(m => 
+      m.parentPhase === phaseId && m.isPhase !== true
+    );
+    
+    const allTasksCompleted = tasksInPhase.length > 0 && 
+      tasksInPhase.every(task => task.status === 'completed');
+    
+    if (!allTasksCompleted) {
+      return res.status(400).json({ 
+        message: "Cannot complete phase - not all tasks are completed",
+        totalTasks: tasksInPhase.length,
+        completedTasks: tasksInPhase.filter(t => t.status === 'completed').length
+      });
+    }
+    
+    // Update phase to completed
+    const now = new Date().toISOString();
+    const updateParams = {
+      TableName: tableName,
+      Key: {
+        projectId,
+        milestoneId: phaseId
+      },
+      UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now',
+      ExpressionAttributeNames: {
+        '#status': 'status'
+      },
+      ExpressionAttributeValues: {
+        ':completed': 'completed',
+        ':now': now
+      },
+      ReturnValues: 'ALL_NEW'
+    };
+    
+    const result = await docClient.send(new UpdateCommand(updateParams));
+    
+    res.status(200).json({ 
+      message: 'Phase completed successfully!', 
+      phase: result.Attributes 
+    });
+  } catch (error) {
+    console.error("Error completing phase:", error);
+    res.status(500).json({ 
+      message: "Failed to complete phase", 
+      error: error.message 
+    });
+  }
+};
+
 // PUT /api/milestones/:projectId/:milestoneId
 export const updateMilestone = async (req, res) => {
   const { projectId, milestoneId } = req.params;
   const updateData = req.body;
   
-  // Remove keys that shouldn't be updated
   delete updateData.projectId;
   delete updateData.milestoneId;
-  delete updateData.createdAt; // IMPORTANT: Never update createdAt to preserve order
+  delete updateData.createdAt;
   
-  // Add updatedAt
+  // ✅ If status is being set to 'completed', add completedAt timestamp
+  if (updateData.status === 'completed' && !updateData.completedAt) {
+    updateData.completedAt = new Date().toISOString();
+  }
+  
+  // ✅ If status is NOT completed, remove completedAt
+  if (updateData.status && updateData.status !== 'completed') {
+    updateData.completedAt = null;
+  }
+  
   updateData.updatedAt = new Date().toISOString();
   
-  // Build update expression
   const updateExpressions = [];
   const expressionAttributeValues = {};
   const expressionAttributeNames = {};
