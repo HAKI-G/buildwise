@@ -16,6 +16,7 @@
     "@aws-sdk/client-s3": "^3.890.0",
     "@aws-sdk/lib-dynamodb": "^3.888.0",
     "@aws-sdk/s3-request-presigner": "^3.899.0",
+    "aws": "^0.0.3-2",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -27,6 +28,7 @@
     "multer": "^2.0.2",
     "multer-s3": "^3.0.1",
     "pdfkit": "^0.17.2",
+    "sdk": "^0.5.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

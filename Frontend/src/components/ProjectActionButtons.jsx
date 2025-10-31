@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import auditService from '../services/auditService'; // ✅ ADD THIS IMPORT
 
 const getToken = () => localStorage.getItem('token');
 
-const ProjectActionButtons = ({ projectId, onProjectDeleted, showProgress = true, size = 'sm' }) => {
+const ProjectActionButtons = ({ projectId, projectName, onProjectDeleted, showProgress = true, size = 'sm' }) => {
     const navigate = useNavigate();
 
     const handleViewProgress = (projectId) => {
@@ -38,6 +39,9 @@ const ProjectActionButtons = ({ projectId, onProjectDeleted, showProgress = true
             };
 
             await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
+            
+            // ✅ ADD THIS: Log project deletion
+            await auditService.logProjectDeleted(projectId, projectName);
             
             alert('Project deleted successfully!');
             
@@ -115,3 +119,11 @@ const ProjectActionButtons = ({ projectId, onProjectDeleted, showProgress = true
 };
 
 export default ProjectActionButtons;
+
+
+
+
+
+
+
+
