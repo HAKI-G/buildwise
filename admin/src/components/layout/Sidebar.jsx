@@ -8,9 +8,11 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useSettings } from '../contexts/SettingsContext';  // ✅ ADD THIS LINE
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
+  const { settings, loading } = useSettings();  // ✅ ADD THIS LINE
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -18,6 +20,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: 'Audit Logs', icon: FileText, path: '/audit-logs' },
     { name: 'Settings', icon: Settings, path: '/settings' },
   ];
+
+  // ✅ ADD THESE 2 LINES - Get app name from settings
+  const appName = loading ? 'BuildWise' : (settings.general.appName || 'BuildWise');
+  const appInitials = appName.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase();
 
   return (
     <div
@@ -28,9 +34,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       {/* Header */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
         {isOpen ? (
-          <h1 className="font-bold text-xl">BuildWise Admin</h1>
+          <h1 className="font-bold text-xl">{appName} Admin</h1>  
         ) : (
-          <span className="text-2xl font-bold mx-auto">BW</span>
+          <span className="text-2xl font-bold mx-auto">{appInitials}</span>  
         )}
       </div>
 

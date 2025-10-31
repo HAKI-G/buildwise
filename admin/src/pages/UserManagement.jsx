@@ -6,6 +6,7 @@ import Modal from '../components/common/Modal';
 import Input from '../components/common/Input';
 import userService from '../services/userService';
 import { USER_ROLES } from '../utils/constants';
+import { useAuditLog } from '../hooks/useAuditLog';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -22,6 +23,9 @@ const UserManagement = () => {
     role: 'Project Manager',
   });
   const [formErrors, setFormErrors] = useState({});
+
+  // Add audit log hook
+  const { logAction, LOG_TYPES } = useAuditLog();
 
   useEffect(() => {
     fetchUsers();
@@ -140,7 +144,63 @@ const UserManagement = () => {
       setIsLoading(true);
       
       if (selectedUser) {
+        // UPDATE USER
         await userService.updateUser(selectedUser.userId, formData);
+        
+        // Log user update
+        await logAction(
+          LOG_TYPES.USER_UPDATED,
+          `Updated user: ${formData.name} (${formData.email})${
+            selectedUser.role !== formData.role 
+              ? ` - Role changed from "${selectedUser.role}" to "${formData.role}"` 
+              : ''
+          }`,
+          {
+            targetResource: 'User',
+            targetId: selectedUser.userId,
+            oldValue: JSON.stringify({
+              name: selectedUser.name,
+              email: selectedUser.email,
+              role: selectedUser.role
+            }),
+            newValue: JSON.stringify({
+              name: formData.name,
+              email: formData.email,
+              role: formData.role,
+              passwordChanged: formData.password ? true : false
+            }),
+            status: 'SUCCESS',
+          }
+        );
+
+        // If password was changed, log separately
+        if (formData.password) {
+          await logAction(
+            LOG_TYPES.PASSWORD_CHANGED,
+            `Password changed for user: ${formData.name} (${formData.email})`,
+            {
+              targetResource: 'User',
+              targetId: selectedUser.userId,
+              status: 'SUCCESS',
+            }
+          );
+        }
+
+        // If role was changed, log separately
+        if (selectedUser.role !== formData.role) {
+          await logAction(
+            LOG_TYPES.ROLE_CHANGED,
+            `Role changed for ${formData.name} from "${selectedUser.role}" to "${formData.role}"`,
+            {
+              targetResource: 'User',
+              targetId: selectedUser.userId,
+              oldValue: JSON.stringify({ role: selectedUser.role }),
+              newValue: JSON.stringify({ role: formData.role }),
+              status: 'SUCCESS',
+            }
+          );
+        }
+        
         setUsers(users.map(user => 
           user.userId === selectedUser.userId 
             ? { ...user, ...formData }
@@ -148,7 +208,25 @@ const UserManagement = () => {
         ));
         alert('User updated successfully!');
       } else {
+        // CREATE USER
         const newUser = await userService.createUser(formData);
+        
+        // Log user creation
+        await logAction(
+          LOG_TYPES.USER_CREATED,
+          `Created new user: ${formData.name} (${formData.email}) with role "${formData.role}"`,
+          {
+            targetResource: 'User',
+            targetId: newUser.userId,
+            newValue: JSON.stringify({
+              name: formData.name,
+              email: formData.email,
+              role: formData.role
+            }),
+            status: 'SUCCESS',
+          }
+        );
+        
         setUsers([...users, newUser]);
         alert('User created successfully!');
       }
@@ -156,7 +234,32 @@ const UserManagement = () => {
       handleCloseModal();
     } catch (error) {
       console.error('Error saving user:', error);
-      alert(error.response?.data?.error || 'Error saving user. Please try again.');
+      const errorMessage = error.response?.data?.error || 'Error saving user. Please try again.';
+      
+      // Log failed action
+      if (selectedUser) {
+        await logAction(
+          LOG_TYPES.USER_UPDATED,
+          `Failed to update user: ${formData.name}`,
+          {
+            targetResource: 'User',
+            targetId: selectedUser.userId,
+            status: 'FAILED',
+            errorMessage: errorMessage,
+          }
+        );
+      } else {
+        await logAction(
+          LOG_TYPES.USER_CREATED,
+          `Failed to create user: ${formData.name}`,
+          {
+            status: 'FAILED',
+            errorMessage: errorMessage,
+          }
+        );
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -171,13 +274,44 @@ const UserManagement = () => {
     try {
       setIsLoading(true);
       await userService.deleteUser(selectedUser.userId);
+      
+      // Log user deletion
+      await logAction(
+        LOG_TYPES.USER_DELETED,
+        `Deleted user: ${selectedUser.name} (${selectedUser.email})`,
+        {
+          targetResource: 'User',
+          targetId: selectedUser.userId,
+          oldValue: JSON.stringify({
+            name: selectedUser.name,
+            email: selectedUser.email,
+            role: selectedUser.role
+          }),
+          status: 'SUCCESS',
+        }
+      );
+      
       setUsers(users.filter(user => user.userId !== selectedUser.userId));
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
       alert('User deleted successfully!');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Error deleting user. Please try again.');
+      const errorMessage = 'Error deleting user. Please try again.';
+      
+      // Log failed deletion
+      await logAction(
+        LOG_TYPES.USER_DELETED,
+        `Failed to delete user: ${selectedUser.name}`,
+        {
+          targetResource: 'User',
+          targetId: selectedUser.userId,
+          status: 'FAILED',
+          errorMessage: error.response?.data?.error || errorMessage,
+        }
+      );
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }

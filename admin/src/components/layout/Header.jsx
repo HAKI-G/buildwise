@@ -1,6 +1,6 @@
-import { Menu, Bell, User, LogOut } from 'lucide-react';
+import { Menu, Bell, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../utils/auth';
+import { auth } from '../../utils/auth'; // ✅ Keep this correct path
 
 const Header = ({ toggleSidebar }) => {
   const navigate = useNavigate();
