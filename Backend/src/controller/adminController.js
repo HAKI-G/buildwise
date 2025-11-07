@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import { sendNotification } from './notificationController.js';  // ✅ ADD THIS
 
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
@@ -107,6 +108,14 @@ export const createUserAdmin = async (req, res) => {
     
     await docClient.send(new PutCommand(putParams));
     
+    // ✅ ADD THIS - Notify all admins
+ await sendNotification(
+  'USER_CREATED',
+  'New User Registered',
+  `${name} has registered as a ${role}`,
+  { userId, userName: name, userEmail: email, userRole: role }
+);
+    
     const { password: _, ...userWithoutPassword } = newUser;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
@@ -120,6 +129,17 @@ export const updateUserAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
     const { name, email, password, role } = req.body;
+    
+    // ✅ Get current user data for notifications
+    const getUserParams = {
+      TableName: tableName,
+      Key: { userId }
+    };
+    const currentUserData = await docClient.send(new GetCommand(getUserParams));
+    
+    if (!currentUserData.Item) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     const updateExpression = [];
     const expressionAttributeNames = {};
@@ -143,6 +163,7 @@ export const updateUserAdmin = async (req, res) => {
       expressionAttributeValues[':p'] = hashedPassword;
     }
     
+    // ✅ Check if role changed and send notification
     if (role !== undefined) {
       const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President'];
       if (!validRoles.includes(role)) {
@@ -151,6 +172,16 @@ export const updateUserAdmin = async (req, res) => {
       updateExpression.push('#role = :r');
       expressionAttributeNames['#role'] = 'role';
       expressionAttributeValues[':r'] = role;
+      
+      // ✅ Send notification if role changed
+   if (currentUserData.Item.role !== role) {
+  await sendNotification(
+    'USER_ROLE_CHANGED',
+    'User Role Updated',
+    `${currentUserData.Item.name}'s role changed from ${currentUserData.Item.role} to ${role}`,
+    { userId, userName: currentUserData.Item.name, oldRole: currentUserData.Item.role, newRole: role }
+  );
+}
     }
     
     updateExpression.push('updatedAt = :u');

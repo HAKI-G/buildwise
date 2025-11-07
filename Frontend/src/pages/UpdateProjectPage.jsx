@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout.jsx';
-import auditService from '../services/auditService'; // ✅ ADD THIS IMPORT
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -16,10 +15,16 @@ function UpdateProjectPage() {
         name: '', 
         location: '', 
         contractor: '',
-        // Add all other project fields here to make them editable
+        dateStarted: '',
+        contractCompletionDate: '',
+        contractCost: '',
+        constructionConsultant: '',
+        implementingOffice: '',
+        sourcesOfFund: '',
+        projectManager: ''
     });
     
-    // ✅ ADD THIS: Store original project data for comparison
+    // Store original project data for comparison
     const [originalData, setOriginalData] = useState(null);
     
     // General state
@@ -40,9 +45,8 @@ function UpdateProjectPage() {
         try {
             const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
             setFormData(projectRes.data);
-            setOriginalData(projectRes.data); // ✅ ADD THIS: Store original data
+            setOriginalData(projectRes.data);
             setError('');
-
         } catch (err) {
             if (err.response && err.response.status === 401) {
                 localStorage.removeItem('token');
@@ -71,44 +75,21 @@ function UpdateProjectPage() {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         try {
-            // Update the project
+            // 1️⃣ Update the project (backend creates audit log automatically)
             await axios.put(`http://localhost:5001/api/projects/${projectId}`, formData, config);
-            
-            // ✅ ADD THIS: Log the project update
-            await auditService.logProjectUpdated(
-                projectId,
-                formData.name,
-                {
-                    // Old values
-                    name: originalData.name,
-                    location: originalData.location,
-                    contractor: originalData.contractor,
-                    dateStarted: originalData.dateStarted,
-                    contractCompletionDate: originalData.contractCompletionDate,
-                    contractCost: originalData.contractCost,
-                    constructionConsultant: originalData.constructionConsultant,
-                    implementingOffice: originalData.implementingOffice,
-                    sourcesOfFund: originalData.sourcesOfFund,
-                    projectManager: originalData.projectManager,
-                },
-                {
-                    // New values
-                    name: formData.name,
-                    location: formData.location,
-                    contractor: formData.contractor,
-                    dateStarted: formData.dateStarted,
-                    contractCompletionDate: formData.contractCompletionDate,
-                    contractCost: formData.contractCost,
-                    constructionConsultant: formData.constructionConsultant,
-                    implementingOffice: formData.implementingOffice,
-                    sourcesOfFund: formData.sourcesOfFund,
-                    projectManager: formData.projectManager,
-                }
-            );
-            
-            navigate(`/project/${projectId}`); // Go back to details page on success
+
+            // 2️⃣ Send notification to all users
+            await axios.post('http://localhost:5001/api/notifications/send', {
+                type: 'PROJECT_UPDATED',
+                title: 'Project Updated',
+                message: `${formData.name} has been updated`,
+                metadata: { projectId, projectName: formData.name }
+            }, config);
+
+            // 3️⃣ Navigate back to project details page
+            navigate(`/project/${projectId}`);
         } catch (err) {
-             setError('Failed to update project. Please try again.');
+            setError('Failed to update project. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -120,7 +101,6 @@ function UpdateProjectPage() {
 
     return (
         <Layout title={`Update: ${formData.name}`}>
-            {/* --- Update Project Details Form --- */}
             <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-md mb-8">
                 <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Update Project Information</h1>
                 <form onSubmit={handleUpdateProject}>
@@ -158,8 +138,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
-                        {/* ✅ ADD MORE FIELDS HERE FOR COMPLETE EDITING */}
                         <div>
                             <label htmlFor="dateStarted" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Date Started</label>
                             <input 
@@ -171,7 +149,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="contractCompletionDate" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Completion Date</label>
                             <input 
@@ -183,7 +160,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="contractCost" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Contract Cost (PHP)</label>
                             <input 
@@ -195,7 +171,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="constructionConsultant" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Construction Consultant</label>
                             <input 
@@ -207,7 +182,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="implementingOffice" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Implementing Office</label>
                             <input 
@@ -219,7 +193,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="sourcesOfFund" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Sources of Fund</label>
                             <input 
@@ -231,7 +204,6 @@ function UpdateProjectPage() {
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white" 
                             />
                         </div>
-                        
                         <div>
                             <label htmlFor="projectManager" className="block text-sm font-medium text-gray-700 dark:text-slate-300">Project Manager</label>
                             <input 

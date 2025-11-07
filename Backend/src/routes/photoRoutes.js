@@ -1,40 +1,44 @@
 import express from 'express';
 import { 
-    upload, 
-    uploadPhotoForUpdate, 
-    getPhotosForUpdate,
-    getPhotosForProject,  // ✅ NEW: Get photos for specific project
-    getAllPhotos, 
-    getPendingPhotos,
-    getPendingPhotosForProject,  // ✅ NEW: Get pending photos for specific project
-    confirmAISuggestion,
-    deletePhoto 
+  upload, 
+  uploadPhotoForUpdate, 
+  getPhotosForUpdate,
+  getPhotosForProject,
+  getAllPhotos, 
+  getPendingPhotos,
+  getPendingPhotosForProject,
+  confirmAISuggestion,
+  deletePhoto 
 } from '../controller/photoController.js';
+import { validateFileType } from '../middleware/fileValidationMiddleware.js';
+import { protect, requireAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all photos (admin use)
-router.get('/all/list', getAllPhotos);
+// ------------------ PHOTO ROUTES ------------------
 
-// Get ALL pending photos (admin use)
-router.get('/pending', getPendingPhotos);
+// Admin-only routes
+router.get('/all/list', protect, requireAdmin, getAllPhotos);
+router.get('/pending', protect, requireAdmin, getPendingPhotos);
+router.get('/project/:projectId', protect, getPhotosForProject);
+router.get('/project/:projectId/pending', protect, requireAdmin, getPendingPhotosForProject);
 
-// ✅ NEW: Get all photos for a specific project
-router.get('/project/:projectId', getPhotosForProject);
+// Upload photo for a specific update (authenticated users)
+router.post(
+  '/:updateId',
+  protect,                  // ✅ ensures req.user exists
+  upload.single('photo'),   
+  validateFileType,         // ✅ file type, size, max projects
+  uploadPhotoForUpdate
+);
 
-// ✅ NEW: Get pending photos for a specific project
-router.get('/project/:projectId/pending', getPendingPhotosForProject);
+// Get photos for a specific update (authenticated)
+router.get('/:updateId', protect, getPhotosForUpdate);
 
-// Upload photo for a specific update (now includes projectId in body)
-router.post('/:updateId', upload.single('photo'), uploadPhotoForUpdate);
+// Confirm AI suggestion (authenticated)
+router.post('/:photoId/confirm', protect, confirmAISuggestion);
 
-// Get photos for a specific update
-router.get('/:updateId', getPhotosForUpdate);
-
-// Confirm AI suggestion
-router.post('/:photoId/confirm', confirmAISuggestion);
-
-// Delete photo
-router.delete('/:photoId', deletePhoto);
+// Delete photo (authenticated)
+router.delete('/:photoId', protect, deletePhoto);
 
 export default router;

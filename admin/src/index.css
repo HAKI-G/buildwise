@@ -53,7 +53,15 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+/* Force dark background everywhere */
+body, #root, main, .main-content {
+  background-color: #ffffff !important;
+}
 
+/* Remove any white backgrounds */
+div {
+  background-color: transparent;
+}
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

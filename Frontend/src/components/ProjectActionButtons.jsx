@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import auditService from '../services/auditService'; // ✅ ADD THIS IMPORT
 
 const getToken = () => localStorage.getItem('token');
 
@@ -38,10 +37,16 @@ const ProjectActionButtons = ({ projectId, projectName, onProjectDeleted, showPr
                 headers: { Authorization: `Bearer ${token}` } 
             };
 
+            // Delete project (backend creates audit log automatically)
             await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
             
-            // ✅ ADD THIS: Log project deletion
-            await auditService.logProjectDeleted(projectId, projectName);
+            // ✅ Send notification
+            await axios.post('http://localhost:5001/api/notifications/send', {
+                type: 'PROJECT_DELETED',
+                title: 'Project Deleted',
+                message: `${projectName} has been deleted`,
+                metadata: { projectId, projectName }
+            }, config);
             
             alert('Project deleted successfully!');
             
@@ -119,11 +124,3 @@ const ProjectActionButtons = ({ projectId, projectName, onProjectDeleted, showPr
 };
 
 export default ProjectActionButtons;
-
-
-
-
-
-
-
-

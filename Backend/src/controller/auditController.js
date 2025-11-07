@@ -1,13 +1,70 @@
 // auditController.js
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = "BuildWiseAuditLogs";
 
-// 🟢 Create a new audit log
+// ✅ Helper function to get user name from userId
+const getUserName = async (userId) => {
+  try {
+    const params = {
+      TableName: "BuildWiseUsers",
+      Key: { userId }
+    };
+    const result = await docClient.send(new GetCommand(params));
+    return result.Item?.name || 'Unknown User';
+  } catch (error) {
+    console.error('Error fetching user name:', error);
+    return 'Unknown User';
+  }
+};
+
+// ✅ NEW: Helper function to create audit log (called from other controllers)
+export const logAudit = async (logData) => {
+  try {
+    const { userId, action, actionDescription, targetType, targetId, changes } = logData;
+    
+    // Get the actual user name
+    const userName = await getUserName(userId);
+
+    const timestamp = Date.now();
+    const logId = `log-${timestamp}`;
+
+    const auditLog = {
+      logId,
+      userId,
+      userName, // ✅ Include real user name
+      action,
+      description: actionDescription || action,
+      actionDescription: actionDescription || action,
+      targetType: targetType || 'unknown',
+      targetId: targetId || '',
+      changes: changes || {},
+      timestamp,
+      isArchived: 'false',
+      archivedAt: null,
+      archivedBy: null,
+      createdAt: new Date().toISOString()
+    };
+
+    await docClient.send(new PutCommand({
+      TableName: TABLE_NAME,
+      Item: auditLog
+    }));
+
+    console.log('✅ Audit log created:', action, 'by', userName);
+    return auditLog;
+  } catch (error) {
+    console.error('❌ Error creating audit log:', error);
+    // Don't throw - we don't want audit logging to break main operations
+    return null;
+  }
+};
+
+// 🟢 Create a new audit log (API endpoint)
 export const createAuditLog = async (req, res) => {
   try {
     const { userId, action, description } = req.body;
@@ -16,50 +73,74 @@ export const createAuditLog = async (req, res) => {
       return res.status(400).json({ message: "userId and action are required" });
     }
 
-    const timestamp = Date.now();
-    const logId = `log-${timestamp}`;
-
-    const params = {
-      TableName: TABLE_NAME,
-      Item: {
-        logId,
-        userId,
-        action,
-        description,
-        timestamp,
-        isArchived: 'false', // ✅ STRING instead of boolean
-        archivedAt: null,
-        archivedBy: null
-      },
-    };
-
-    await docClient.send(new PutCommand(params));
-
-    res.status(201).json({
-      message: "Audit log created successfully",
-      log: params.Item,
+    const result = await logAudit({
+      userId,
+      action,
+      actionDescription: description
     });
+
+    if (result) {
+      res.status(201).json({
+        message: "Audit log created successfully",
+        log: result,
+      });
+    } else {
+      res.status(500).json({ message: "Failed to create audit log" });
+    }
   } catch (error) {
     console.error("Error creating audit log:", error);
     res.status(500).json({ message: "Failed to create audit log", error: error.message });
   }
 };
 
-// 🟢 Get all audit logs
+// 🟢 Get all audit logs - ✅ UPDATED
 export const getAuditLogs = async (req, res) => {
   try {
+    const { limit } = req.query;
+
     const params = {
       TableName: TABLE_NAME,
     };
 
+    console.log('📋 Fetching audit logs from DynamoDB...');
     const data = await docClient.send(new ScanCommand(params));
+    console.log(`   Found ${data.Items?.length || 0} total logs`);
+
+    // ✅ Filter out archived logs and sort by timestamp descending
+    const activeLogs = (data.Items || [])
+      .filter(log => {
+        const isArchived = log.isArchived === 'true' || log.isArchived === true;
+        return !isArchived; // Only non-archived logs
+      })
+      .sort((a, b) => {
+        // Sort by timestamp (newest first)
+        const timeA = Number(a.timestamp) || new Date(a.createdAt).getTime() || 0;
+        const timeB = Number(b.timestamp) || new Date(b.createdAt).getTime() || 0;
+        return timeB - timeA; // Descending (newest first)
+      });
+
+    console.log(`   Active logs after filtering: ${activeLogs.length}`);
+
+    // Apply limit after filtering
+    const limitedLogs = limit ? activeLogs.slice(0, parseInt(limit)) : activeLogs;
+
+    console.log(`   Returning ${limitedLogs.length} logs (newest first)`);
+    
+    // Log first few for debugging
+    if (limitedLogs.length > 0) {
+      console.log('   First log:', {
+        action: limitedLogs[0].action,
+        userName: limitedLogs[0].userName,
+        timestamp: new Date(limitedLogs[0].timestamp).toISOString()
+      });
+    }
 
     res.status(200).json({
-      count: data.Items?.length || 0,
-      logs: data.Items || [],
+      count: limitedLogs.length,
+      logs: limitedLogs,
     });
   } catch (error) {
-    console.error("Error fetching audit logs:", error);
+    console.error("❌ Error fetching audit logs:", error);
     res.status(500).json({ message: "Failed to fetch audit logs", error: error.message });
   }
 };
@@ -117,7 +198,7 @@ export const archiveLog = async (req, res) => {
       },
       UpdateExpression: 'SET isArchived = :isArchived, archivedAt = :archivedAt, archivedBy = :archivedBy',
       ExpressionAttributeValues: {
-        ':isArchived': 'true', // ✅ STRING 'true' instead of boolean true
+        ':isArchived': 'true',
         ':archivedAt': archivedTimestamp,
         ':archivedBy': adminId || 'admin'
       },
@@ -166,7 +247,7 @@ export const unarchiveLog = async (req, res) => {
       },
       UpdateExpression: 'SET isArchived = :isArchived, archivedAt = :archivedAt, archivedBy = :archivedBy',
       ExpressionAttributeValues: {
-        ':isArchived': 'false', // ✅ STRING 'false' instead of boolean false
+        ':isArchived': 'false',
         ':archivedAt': null,
         ':archivedBy': null
       },
@@ -200,11 +281,7 @@ export const bulkArchiveLogs = async (req, res) => {
     const adminId = req.user?.id;
 
     console.log('📦 Bulk archive request received');
-    console.log('   Request body:', JSON.stringify(req.body, null, 2));
-    console.log('   Logs type:', typeof logs);
-    console.log('   Is array?:', Array.isArray(logs));
     console.log('   Logs length:', logs?.length);
-    console.log('   Admin ID:', adminId);
 
     if (!logs || !Array.isArray(logs) || logs.length === 0) {
       return res.status(400).json({ 
@@ -212,27 +289,13 @@ export const bulkArchiveLogs = async (req, res) => {
       });
     }
 
-    // Validate each log
-    for (let i = 0; i < logs.length; i++) {
-      const log = logs[i];
-      console.log(`   Validating log ${i}:`, log);
-      
-      if (!log.logId || (!log.timestamp && log.timestamp !== 0)) {
-        return res.status(400).json({ 
-          message: `Log at index ${i} is missing logId or timestamp`,
-          log: log
-        });
-      }
-    }
-
     const archivedTimestamp = Date.now();
     const results = [];
     const errors = [];
     
-    // Archive each log
     for (let i = 0; i < logs.length; i++) {
       const log = logs[i];
-      console.log(`   [${i + 1}/${logs.length}] Archiving: ${log.logId} (timestamp: ${log.timestamp})`);
+      console.log(`   [${i + 1}/${logs.length}] Archiving: ${log.logId}`);
       
       try {
         const params = {
@@ -243,7 +306,7 @@ export const bulkArchiveLogs = async (req, res) => {
           },
           UpdateExpression: 'SET isArchived = :isArchived, archivedAt = :archivedAt, archivedBy = :archivedBy',
           ExpressionAttributeValues: {
-            ':isArchived': 'true', // ✅ STRING 'true' instead of boolean true
+            ':isArchived': 'true',
             ':archivedAt': archivedTimestamp,
             ':archivedBy': adminId || 'admin'
           }
@@ -261,10 +324,7 @@ export const bulkArchiveLogs = async (req, res) => {
       }
     }
 
-    console.log(`📊 Bulk archive summary:`);
-    console.log(`   Total: ${logs.length}`);
-    console.log(`   Successful: ${results.length}`);
-    console.log(`   Failed: ${errors.length}`);
+    console.log(`📊 Bulk archive summary: ${results.length} succeeded, ${errors.length} failed`);
 
     if (errors.length === 0) {
       res.status(200).json({
@@ -297,23 +357,3 @@ export const bulkArchiveLogs = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -20,7 +20,7 @@ const tableName = 'BuildWiseComments';
  */
 export const createComment = async (req, res) => {
   const { updateId } = req.params;
-  const { commentText, userId } = req.body; // userId will eventually come from auth middleware
+  const { commentText, userId, userName } = req.body; // userId will eventually come from auth middleware
   const commentId = uuidv4();
 
   if (!commentText || !userId) {
@@ -34,6 +34,7 @@ export const createComment = async (req, res) => {
       commentId: commentId, // Sort Key
       commentText,
       userId, // Who posted the comment
+      userName: userName || 'Unknown User', // ✅ Save userName
       createdAt: new Date().toISOString(),
     },
   };

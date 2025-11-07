@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import bcrypt from 'bcryptjs';
+import { clearMaintenanceCache } from '../middleware/maintenanceMiddleware.js';
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION || "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
@@ -136,6 +137,9 @@ export const updateSettings = async (req, res) => {
       return res.status(400).json({ message: 'Invalid category' });
     }
 
+    // Check if maintenance mode is being updated
+    const isMaintenanceModeUpdate = category === 'system' && settingsData.maintenanceMode !== undefined;
+
     // Save each setting individually
     const savePromises = Object.entries(settingsData).map(([key, value]) => {
       const settingId = `${category}_${key}`;
@@ -153,6 +157,13 @@ export const updateSettings = async (req, res) => {
     });
 
     await Promise.all(savePromises);
+
+    // Clear maintenance cache if maintenance mode was updated
+    if (isMaintenanceModeUpdate) {
+      clearMaintenanceCache();
+      console.log('✅ Maintenance mode updated to:', settingsData.maintenanceMode);
+      console.log('🔄 Maintenance cache cleared - changes will be reflected immediately');
+    }
 
     res.status(200).json({
       message: `${category} settings updated successfully`,
@@ -332,6 +343,12 @@ export const resetSettings = async (req, res) => {
         }))
       );
       await Promise.all(deletePromises);
+    }
+
+    // If resetting system settings, clear maintenance cache
+    if (category === 'system') {
+      clearMaintenanceCache();
+      console.log('🔄 System settings reset - maintenance cache cleared');
     }
 
     res.status(200).json({

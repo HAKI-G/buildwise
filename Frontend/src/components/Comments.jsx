@@ -1,39 +1,46 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom'; // ✅ Add this import
+import api from '../services/api';
 
 const Comments = () => {
+    const { projectId } = useParams(); // ✅ Get projectId from URL
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isPosting, setIsPosting] = useState(false);
     const [error, setError] = useState(null);
-    
-    const API_URL = 'http://localhost:5001/api';
-    const UPDATE_ID = 'default-update';
-    const USER_ID = 'current-user-id';
+
+    // ✅ Get real user from localStorage
+    const getUser = () => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            return user || { userId: 'unknown', name: 'Unknown User' };
+        } catch {
+            return { userId: 'unknown', name: 'Unknown User' };
+        }
+    };
 
     useEffect(() => {
-        loadComments();
-    }, []);
+        if (projectId) {
+            loadComments();
+        }
+    }, [projectId]); // ✅ Reload when projectId changes
 
     const loadComments = async () => {
         setIsLoading(true);
         setError(null);
         
         try {
-            const response = await fetch(`${API_URL}/comments/${UPDATE_ID}`);
+            // ✅ Use actual projectId from URL
+            const response = await api.get(`/comments/${projectId}`);
             
-            if (!response.ok) {
-                throw new Error('Failed to load comments');
-            }
-            
-            const data = await response.json();
-            const sortedComments = (data || []).sort((a, b) => 
+            const sortedComments = (response.data || []).sort((a, b) => 
                 new Date(b.createdAt) - new Date(a.createdAt)
             );
             setComments(sortedComments);
         } catch (error) {
             console.error('Error loading comments:', error);
-            setError(error.message);
+            setError('Failed to load comments');
             setComments([]);
         } finally {
             setIsLoading(false);
@@ -46,25 +53,23 @@ const Comments = () => {
             return;
         }
 
+        if (!projectId) {
+            alert('Project ID not found');
+            return;
+        }
+
         setIsPosting(true);
         setError(null);
 
         try {
-            const response = await fetch(`${API_URL}/comments/${UPDATE_ID}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    commentText: newComment,
-                    userId: USER_ID
-                })
+            const user = getUser();
+            
+            // ✅ Use actual projectId from URL
+            await api.post(`/comments/${projectId}`, {
+                commentText: newComment,
+                userId: user.userId,
+                userName: user.name
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to post comment');
-            }
 
             await loadComments();
             
@@ -72,12 +77,22 @@ const Comments = () => {
             alert('Comment posted successfully!');
         } catch (error) {
             console.error('Error posting comment:', error);
-            setError(error.message);
-            alert(`Failed to post comment: ${error.message}`);
+            const message = error.response?.data?.message || 'Failed to post comment';
+            setError(message);
+            alert(`Failed to post comment: ${message}`);
         } finally {
             setIsPosting(false);
         }
     };
+
+    // ✅ Show message if no projectId
+    if (!projectId) {
+        return (
+            <div className="text-center py-8">
+                <p className="text-gray-500">Project ID not found</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -130,7 +145,7 @@ const Comments = () => {
                         <div key={comment.commentId} className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                             <div className="flex justify-between items-start mb-2">
                                 <div className="font-medium text-gray-900 dark:text-white">
-                                    User: {comment.userId}
+                                    {comment.userName || 'User'}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-slate-400">
                                     {new Date(comment.createdAt).toLocaleString()}

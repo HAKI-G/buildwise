@@ -8,15 +8,13 @@ import {
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import { logAudit } from "./auditController.js"; // ✅ Import audit logger
 
-// --- AWS DynamoDB Client Setup ---
 const client = new DynamoDBClient({
   region: "ap-southeast-1",
 });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = "buildwiseProjects";
-
-// --- Controller Functions ---
 
 /**
  * @desc     Get all projects
@@ -57,6 +55,32 @@ export const createProject = async (req, res) => {
   }
 
   try {
+    const userId = req.user.id;
+
+    // Max Projects Per User Enforcement
+    const settingsParams = {
+      TableName: "BuildWiseSettings",
+      FilterExpression: "category = :category AND #key = :key",
+      ExpressionAttributeNames: { '#key': 'key' },
+      ExpressionAttributeValues: { ':category': 'system', ':key': 'maxProjectsPerUser' }
+    };
+    const settingsData = await docClient.send(new ScanCommand(settingsParams));
+    const maxProjects = settingsData.Items?.[0]?.value || 50;
+
+    const countParams = {
+      TableName: tableName,
+      FilterExpression: "createdBy = :userId",
+      ExpressionAttributeValues: { ':userId': userId }
+    };
+    const projectsData = await docClient.send(new ScanCommand(countParams));
+    const currentCount = projectsData.Items?.length || 0;
+
+    if (currentCount >= maxProjects) {
+      return res.status(403).json({
+        error: `You have reached the maximum limit of ${maxProjects} projects.`
+      });
+    }
+
     const projectId = uuidv4();
     
     const projectItem = {
@@ -72,9 +96,10 @@ export const createProject = async (req, res) => {
       sourcesOfFund,
       projectManager: projectManager && projectManager.trim() !== "" 
         ? projectManager.trim() 
-        : "Juan Dela Cruz",   // ✅ only fallback if actually empty/missing
+        : "Juan Dela Cruz",
       status: "Not Started",
       createdAt: new Date().toISOString(),
+      createdBy: userId,
     };
 
     const putParams = {
@@ -83,6 +108,16 @@ export const createProject = async (req, res) => {
     };
 
     await docClient.send(new PutCommand(putParams));
+
+    // ✅ Create audit log
+    await logAudit({
+      userId: userId,
+      action: 'PROJECT_CREATED',
+      actionDescription: `New project created: ${name}`,
+      targetType: 'project',
+      targetId: projectId,
+      changes: { name, location, contractor }
+    });
 
     res.status(201).json({
       message: "Project created successfully!",
@@ -138,7 +173,6 @@ export const updateProject = async (req, res) => {
     status
   } = req.body;
 
-  // Build update expression dynamically (only update provided fields)
   let updateExp = "set";
   const expAttrNames = {};
   const expAttrValues = {};
@@ -164,7 +198,6 @@ export const updateProject = async (req, res) => {
   addUpdateField("implementingOffice", implementingOffice);
   addUpdateField("sourcesOfFund", sourcesOfFund);
 
-  // ✅ Only update projectManager if provided and not blank
   if (projectManager && projectManager.trim() !== "") {
     addUpdateField("projectManager", projectManager.trim());
   }
@@ -182,6 +215,17 @@ export const updateProject = async (req, res) => {
 
   try {
     const data = await docClient.send(new UpdateCommand(params));
+
+    // ✅ Create audit log
+    await logAudit({
+      userId: req.user.id,
+      action: 'PROJECT_UPDATED',
+      actionDescription: `Project updated: ${name || id}`,
+      targetType: 'project',
+      targetId: id,
+      changes: { name, location, contractor, status }
+    });
+
     res.status(200).json({
       message: `Project ${id} updated successfully!`,
       updatedProject: data.Attributes,
@@ -198,12 +242,36 @@ export const updateProject = async (req, res) => {
  */
 export const deleteProject = async (req, res) => {
   const { id } = req.params;
-  const params = {
-    TableName: tableName,
-    Key: { projectId: id },
-  };
+
   try {
-    await docClient.send(new DeleteCommand(params));
+    // Get project details first for audit log
+    const getParams = {
+      TableName: tableName,
+      Key: { projectId: id },
+    };
+    const projectData = await docClient.send(new GetCommand(getParams));
+    const project = projectData.Item;
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Delete project
+    const deleteParams = {
+      TableName: tableName,
+      Key: { projectId: id },
+    };
+    await docClient.send(new DeleteCommand(deleteParams));
+
+    // ✅ Create audit log
+    await logAudit({
+      userId: req.user.id,
+      action: 'PROJECT_DELETED',
+      actionDescription: `Project deleted: ${project.name}`,
+      targetType: 'project',
+      targetId: id
+    });
+
     res.status(200).json({ message: `Project ${id} deleted successfully.` });
   } catch (error) {
     console.error(`❌ Error deleting project with ID ${id}:`, error);

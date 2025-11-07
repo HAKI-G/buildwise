@@ -96,7 +96,7 @@ const Photos = ({ projectId }) => {
     const updateId = generateUpdateId();
 
     const formData = new FormData();
-    formData.append("photo", selectedFile);
+    formData.append("photo", selectedFile); 
     formData.append("caption", caption);
     formData.append("projectId", projectId);
     formData.append("milestone", selectedMilestone); // ✅ Include milestone
