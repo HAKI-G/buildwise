@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import settingsService from '../../services/settingsService';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import settingsService from '../services/settingsService';
 
 const SettingsContext = createContext();
 
@@ -28,29 +28,35 @@ export const SettingsProvider = ({ children }) => {
   });
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await settingsService.getAllSettings();
       setSettings(data);
     } catch (err) {
       console.error('Error fetching settings:', err);
+      setError(err.message);
+      // Don't throw - keep default settings
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSettings();
   }, []);
 
-  const refreshSettings = async () => {
+  useEffect(() => {
+    // This will only run when component mounts
+    // And it will ONLY mount when user is authenticated (inside ProtectedRoute)
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const refreshSettings = useCallback(async () => {
     await fetchSettings();
-  };
+  }, [fetchSettings]);
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, refreshSettings }}>
+    <SettingsContext.Provider value={{ settings, loading, error, refreshSettings }}>
       {children}
     </SettingsContext.Provider>
   );

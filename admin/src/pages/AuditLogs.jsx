@@ -14,9 +14,41 @@ const AuditLogs = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
+  // ✅ NEW: Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    created: 0,
+    updated: 0,
+    deleted: 0
+  });
+
   useEffect(() => {
     fetchAuditLogs();
+    fetchStats(); // ✅ ADD THIS
   }, [showArchived]);
+
+  // ✅ NEW: Fetch stats separately for accurate counts
+  const fetchStats = async () => {
+    try {
+      // Fetch ALL logs for accurate stats (increase limit)
+      const response = await auditService.getAllLogs({ limit: 1000 });
+      const allLogs = response.logs || [];
+      
+      // Filter by archived status
+      const relevantLogs = allLogs.filter(log => 
+        showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
+      );
+      
+      setStats({
+        total: relevantLogs.length,
+        created: relevantLogs.filter(l => l.action === 'PROJECT_CREATED').length,
+        updated: relevantLogs.filter(l => l.action === 'PROJECT_UPDATED').length,
+        deleted: relevantLogs.filter(l => l.action === 'PROJECT_DELETED').length
+      });
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+  };
 
   const fetchAuditLogs = async () => {
     try {
@@ -65,53 +97,62 @@ const AuditLogs = () => {
   };
 
   const handleFilter = async () => {
-    try {
-      setLoading(true);
-      let filteredLogs = [];
-      
-      if (filterType === 'user' && filterValue.trim()) {
-        const allResponse = await auditService.getAllLogs({ limit: 500 });
-        const allLogs = allResponse.logs || [];
-        filteredLogs = allLogs.filter(log => 
-          log.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
-          log.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
-          log.userId?.toLowerCase().includes(filterValue.toLowerCase())
-        );
-      } else if (filterType === 'action' && filterValue) {
-        const allResponse = await auditService.getAllLogs({ limit: 500 });
-        const allLogs = allResponse.logs || [];
-        filteredLogs = allLogs.filter(log => log.action === filterValue);
-      } else if (filterType === 'dateRange' && dateRange.start && dateRange.end) {
-        const allResponse = await auditService.getAllLogs({ limit: 500 });
-        const allLogs = allResponse.logs || [];
-        const startDate = new Date(dateRange.start);
-        const endDate = new Date(dateRange.end);
-        filteredLogs = allLogs.filter(log => {
-          const logDate = new Date(log.timestamp);
-          return logDate >= startDate && logDate <= endDate;
-        });
-      } else {
-        const response = await auditService.getAllLogs({ limit: 100 });
-        filteredLogs = response.logs || [];
-      }
-      
-      filteredLogs = filteredLogs.filter(log => 
-        showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
+  try {
+    setLoading(true);
+    let filteredLogs = [];
+    
+    if (filterType === 'user' && filterValue.trim()) {
+      const allResponse = await auditService.getAllLogs({ limit: 500 });
+      const allLogs = allResponse.logs || [];
+      filteredLogs = allLogs.filter(log => 
+        log.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
+        log.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
+        log.userId?.toLowerCase().includes(filterValue.toLowerCase())
       );
+    } else if (filterType === 'action' && filterValue) {
+      const allResponse = await auditService.getAllLogs({ limit: 500 });
+      const allLogs = allResponse.logs || [];
+      filteredLogs = allLogs.filter(log => log.action === filterValue);
+    } else if (filterType === 'dateRange' && dateRange.start && dateRange.end) {
+      const allResponse = await auditService.getAllLogs({ limit: 500 });
+      const allLogs = allResponse.logs || [];
       
-      const sortedLogs = filteredLogs.sort((a, b) => 
-        new Date(b.timestamp) - new Date(a.timestamp)
-      );
+      // Simple date comparison - start of day to end of day
+      const startDate = new Date(dateRange.start);
+      startDate.setHours(0, 0, 0, 0);
       
-      setLogs(sortedLogs);
-      setError(null);
-    } catch (err) {
-      setError('Failed to filter logs');
-      console.error(err);
-    } finally {
-      setLoading(false);
+      const endDate = new Date(dateRange.end);
+      endDate.setHours(23, 59, 59, 999);
+      
+      filteredLogs = allLogs.filter(log => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= startDate && logDate <= endDate;
+      });
+      
+      console.log(`📅 Date filter: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+      console.log(`   Found ${filteredLogs.length} logs in this range`);
+    } else {
+      const response = await auditService.getAllLogs({ limit: 100 });
+      filteredLogs = response.logs || [];
     }
-  };
+    
+    filteredLogs = filteredLogs.filter(log => 
+      showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
+    );
+    
+    const sortedLogs = filteredLogs.sort((a, b) => 
+      new Date(b.timestamp) - new Date(a.timestamp)
+    );
+    
+    setLogs(sortedLogs);
+    setError(null);
+  } catch (err) {
+    setError('Failed to filter logs');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ✅ Archive single log
   const handleArchiveLog = async (log) => {
@@ -123,6 +164,7 @@ const AuditLogs = () => {
       setArchiving(true);
       await auditService.archiveLog(log.logId, log.timestamp);
       await fetchAuditLogs();
+      await fetchStats(); // ✅ Refresh stats
     } catch (err) {
       setError('Failed to archive log');
       console.error(err);
@@ -141,6 +183,7 @@ const AuditLogs = () => {
       setArchiving(true);
       await auditService.unarchiveLog(log.logId, log.timestamp);
       await fetchAuditLogs();
+      await fetchStats(); // ✅ Refresh stats
     } catch (err) {
       setError('Failed to unarchive log');
       console.error(err);
@@ -149,7 +192,7 @@ const AuditLogs = () => {
     }
   };
 
-  // ✅ NEW: Restore all archived logs
+  // ✅ Restore all archived logs
   const handleRestoreAll = async () => {
     if (logs.length === 0) {
       alert('No archived logs to restore');
@@ -177,6 +220,7 @@ const AuditLogs = () => {
       );
       
       await fetchAuditLogs();
+      await fetchStats(); // ✅ Refresh stats
     } catch (err) {
       setError('Failed to restore all logs');
       console.error(err);
@@ -287,7 +331,7 @@ const AuditLogs = () => {
             </div>
           </div>
           <div className="flex gap-3">
-            {/* ✅ NEW: Restore All button (only in archived view) */}
+            {/* Restore All button (only in archived view) */}
             {showArchived && logs.length > 0 && (
               <button 
                 onClick={handleRestoreAll} 
@@ -300,7 +344,7 @@ const AuditLogs = () => {
                 Restore All ({logs.length})
               </button>
             )}
-            <button onClick={fetchAuditLogs} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2">
+            <button onClick={() => { fetchAuditLogs(); fetchStats(); }} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -424,13 +468,15 @@ const AuditLogs = () => {
           </div>
         )}
 
-        {/* Stats */}
+        {/* ✅ UPDATED: Stats using new stats state */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Logs</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{logs.length}</p>
+                <p className="text-sm font-medium text-gray-500">
+                  Total {showArchived ? 'Archived' : 'Active'} Logs
+                </p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,9 +489,7 @@ const AuditLogs = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Projects Created</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {logs.filter(l => l.action === 'PROJECT_CREATED').length}
-                </p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{stats.created}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -458,9 +502,7 @@ const AuditLogs = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Projects Updated</p>
-                <p className="text-2xl font-bold text-yellow-600 mt-1">
-                  {logs.filter(l => l.action === 'PROJECT_UPDATED').length}
-                </p>
+                <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.updated}</p>
               </div>
               <div className="p-3 bg-yellow-100 rounded-lg">
                 <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -473,9 +515,7 @@ const AuditLogs = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Projects Deleted</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">
-                  {logs.filter(l => l.action === 'PROJECT_DELETED').length}
-                </p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{stats.deleted}</p>
               </div>
               <div className="p-3 bg-red-100 rounded-lg">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -492,7 +532,6 @@ const AuditLogs = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {/* ✅ REMOVED: Checkbox column */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
@@ -504,7 +543,6 @@ const AuditLogs = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {logs.map((log) => (
                   <tr key={log.logId} className="hover:bg-gray-50 transition-colors">
-                    {/* ✅ REMOVED: Checkbox cell */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(log.timestamp)}
                     </td>
@@ -534,7 +572,6 @@ const AuditLogs = () => {
                       >
                         View
                       </button>
-                      {/* ✅ Individual archive/restore buttons */}
                       {!showArchived ? (
                         <button 
                           onClick={() => handleArchiveLog(log)}

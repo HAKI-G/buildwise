@@ -29,12 +29,22 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Only redirect to login if:
+    // 1. Response is 401 (Unauthorized)
+    // 2. We're NOT already on the login page
+    // 3. The request was NOT to the login endpoint
+    const isLoginPage = window.location.pathname === '/login';
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
+    
+    if (error.response?.status === 401 && !isLoginPage && !isLoginRequest) {
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('adminToken');
       localStorage.removeItem('adminUser');
-      window.location.href = '/login';
+      
+      // Use replace to prevent back button issues
+      window.location.replace('/login');
     }
+    
     return Promise.reject(error);
   }
 );

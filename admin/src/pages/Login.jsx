@@ -55,20 +55,39 @@ const Login = () => {
     try {
       setIsLoading(true);
       
+      console.log('🔐 Attempting admin login...'); // Debug
+      
+      // Use the admin login endpoint
       const response = await api.post('/auth/admin/login', {
         email: formData.email,
         password: formData.password,
       });
 
-      auth.setToken(response.data.token);
-      auth.setUser(response.data.user);
+      console.log('✅ Login successful:', response.data); // Debug
 
-      navigate('/');
+      const { token, user } = response.data;
+
+      // Save auth data
+      auth.setToken(token);
+      auth.setUser(user);
+
+      console.log('✅ Auth data saved, navigating to dashboard...'); // Debug
+
+      // Navigate to dashboard
+      navigate('/', { replace: true });
     } catch (error) {
-      console.error('Login error:', error);
-      setErrorMessage(
-        error.response?.data?.error || error.response?.data?.message || 'Login failed. Please try again.'
-      );
+      console.error('❌ Login error:', error); // Debug
+      console.error('Response data:', error.response?.data); // Debug
+      
+      if (error.response?.status === 401) {
+        setErrorMessage(error.response?.data?.message || 'Invalid email or password');
+      } else if (error.response?.data?.error) {
+        setErrorMessage(error.response.data.error);
+      } else if (error.response?.data?.message) {
+        setErrorMessage(error.response.data.message);
+      } else {
+        setErrorMessage('Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +142,7 @@ const Login = () => {
                 }`}
               />
             </div>
-            {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+            {errors.email && <p className="mt-1 text-sm text-red-500 text-left">{errors.email}</p>}
           </div>
 
           <div className="mb-6">
@@ -144,7 +163,7 @@ const Login = () => {
                 }`}
               />
             </div>
-            {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
+            {errors.password && <p className="mt-1 text-sm text-red-500 text-left">{errors.password}</p>}
           </div>
 
           <Button

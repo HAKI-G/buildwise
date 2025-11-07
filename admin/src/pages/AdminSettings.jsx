@@ -220,122 +220,168 @@ const AdminSettings = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               
               {/* General Settings Tab */}
-              {activeTab === 'general' && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">General Settings</h2>
-                    <button
-                      onClick={() => handleResetSettings('general')}
-                      className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Reset to Default
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
-                      <input
-                        type="text"
-                        value={generalSettings.appName || ''}
-                        onChange={(e) => setGeneralSettings({ ...generalSettings, appName: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="BuildWise"
-                      />
-                    </div>
+{activeTab === 'general' && (
+  <div>
+    <div className="flex justify-between items-center mb-6">
+      <h2 className="text-2xl font-bold text-gray-900">General Settings</h2>
+      <button
+        onClick={() => handleResetSettings('general')}
+        className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      >
+        Reset to Default
+      </button>
+    </div>
+    
+    <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
+        <input
+          type="text"
+          value={generalSettings.appName || ''}
+          onChange={(e) => setGeneralSettings({ ...generalSettings, appName: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="BuildWise"
+        />
+      </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
-                      <input
-                        type="text"
-                        value={generalSettings.companyName || ''}
-                        onChange={(e) => setGeneralSettings({ ...generalSettings, companyName: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your Company Name"
-                      />
-                    </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+        <input
+          type="text"
+          value={generalSettings.companyName || ''}
+          onChange={(e) => setGeneralSettings({ ...generalSettings, companyName: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Your Company Name"
+        />
+      </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Support Email</label>
-                        <input
-                          type="email"
-                          value={generalSettings.supportEmail || ''}
-                          onChange={(e) => setGeneralSettings({ ...generalSettings, supportEmail: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="support@buildwise.com"
-                        />
-                      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Support Email</label>
+          <input
+            type="email"
+            value={generalSettings.supportEmail || ''}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, supportEmail: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="support@buildwise.com"
+          />
+        </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Support Phone</label>
-                        <input
-                          type="tel"
-                          value={generalSettings.supportPhone || ''}
-                          onChange={(e) => setGeneralSettings({ ...generalSettings, supportPhone: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="+63 xxx xxx xxxx"
-                        />
-                      </div>
-                    </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Support Phone</label>
+          <input
+            type="tel"
+            value={generalSettings.supportPhone || ''}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, supportPhone: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="+63 xxx xxx xxxx"
+          />
+        </div>
+      </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
-                        <select
-                          value={generalSettings.timezone || 'Asia/Manila'}
-                          onChange={(e) => setGeneralSettings({ ...generalSettings, timezone: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="Asia/Manila">Asia/Manila</option>
-                          <option value="Asia/Singapore">Asia/Singapore</option>
-                          <option value="Asia/Tokyo">Asia/Tokyo</option>
-                          <option value="America/New_York">America/New York</option>
-                          <option value="Europe/London">Europe/London</option>
-                        </select>
-                      </div>
+      {/* ✅ UPDATED: Changed from 3 columns to 4 columns and replaced Currency */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
+          <select
+            value={generalSettings.timezone || 'Asia/Manila'}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, timezone: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="Asia/Manila">Asia/Manila</option>
+            <option value="Asia/Singapore">Asia/Singapore</option>
+            <option value="Asia/Tokyo">Asia/Tokyo</option>
+            <option value="America/New_York">America/New York</option>
+            <option value="Europe/London">Europe/London</option>
+          </select>
+        </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Date Format</label>
-                        <select
-                          value={generalSettings.dateFormat || 'MM/DD/YYYY'}
-                          onChange={(e) => setGeneralSettings({ ...generalSettings, dateFormat: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                        </select>
-                      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date Format</label>
+          <select
+            value={generalSettings.dateFormat || 'MM/DD/YYYY'}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, dateFormat: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+          </select>
+        </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                        <select
-                          value={generalSettings.currency || 'PHP'}
-                          onChange={(e) => setGeneralSettings({ ...generalSettings, currency: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="PHP">PHP - Philippine Peso</option>
-                          <option value="USD">USD - US Dollar</option>
-                          <option value="EUR">EUR - Euro</option>
-                          <option value="GBP">GBP - British Pound</option>
-                        </select>
-                      </div>
-                    </div>
+        {/* ✅ NEW: Language setting */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+          <select
+            value={generalSettings.language || 'en'}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, language: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="en">English</option>
+            <option value="fil">Filipino</option>
+            <option value="es">Spanish</option>
+            <option value="zh">Chinese</option>
+          </select>
+        </div>
 
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleSaveGeneral}
-                        disabled={saving}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+        {/* ✅ NEW: Items per page */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Items Per Page</label>
+          <select
+            value={generalSettings.itemsPerPage || 10}
+            onChange={(e) => setGeneralSettings({ ...generalSettings, itemsPerPage: parseInt(e.target.value) })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+      </div>
 
+      {/* ✅ NEW: Default Project Status */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Default Project Status</label>
+        <select
+          value={generalSettings.defaultProjectStatus || 'Not Started'}
+          onChange={(e) => setGeneralSettings({ ...generalSettings, defaultProjectStatus: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="Not Started">Not Started</option>
+          <option value="Planning">Planning</option>
+          <option value="In Progress">In Progress</option>
+          <option value="On Hold">On Hold</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <p className="mt-1 text-sm text-gray-500">Default status for newly created projects</p>
+      </div>
+
+      {/* ✅ NEW: Available Project Statuses */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Available Project Statuses</label>
+        <input
+          type="text"
+          value={generalSettings.projectStatuses || 'Not Started, Planning, In Progress, On Hold, Completed, Cancelled'}
+          onChange={(e) => setGeneralSettings({ ...generalSettings, projectStatuses: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Not Started, Planning, In Progress, On Hold, Completed, Cancelled"
+        />
+        <p className="mt-1 text-sm text-gray-500">Comma-separated list of available project statuses</p>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleSaveGeneral}
+          disabled={saving}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
               {/* Profile Settings Tab */}
               {activeTab === 'profile' && (
                 <div>
