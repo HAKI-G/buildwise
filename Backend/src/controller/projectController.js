@@ -56,9 +56,7 @@ export const createProject = async (req, res) => {
 
   try {
     const userId = req.user.id;
-
-    // Max Projects Per User Enforcement
-    const settingsParams = {
+      const settingsParams = {
       TableName: "BuildWiseSettings",
       FilterExpression: "category = :category AND #key = :key",
       ExpressionAttributeNames: { '#key': 'key' },
@@ -80,7 +78,6 @@ export const createProject = async (req, res) => {
         error: `You have reached the maximum limit of ${maxProjects} projects.`
       });
     }
-
     const projectId = uuidv4();
     
     const projectItem = {

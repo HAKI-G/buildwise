@@ -68,30 +68,52 @@ function ProjectsPage() {
 
     // Handle project deletion
     const handleDelete = async (projectId) => {
-        const deletedProject = projects.find(p => p.projectId === projectId);
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
+    // Confirmation
+    if (!window.confirm('Are you sure you want to delete this project?')) {
+        return;
+    }
 
-        try {
-            // Delete project in backend (backend creates audit log automatically)
-            await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
+    const token = getToken();
+    if (!token) {
+        navigate('/login');
+        return;
+    }
 
-            // Send notification
-            if (deletedProject) {
-                await axios.post('http://localhost:5001/api/notifications/send', {
-                    type: 'PROJECT_DELETED',
-                    title: 'Project Deleted',
-                    message: `${deletedProject.name} has been deleted`,
-                    metadata: { projectId, projectName: deletedProject.name }
-                }, config);
-            }
+    const config = { headers: { Authorization: `Bearer ${token}` } };
 
-            // Remove from frontend list
-            setProjects(projects.filter(p => p.projectId !== projectId));
-        } catch (err) {
-            setError(err.response ? err.response.data.message : 'Failed to delete project.');
+    try {
+        // Try to delete from backend
+        await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
+        
+        console.log('✅ Project deleted from database');
+    } catch (err) {
+        console.error('Delete error:', err);
+        
+        // ✅ If 404, project is already gone from database - that's fine!
+        if (err.response?.status !== 404) {
+            // Only show error if it's NOT a 404
+            alert('Failed to delete: ' + (err.response?.data?.message || 'Unknown error'));
+            return; // Don't update state if real error
         }
-    };
+        
+        console.log('⚠️ Project already deleted from database');
+    }
+
+    // ✅ ALWAYS update frontend state after delete attempt
+    setProjects(prevProjects => prevProjects.filter(p => p.projectId !== projectId));
+    
+    // Optional: Send notification
+    try {
+        await axios.post('http://localhost:5001/api/notifications/send', {
+            type: 'PROJECT_DELETED',
+            title: 'Project Deleted',
+            message: 'Project has been deleted',
+            metadata: { projectId }
+        }, config);
+    } catch (notifErr) {
+        console.warn('Notification failed:', notifErr);
+    }
+};
 
     // Handle project creation
     const handleCreateProject = async (e) => {
