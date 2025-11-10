@@ -12,8 +12,6 @@ import { useMaintenanceMode } from './hooks/useMaintenanceMode';
 import { AlertTriangle } from 'lucide-react';
 import SupportTickets from './pages/SupportTickets';
 
-<<<<<<< HEAD
-
 // Maintenance Banner Component
 const MaintenanceBanner = () => {
   return (
@@ -94,44 +92,6 @@ function App() {
       />
 
       <AppContent />
-=======
-function App() {
-  return (
-    <Router> {/* ✅ Router FIRST */}
-      <SettingsProvider> {/* ✅ SettingsProvider INSIDE Router */}
-        {/* Global Toast Container */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            className: "",
-            style: {
-              background: "#1f2937",
-              color: "#fff",
-              borderRadius: "0.5rem",
-            },
-          }}
-        />
-
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/users" element={<UserManagement />} />
-                    <Route path="/audit-logs" element={<AuditLogs />} />
-                    <Route path="/settings" element={<Settings />} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </SettingsProvider>
->>>>>>> 3265439 (Admin Dashboard Not static)
     </Router>
   );
 }

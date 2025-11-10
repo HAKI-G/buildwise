@@ -1,12 +1,5 @@
-<<<<<<< HEAD:admin/src/contexts/SettingsContext.jsx
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import settingsService from '../services/settingsService';
-=======
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { useLocation } from 'react-router-dom'; // ✅ ADD THIS
-import settingsService from '../../services/settingsService';
-import { auth } from '../../utils/auth'; // ✅ ADD THIS
->>>>>>> 3265439 (Admin Dashboard Not static):admin/src/components/contexts/SettingsContext.jsx
 
 const SettingsContext = createContext();
 
@@ -19,7 +12,6 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider = ({ children }) => {
-  const location = useLocation(); // ✅ ADD THIS
   const [settings, setSettings] = useState({
     general: {
       appName: 'BuildWise',
@@ -35,12 +27,8 @@ export const SettingsProvider = ({ children }) => {
     system: {}
   });
   
-<<<<<<< HEAD:admin/src/contexts/SettingsContext.jsx
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-=======
-  const [loading, setLoading] = useState(false); // ✅ CHANGED to false
->>>>>>> 3265439 (Admin Dashboard Not static):admin/src/components/contexts/SettingsContext.jsx
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -55,21 +43,7 @@ export const SettingsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-<<<<<<< HEAD:admin/src/contexts/SettingsContext.jsx
   }, []);
-=======
-  };
-
-  useEffect(() => {
-    // ✅ ONLY fetch settings if authenticated AND not on login page
-    const isAuthenticated = auth.isAuthenticated();
-    const isLoginPage = location.pathname === '/login';
-    
-    if (isAuthenticated && !isLoginPage) {
-      fetchSettings();
-    }
-  }, [location.pathname]); // ✅ Re-run when route changes
->>>>>>> 3265439 (Admin Dashboard Not static):admin/src/components/contexts/SettingsContext.jsx
 
   useEffect(() => {
     // This will only run when component mounts
