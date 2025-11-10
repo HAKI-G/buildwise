@@ -1,42 +1,54 @@
-// Authentication utility functions
-
 export const auth = {
-  // Store token
-  setToken: (token) => {
-    localStorage.setItem('adminToken', token);
-  },
-
-  // Get token
+  // Get token from localStorage
   getToken: () => {
     return localStorage.getItem('adminToken');
   },
 
-  // Remove token
+  // Set token in localStorage
+  setToken: (token) => {
+    localStorage.setItem('adminToken', token);
+  },
+
+  // Remove token from localStorage
   removeToken: () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
   },
 
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!localStorage.getItem('adminToken');
+    const token = localStorage.getItem('adminToken');
+    return !!token;
   },
 
-  // Store user info
-  setUser: (user) => {
-    localStorage.setItem('adminUser', JSON.stringify(user));
-  },
-
-  // Get user info
+  // Get user data from localStorage
   getUser: () => {
-    const user = localStorage.getItem('adminUser');
-    return user ? JSON.parse(user) : null;
+    try {
+      const userStr = localStorage.getItem('adminUser');
+      // ✅ FIX: Check if userStr exists before parsing
+      if (!userStr || userStr === 'undefined') {
+        return null;
+      }
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return null;
+    }
   },
 
-  // Logout
+  // Set user data in localStorage
+  setUser: (user) => {
+    if (user) {
+      localStorage.setItem('adminUser', JSON.stringify(user));
+    }
+  },
+
+  // Logout - clear all auth data
   logout: () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
-  },
+    window.location.href = '/login';
+  }
 };
 
 export default auth;
