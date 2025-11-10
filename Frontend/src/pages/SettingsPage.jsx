@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
 import Layout from '../components/Layout';
+import userService from '../services/userService';
 
 const getToken = () => localStorage.getItem('token');
 
@@ -65,6 +66,7 @@ function SettingsPage() {
         load2FAStatus(); // ✅ Load 2FA status
     }, []);
 
+<<<<<<< HEAD
     // ✅ LOAD 2FA STATUS
     const load2FAStatus = async () => {
         try {
@@ -82,19 +84,40 @@ function SettingsPage() {
     };
 
     const loadUserProfile = () => {
+=======
+   const loadUserProfile = async () => {
+    try {
+        // Try to load from backend first
+        const token = getToken();
+        if (token) {
+            const profileData = await userService.getUserProfile();
+            setProfileForm({
+                name: profileData.name || '',
+                email: profileData.email || '',
+                role: profileData.role || '',
+                avatar: profileData.avatar || ''
+            });
+            setPreviewAvatar(profileData.avatar || '');
+            
+            // Sync with localStorage
+            localStorage.setItem('userName', profileData.name);
+            localStorage.setItem('userEmail', profileData.email);
+            localStorage.setItem('userRole', profileData.role);
+            localStorage.setItem('userAvatar', profileData.avatar || '');
+        }
+    } catch (error) {
+        // Fallback to localStorage if API fails
+        console.error('Error loading profile from backend:', error);
+>>>>>>> 3265439 (Admin Dashboard Not static)
         const userName = localStorage.getItem('userName') || '';
         const userEmail = localStorage.getItem('userEmail') || '';
         const userRole = localStorage.getItem('userRole') || '';
         const userAvatar = localStorage.getItem('userAvatar') || '';
         
-        setProfileForm({
-            name: userName,
-            email: userEmail,
-            role: userRole,
-            avatar: userAvatar
-        });
+        setProfileForm({ name: userName, email: userEmail, role: userRole, avatar: userAvatar });
         setPreviewAvatar(userAvatar);
-    };
+    }
+};
 
     const loadPreferences = () => {
         const savedPrefs = localStorage.getItem('userPreferences');
@@ -174,12 +197,13 @@ function SettingsPage() {
         setProfileForm(prev => ({ ...prev, avatar: '' }));
     };
 
-    // Save profile changes
-    const handleSaveProfile = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage({ type: '', text: '' });
+   // Save profile changes
+const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
 
+<<<<<<< HEAD
         try {
             const token = getToken();
             if (!token) {
@@ -217,8 +241,54 @@ function SettingsPage() {
             setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update profile. Please try again.' });
         } finally {
             setLoading(false);
+=======
+    try {
+        const token = getToken();
+        if (!token) {
+            navigate('/login');
+            return;
+>>>>>>> 3265439 (Admin Dashboard Not static)
         }
-    };
+
+        // Prepare the data to send to backend
+        const updateData = {
+            name: profileForm.name,
+            email: profileForm.email,
+            avatar: previewAvatar || '' // Send the base64 image or empty string
+        };
+
+        // Call the backend API
+        const response = await userService.updateUserProfile(updateData);
+
+        // Update localStorage with the new data from backend
+        if (response.user) {
+            localStorage.setItem('userName', response.user.name);
+            localStorage.setItem('userEmail', response.user.email);
+            localStorage.setItem('userAvatar', response.user.avatar || '');
+        }
+
+        // Log the profile update for audit
+        await auditService.logProfileUpdated(
+            { name: profileForm.name, email: profileForm.email },
+            response.user
+        );
+
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        
+        // Reload to reflect changes in navbar/other components
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        setMessage({ 
+            type: 'error', 
+            text: error.response?.data?.message || 'Failed to update profile. Please try again.' 
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     // Save preferences
     const handleSavePreferences = () => {

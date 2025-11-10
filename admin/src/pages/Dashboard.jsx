@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Users, FolderOpen, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../services/api';
@@ -11,6 +12,28 @@ const StatCard = ({ title, value, icon: Icon, color, gradient, loading }) => (
           <div className="h-10 w-20 bg-white/20 animate-pulse rounded mt-3"></div>
         ) : (
           <p className="text-4xl font-bold mt-2">{value}</p>
+=======
+import { useState, useEffect } from 'react';
+import { Users, FolderOpen, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import adminDashboardService from '../services/adminDashboardService';
+
+
+
+const StatCard = ({ title, value, icon: Icon, color, trend, loading }) => (
+  <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-gray-600 text-sm font-medium">{title}</p>
+        {loading ? (
+          <div className="h-9 w-16 bg-gray-200 animate-pulse rounded mt-2"></div>
+        ) : (
+          <>
+            <p className="text-3xl font-bold mt-2">{value}</p>
+            {trend > 0 && (
+              <p className="text-sm text-green-600 mt-1">↑ {trend}% from last month</p>
+            )}
+          </>
+>>>>>>> 3265439 (Admin Dashboard Not static)
         )}
       </div>
       <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm">
@@ -20,11 +43,13 @@ const StatCard = ({ title, value, icon: Icon, color, gradient, loading }) => (
   </div>
 );
 
+
 const Dashboard = () => {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeProjects: 0,
     completedProjects: 0,
+<<<<<<< HEAD
     pendingIssues: 0
   });
   const [recentActivities, setRecentActivities] = useState([]);
@@ -124,10 +149,67 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
+=======
+    pendingIssues: 0,
+    trends: { users: 0, projects: 0, completed: 0 }
+  });
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [systemStatus, setSystemStatus] = useState({
+    server: { status: 'unknown' },
+    database: { status: 'unknown' },
+    storage: { used: 0 },
+    api: { responseTime: 0 }
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+
+  const fetchDashboardData = async () => {
+    try {
+      setError(null);
+      
+      // Fetch all admin dashboard data in parallel
+      const [statsData, activityData, statusData] = await Promise.all([
+        adminDashboardService.getStats(),
+        adminDashboardService.getRecentActivity(),
+        adminDashboardService.getSystemStatus()
+      ]);
+
+
+      setStats(statsData);
+      setRecentActivities(activityData);
+      setSystemStatus(statusData);
+    } catch (err) {
+      console.error('Error fetching admin dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
+  };
+
+
+  return (
+    <div>
+      <div className="mb-6 flex justify-between items-center">
+>>>>>>> 3265439 (Admin Dashboard Not static)
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
         </div>
+<<<<<<< HEAD
         {lastUpdated && (
           <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
             <Clock className="w-4 h-4" />
@@ -148,24 +230,56 @@ const Dashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+=======
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+>>>>>>> 3265439 (Admin Dashboard Not static)
         <StatCard
           title="Total Users"
           value={stats.totalUsers}
           icon={Users}
+<<<<<<< HEAD
           gradient="from-blue-500 to-blue-600"
+=======
+          color="bg-blue-500"
+          trend={stats.trends.users}
+>>>>>>> 3265439 (Admin Dashboard Not static)
           loading={loading}
         />
         <StatCard
           title="Active Projects"
           value={stats.activeProjects}
           icon={FolderOpen}
+<<<<<<< HEAD
           gradient="from-green-500 to-green-600"
+=======
+          color="bg-green-500"
+          trend={stats.trends.projects}
+>>>>>>> 3265439 (Admin Dashboard Not static)
           loading={loading}
         />
         <StatCard
           title="Pending Issues"
           value={stats.pendingIssues}
           icon={AlertCircle}
+<<<<<<< HEAD
           gradient="from-yellow-500 to-orange-500"
           loading={loading}
         />
@@ -174,10 +288,22 @@ const Dashboard = () => {
           value={stats.completedProjects}
           icon={CheckCircle}
           gradient="from-purple-500 to-purple-600"
+=======
+          color="bg-yellow-500"
+          loading={loading}
+        />
+        <StatCard
+          title="Completed Projects"
+          value={stats.completedProjects}
+          icon={CheckCircle}
+          color="bg-purple-500"
+          trend={stats.trends.completed}
+>>>>>>> 3265439 (Admin Dashboard Not static)
           loading={loading}
         />
       </div>
 
+<<<<<<< HEAD
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
@@ -226,10 +352,46 @@ const Dashboard = () => {
                 <p className="text-gray-600 font-medium">No recent activity</p>
                 <p className="text-sm text-gray-500 mt-1">Activity will appear here as users interact with the system</p>
               </div>
+=======
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center">
+            <div className="w-1 h-6 bg-blue-600 mr-3 rounded"></div>
+            Recent Activity
+          </h2>
+          <div className="space-y-4">
+            {loading ? (
+              // Loading skeleton
+              Array(4).fill(0).map((_, index) => (
+                <div key={index} className="flex items-start space-x-3 pb-4 border-b last:border-b-0">
+                  <div className="w-2 h-2 bg-gray-300 rounded-full mt-2 animate-pulse"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                  </div>
+                </div>
+              ))
+            ) : recentActivities.length > 0 ? (
+              recentActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-3 pb-4 border-b last:border-b-0">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                    <p className="text-xs text-gray-600">by {activity.user}</p>
+                    <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+>>>>>>> 3265439 (Admin Dashboard Not static)
             )}
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* System Status */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
@@ -296,11 +458,96 @@ const Dashboard = () => {
                 ></div>
               </div>
             </div>
+=======
+
+        {/* System Status */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center">
+            <div className="w-1 h-6 bg-green-600 mr-3 rounded"></div>
+            System Status
+          </h2>
+          <div className="space-y-4">
+            {loading ? (
+              // Loading skeleton
+              Array(4).fill(0).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                  <div className="h-2 bg-gray-200 rounded-full animate-pulse"></div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Server Status</span>
+                    <span className={`text-sm font-semibold ${
+                      systemStatus.server.status === 'operational' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ● {systemStatus.server.status === 'operational' ? 'Operational' : 'Down'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-600 h-2 rounded-full" 
+                      style={{ width: systemStatus.server.status === 'operational' ? '100%' : '0%' }}
+                    ></div>
+                  </div>
+                </div>
+
+
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Database</span>
+                    <span className={`text-sm font-semibold ${
+                      systemStatus.database.status === 'connected' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ● {systemStatus.database.status === 'connected' ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-600 h-2 rounded-full" 
+                      style={{ width: systemStatus.database.status === 'connected' ? '100%' : '0%' }}
+                    ></div>
+                  </div>
+                </div>
+
+
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Storage Usage</span>
+                    <span className="text-sm text-blue-600 font-semibold">{systemStatus.storage.used}% Used</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full" 
+                      style={{ width: `${systemStatus.storage.used}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">API Response Time</span>
+                    <span className="text-sm text-green-600 font-semibold">{systemStatus.api.responseTime}ms</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-600 h-2 rounded-full" 
+                      style={{ width: '90%' }}
+                    ></div>
+                  </div>
+                </div>
+              </>
+            )}
+>>>>>>> 3265439 (Admin Dashboard Not static)
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 
 export default Dashboard;

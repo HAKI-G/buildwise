@@ -1,47 +1,42 @@
 import express from 'express';
-import { protect, requireAdmin } from '../middleware/authMiddleware.js';
-import {
-  getAllUsersAdmin,
-  getUserByIdAdmin,
-  createUserAdmin,
-  updateUserAdmin,
-  deleteUserAdmin
-} from '../controller/adminController.js';
-import { 
-  getAuditLogs,
-  getAuditLogsByUser,
-  archiveLog,
-  unarchiveLog,
-  bulkArchiveLogs
-} from '../controller/auditController.js';
+   import { protect, requireAdmin } from '../middleware/authMiddleware.js';
+   import {
+     getAllUsersAdmin,
+     getUserByIdAdmin,
+     createUserAdmin,
+     updateUserAdmin,
+     deleteUserAdmin
+   } from '../controller/adminController.js';
+   import { 
+     getAuditLogs,
+     getAuditLogsByUser,
+     archiveLog,
+     unarchiveLog,
+     bulkArchiveLogs
+   } from '../controller/auditController.js';
 
-const router = express.Router();
+   // ✅ ADD THIS IMPORT
+   import adminDashboardRoutes from './adminDashboardRoutes.js';
 
-// Apply authentication to ALL routes
-router.use(protect);
-// Uncomment this if you want ALL admin routes to require admin role
-// router.use(requireAdmin);
+   const router = express.Router();
 
-// ==========================================
-// Admin user management routes
-// ==========================================
-router.get('/users', getAllUsersAdmin);
-router.get('/users/:userId', getUserByIdAdmin);
-router.post('/users', createUserAdmin);
-router.put('/users/:userId', updateUserAdmin);
-router.delete('/users/:userId', deleteUserAdmin);
+   router.use(protect);
 
-// ==========================================
-// ✅ Admin audit log routes (GET)
-// ==========================================
-router.get('/audit-logs', getAuditLogs);
-router.get('/audit-logs/user/:userId', getAuditLogsByUser);
+   // User management routes
+   router.get('/users', getAllUsersAdmin);
+   router.get('/users/:userId', getUserByIdAdmin);
+   router.post('/users', createUserAdmin);
+   router.put('/users/:userId', updateUserAdmin);
+   router.delete('/users/:userId', deleteUserAdmin);
 
-// ==========================================
-// ✅ Admin audit log routes (ARCHIVE)
-// ==========================================
-router.post('/audit-logs/archive', archiveLog);
-router.post('/audit-logs/unarchive', unarchiveLog);
-router.post('/audit-logs/bulk-archive', bulkArchiveLogs);
+   // Audit log routes
+   router.get('/audit-logs', getAuditLogs);
+   router.get('/audit-logs/user/:userId', getAuditLogsByUser);
+   router.post('/audit-logs/archive', archiveLog);
+   router.post('/audit-logs/unarchive', unarchiveLog);
+   router.post('/audit-logs/bulk-archive', bulkArchiveLogs);
 
-export default router;
+   // ✅ ADD THIS - Admin Dashboard routes
+   router.use('/dashboard', adminDashboardRoutes);
+
+   export default router;
