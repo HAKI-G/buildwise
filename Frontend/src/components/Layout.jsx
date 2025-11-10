@@ -3,11 +3,13 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Settings, Moon, Sun } from 'lucide-react';
 
+
 const DashboardIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
+
 
 const StatsIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -15,11 +17,13 @@ const StatsIcon = () => (
   </svg>
 );
 
+
 const ProjectsIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
   </svg>
 );
+
 
 const SettingsIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -28,11 +32,13 @@ const SettingsIcon = () => (
   </svg>
 );
 
+
 const LogoutIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
   </svg>
 );
+
 
 function Layout({ title, children, headerContent }) {
     const navigate = useNavigate();
@@ -43,6 +49,7 @@ function Layout({ title, children, headerContent }) {
         role: 'User',
         avatar: ''
     });
+
 
     useEffect(() => {
         const userName = localStorage.getItem('userName') || 'User';
@@ -56,15 +63,6 @@ function Layout({ title, children, headerContent }) {
         });
     }, []);
 
-    const handleStatisticsClick = () => {
-        const lastSelectedProjectId = localStorage.getItem('lastSelectedProjectId');
-        if (lastSelectedProjectId) {
-            navigate(`/statistics/${lastSelectedProjectId}`);
-        } else {
-            alert("Please select a project from the Dashboard or Projects page first.");
-            navigate('/projects');
-        }
-    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -77,6 +75,7 @@ function Layout({ title, children, headerContent }) {
         navigate('/login');
     };
 
+
     const getInitials = (name) => {
         if (!name) return 'U';
         return name
@@ -87,8 +86,10 @@ function Layout({ title, children, headerContent }) {
             .slice(0, 2);
     };
 
+
     const navLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors";
     const activeNavLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg font-bold bg-white dark:bg-slate-700 text-black dark:text-white shadow-sm";
+
 
     return (
         <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white transition-colors duration-200">
@@ -104,13 +105,13 @@ function Layout({ title, children, headerContent }) {
                             <span>Dashboard</span>
                         </NavLink>
                         
-                        <button 
-                            onClick={handleStatisticsClick} 
-                            className={navLinkClasses}
+                        <NavLink 
+                            to="/statistics" 
+                            className={({ isActive }) => isActive ? activeNavLinkClasses : navLinkClasses}
                         >
                             <StatsIcon />
                             <span>Statistics</span>
-                        </button>
+                        </NavLink>
                         
                         <NavLink 
                             to="/projects" 
@@ -133,6 +134,7 @@ function Layout({ title, children, headerContent }) {
                     </button>
                 </div>
             </aside>
+
 
             <main className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Header Bar */}
@@ -164,6 +166,7 @@ function Layout({ title, children, headerContent }) {
                                 )}
                             </button>
 
+
                             {/* Settings Button */}
                             <button 
                                 onClick={() => navigate('/settings')}
@@ -173,6 +176,7 @@ function Layout({ title, children, headerContent }) {
                             >
                                 <Settings className="w-5 h-5" />
                             </button>
+
 
                             {/* User Info */}
                             <div className="flex items-center space-x-4">
@@ -188,6 +192,7 @@ function Layout({ title, children, headerContent }) {
                     </div>
                 </header>
 
+
                 {/* Main Content Area */}
                 <div className="flex-1 p-8 overflow-y-auto">
                     {children}
@@ -196,5 +201,6 @@ function Layout({ title, children, headerContent }) {
         </div>
     );
 }
+
 
 export default Layout;
