@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from './contexts/ThemeContext';
 import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
@@ -51,7 +52,7 @@ const ProtectedContent = () => {
   );
 };
 
-// Main App Content
+// Main App Content - MUST be inside Router to use useLocation
 const AppContent = () => {
   return (
     <Routes>
@@ -77,22 +78,30 @@ const AppContent = () => {
 
 function App() {
   return (
-    <Router>
-      {/* Global Toast Container */}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          className: "",
-          style: {
-            background: "#1f2937",
-            color: "#fff",
-            borderRadius: "0.5rem",
-          },
-        }}
-      />
+    <ThemeProvider>
+      <Router>
+        {/* Global Toast Container */}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            className: "dark:bg-gray-800",
+            style: {
+              background: "#1f2937",
+              color: "#fff",
+              borderRadius: "0.5rem",
+            },
+            success: {
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
 
-      <AppContent />
-    </Router>
+        <AppContent />
+      </Router>
+    </ThemeProvider>
   );
 }
 
