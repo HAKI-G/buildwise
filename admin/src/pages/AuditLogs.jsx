@@ -14,7 +14,6 @@ const AuditLogs = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
-  // ✅ NEW: Stats state
   const [stats, setStats] = useState({
     total: 0,
     created: 0,
@@ -24,17 +23,14 @@ const AuditLogs = () => {
 
   useEffect(() => {
     fetchAuditLogs();
-    fetchStats(); // ✅ ADD THIS
+    fetchStats();
   }, [showArchived]);
 
-  // ✅ NEW: Fetch stats separately for accurate counts
   const fetchStats = async () => {
     try {
-      // Fetch ALL logs for accurate stats (increase limit)
       const response = await auditService.getAllLogs({ limit: 1000 });
       const allLogs = response.logs || [];
       
-      // Filter by archived status
       const relevantLogs = allLogs.filter(log => 
         showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
       );
@@ -55,7 +51,6 @@ const AuditLogs = () => {
       setLoading(true);
       const response = await auditService.getAllLogs({ limit: 100 });
       
-      // ✅ Filter by string 'true' or 'false'
       let filteredByArchive = (response.logs || []).filter(log => 
         showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
       );
@@ -97,64 +92,59 @@ const AuditLogs = () => {
   };
 
   const handleFilter = async () => {
-  try {
-    setLoading(true);
-    let filteredLogs = [];
-    
-    if (filterType === 'user' && filterValue.trim()) {
-      const allResponse = await auditService.getAllLogs({ limit: 500 });
-      const allLogs = allResponse.logs || [];
-      filteredLogs = allLogs.filter(log => 
-        log.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
-        log.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
-        log.userId?.toLowerCase().includes(filterValue.toLowerCase())
+    try {
+      setLoading(true);
+      let filteredLogs = [];
+      
+      if (filterType === 'user' && filterValue.trim()) {
+        const allResponse = await auditService.getAllLogs({ limit: 500 });
+        const allLogs = allResponse.logs || [];
+        filteredLogs = allLogs.filter(log => 
+          log.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
+          log.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
+          log.userId?.toLowerCase().includes(filterValue.toLowerCase())
+        );
+      } else if (filterType === 'action' && filterValue) {
+        const allResponse = await auditService.getAllLogs({ limit: 500 });
+        const allLogs = allResponse.logs || [];
+        filteredLogs = allLogs.filter(log => log.action === filterValue);
+      } else if (filterType === 'dateRange' && dateRange.start && dateRange.end) {
+        const allResponse = await auditService.getAllLogs({ limit: 500 });
+        const allLogs = allResponse.logs || [];
+        
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        
+        filteredLogs = allLogs.filter(log => {
+          const logDate = new Date(log.timestamp);
+          return logDate >= startDate && logDate <= endDate;
+        });
+      } else {
+        const response = await auditService.getAllLogs({ limit: 100 });
+        filteredLogs = response.logs || [];
+      }
+      
+      filteredLogs = filteredLogs.filter(log => 
+        showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
       );
-    } else if (filterType === 'action' && filterValue) {
-      const allResponse = await auditService.getAllLogs({ limit: 500 });
-      const allLogs = allResponse.logs || [];
-      filteredLogs = allLogs.filter(log => log.action === filterValue);
-    } else if (filterType === 'dateRange' && dateRange.start && dateRange.end) {
-      const allResponse = await auditService.getAllLogs({ limit: 500 });
-      const allLogs = allResponse.logs || [];
       
-      // Simple date comparison - start of day to end of day
-      const startDate = new Date(dateRange.start);
-      startDate.setHours(0, 0, 0, 0);
+      const sortedLogs = filteredLogs.sort((a, b) => 
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
       
-      const endDate = new Date(dateRange.end);
-      endDate.setHours(23, 59, 59, 999);
-      
-      filteredLogs = allLogs.filter(log => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= startDate && logDate <= endDate;
-      });
-      
-      console.log(`📅 Date filter: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
-      console.log(`   Found ${filteredLogs.length} logs in this range`);
-    } else {
-      const response = await auditService.getAllLogs({ limit: 100 });
-      filteredLogs = response.logs || [];
+      setLogs(sortedLogs);
+      setError(null);
+    } catch (err) {
+      setError('Failed to filter logs');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    
-    filteredLogs = filteredLogs.filter(log => 
-      showArchived ? log.isArchived === 'true' : log.isArchived !== 'true'
-    );
-    
-    const sortedLogs = filteredLogs.sort((a, b) => 
-      new Date(b.timestamp) - new Date(a.timestamp)
-    );
-    
-    setLogs(sortedLogs);
-    setError(null);
-  } catch (err) {
-    setError('Failed to filter logs');
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-  // ✅ Archive single log
   const handleArchiveLog = async (log) => {
     if (!window.confirm('Archive this log? It will be moved to archived logs.')) {
       return;
@@ -164,7 +154,7 @@ const AuditLogs = () => {
       setArchiving(true);
       await auditService.archiveLog(log.logId, log.timestamp);
       await fetchAuditLogs();
-      await fetchStats(); // ✅ Refresh stats
+      await fetchStats();
     } catch (err) {
       setError('Failed to archive log');
       console.error(err);
@@ -173,7 +163,6 @@ const AuditLogs = () => {
     }
   };
 
-  // ✅ Unarchive single log
   const handleUnarchiveLog = async (log) => {
     if (!window.confirm('Restore this log from archive?')) {
       return;
@@ -183,7 +172,7 @@ const AuditLogs = () => {
       setArchiving(true);
       await auditService.unarchiveLog(log.logId, log.timestamp);
       await fetchAuditLogs();
-      await fetchStats(); // ✅ Refresh stats
+      await fetchStats();
     } catch (err) {
       setError('Failed to unarchive log');
       console.error(err);
@@ -192,7 +181,6 @@ const AuditLogs = () => {
     }
   };
 
-  // ✅ Restore all archived logs
   const handleRestoreAll = async () => {
     if (logs.length === 0) {
       alert('No archived logs to restore');
@@ -206,13 +194,11 @@ const AuditLogs = () => {
     try {
       setArchiving(true);
       
-      // Build array of {logId, timestamp} for all archived logs
       const logsToRestore = logs.map(log => ({
         logId: log.logId,
         timestamp: log.timestamp
       }));
       
-      // Restore each log
       await Promise.all(
         logsToRestore.map(log => 
           auditService.unarchiveLog(log.logId, log.timestamp)
@@ -220,7 +206,7 @@ const AuditLogs = () => {
       );
       
       await fetchAuditLogs();
-      await fetchStats(); // ✅ Refresh stats
+      await fetchStats();
     } catch (err) {
       setError('Failed to restore all logs');
       console.error(err);
@@ -231,17 +217,17 @@ const AuditLogs = () => {
 
   const getActionBadgeColor = (action) => {
     const colors = {
-      PROJECT_CREATED: 'bg-green-100 text-green-800',
-      PROJECT_UPDATED: 'bg-yellow-100 text-yellow-800',
-      PROJECT_DELETED: 'bg-red-100 text-red-800',
-      USER_CREATED: 'bg-indigo-100 text-indigo-800',
-      USER_UPDATED: 'bg-yellow-100 text-yellow-800',
-      USER_DELETED: 'bg-red-100 text-red-800',
-      ROLE_CHANGED: 'bg-purple-100 text-purple-800',
-      SETTINGS_UPDATED: 'bg-cyan-100 text-cyan-800',
-      DATA_EXPORT: 'bg-teal-100 text-teal-800',
+      PROJECT_CREATED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      PROJECT_UPDATED: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+      PROJECT_DELETED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+      USER_CREATED: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+      USER_UPDATED: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+      USER_DELETED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+      ROLE_CHANGED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+      SETTINGS_UPDATED: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+      DATA_EXPORT: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
     };
-    return colors[action] || 'bg-gray-100 text-gray-800';
+    return colors[action] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
 
   const formatDate = (timestamp) => {
@@ -287,9 +273,9 @@ const AuditLogs = () => {
 
   if (loading && logs.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Project Audit Logs</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Project Audit Logs</h1>
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
@@ -299,13 +285,13 @@ const AuditLogs = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Project Audit Logs {showArchived && <span className="text-gray-500">(Archived)</span>}
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Project Audit Logs {showArchived && <span className="text-gray-500 dark:text-gray-400">(Archived)</span>}
             </h1>
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -313,7 +299,7 @@ const AuditLogs = () => {
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   !showArchived 
                     ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 Active Logs
@@ -323,7 +309,7 @@ const AuditLogs = () => {
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   showArchived 
                     ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 Archived Logs
@@ -331,7 +317,6 @@ const AuditLogs = () => {
             </div>
           </div>
           <div className="flex gap-3">
-            {/* Restore All button (only in archived view) */}
             {showArchived && logs.length > 0 && (
               <button 
                 onClick={handleRestoreAll} 
@@ -360,10 +345,10 @@ const AuditLogs = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter By</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter By</label>
               <select 
                 value={filterType} 
                 onChange={(e) => {
@@ -371,7 +356,7 @@ const AuditLogs = () => {
                   setFilterValue('');
                   setDateRange({ start: '', end: '' });
                 }} 
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="all">All Logs</option>
                 <option value="user">User Name/Email</option>
@@ -382,24 +367,24 @@ const AuditLogs = () => {
             
             {filterType === 'user' && (
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">User Name or Email</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Name or Email</label>
                 <input 
                   type="text" 
                   value={filterValue} 
                   onChange={(e) => setFilterValue(e.target.value)} 
                   placeholder="Enter name or email" 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500" 
                 />
               </div>
             )}
             
             {filterType === 'action' && (
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Action Type</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Action Type</label>
                 <select 
                   value={filterValue} 
                   onChange={(e) => setFilterValue(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="">Select Action</option>
                   {Object.values(ACTION_TYPES).map(type => (
@@ -412,21 +397,21 @@ const AuditLogs = () => {
             {filterType === 'dateRange' && (
               <>
                 <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
                   <input 
                     type="datetime-local" 
                     value={dateRange.start} 
                     onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
                   />
                 </div>
                 <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
                   <input 
                     type="datetime-local" 
                     value={dateRange.end} 
                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
                   />
                 </div>
               </>
@@ -451,7 +436,7 @@ const AuditLogs = () => {
                   setDateRange({ start: '', end: '' });
                   fetchAuditLogs();
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
               >
                 Clear Filter
               </button>
@@ -460,7 +445,7 @@ const AuditLogs = () => {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6 flex items-start">
             <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
@@ -468,57 +453,57 @@ const AuditLogs = () => {
           </div>
         )}
 
-        {/* ✅ UPDATED: Stats using new stats state */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                   Total {showArchived ? 'Archived' : 'Active'} Logs
                 </p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.total}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Projects Created</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{stats.created}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Projects Created</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{stats.created}</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Projects Updated</p>
-                <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.updated}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Projects Updated</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{stats.updated}</p>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Projects Deleted</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{stats.deleted}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Projects Deleted</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{stats.deleted}</p>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
@@ -527,29 +512,29 @@ const AuditLogs = () => {
         </div>
 
         {/* Logs Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Timestamp</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {logs.map((log) => (
-                  <tr key={log.logId} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <tr key={log.logId} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(log.timestamp)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{log.userName}</span>
-                        <span className="text-xs text-gray-500">{log.userEmail}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{log.userName}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{log.userEmail}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -557,18 +542,18 @@ const AuditLogs = () => {
                         {log.action.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md truncate">
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-300 max-w-md truncate">
                       {log.actionDescription}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>
                         {log.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm flex gap-2">
                       <button 
                         onClick={() => setSelectedLog(log)} 
-                        className="text-blue-600 hover:text-blue-900 font-medium"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium"
                       >
                         View
                       </button>
@@ -576,7 +561,7 @@ const AuditLogs = () => {
                         <button 
                           onClick={() => handleArchiveLog(log)}
                           disabled={archiving}
-                          className="text-orange-600 hover:text-orange-900 font-medium disabled:opacity-50"
+                          className="text-orange-600 dark:text-orange-400 hover:text-orange-900 dark:hover:text-orange-300 font-medium disabled:opacity-50"
                         >
                           Archive
                         </button>
@@ -584,7 +569,7 @@ const AuditLogs = () => {
                         <button 
                           onClick={() => handleUnarchiveLog(log)}
                           disabled={archiving}
-                          className="text-green-600 hover:text-green-900 font-medium disabled:opacity-50"
+                          className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 font-medium disabled:opacity-50"
                         >
                           Restore
                         </button>
@@ -598,13 +583,13 @@ const AuditLogs = () => {
 
           {logs.length === 0 && !loading && (
             <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
                 {showArchived ? 'No archived logs found' : 'No audit logs found'}
               </h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {filterType !== 'all' 
                   ? 'No logs match your filter criteria. Try adjusting your filters.' 
                   : showArchived 
@@ -643,15 +628,15 @@ const AuditLogs = () => {
         {/* Details Modal */}
         {selectedLog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Audit Log Details
                   {selectedLog.isArchived === 'true' && (
-                    <span className="ml-2 text-sm font-normal text-orange-600">(Archived)</span>
+                    <span className="ml-2 text-sm font-normal text-orange-600 dark:text-orange-400">(Archived)</span>
                   )}
                 </h2>
-                <button onClick={() => setSelectedLog(null)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSelectedLog(null)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -661,27 +646,27 @@ const AuditLogs = () => {
               <div className="px-6 py-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Log ID</label>
-                    <p className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.logId}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Log ID</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white font-mono">{selectedLog.logId}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Timestamp</label>
-                    <p className="mt-1 text-sm text-gray-900">{formatDate(selectedLog.timestamp)}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Timestamp</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(selectedLog.timestamp)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">User Name</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedLog.userName}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User Name</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLog.userName}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">User Email</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedLog.userEmail}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User Email</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLog.userEmail}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">User ID</label>
-                    <p className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.userId}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User ID</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white font-mono">{selectedLog.userId}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Action</label>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Action</label>
                     <p className="mt-1">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionBadgeColor(selectedLog.action)}`}>
                         {selectedLog.action}
@@ -689,59 +674,59 @@ const AuditLogs = () => {
                     </p>
                   </div>
                   <div className="col-span-2">
-                    <label className="text-sm font-medium text-gray-500">Description</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedLog.actionDescription}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLog.actionDescription}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Status</label>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
                     <p className="mt-1">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${selectedLog.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${selectedLog.status === 'SUCCESS' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>
                         {selectedLog.status}
                       </span>
                     </p>
                   </div>
                   {selectedLog.targetResource && (
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Target Resource</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLog.targetResource}</p>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Target Resource</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLog.targetResource}</p>
                     </div>
                   )}
                   {selectedLog.targetId && (
                     <div className="col-span-2">
-                      <label className="text-sm font-medium text-gray-500">Target ID (Project ID)</label>
-                      <p className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.targetId}</p>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Target ID (Project ID)</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white font-mono">{selectedLog.targetId}</p>
                     </div>
                   )}
                   {selectedLog.oldValue && (
                     <div className="col-span-2">
-                      <label className="text-sm font-medium text-gray-500">Old Value (Before Update)</label>
-                      <pre className="mt-1 text-xs text-gray-900 bg-gray-50 p-3 rounded-lg overflow-x-auto">
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Old Value (Before Update)</label>
+                      <pre className="mt-1 text-xs text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-3 rounded-lg overflow-x-auto">
                         {JSON.stringify(JSON.parse(selectedLog.oldValue), null, 2)}
                       </pre>
                     </div>
                   )}
                   {selectedLog.newValue && (
                     <div className="col-span-2">
-                      <label className="text-sm font-medium text-gray-500">New Value (After Update)</label>
-                      <pre className="mt-1 text-xs text-gray-900 bg-gray-50 p-3 rounded-lg overflow-x-auto">
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">New Value (After Update)</label>
+                      <pre className="mt-1 text-xs text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-3 rounded-lg overflow-x-auto">
                         {JSON.stringify(JSON.parse(selectedLog.newValue), null, 2)}
                       </pre>
                     </div>
                   )}
                   {selectedLog.errorMessage && (
                     <div className="col-span-2">
-                      <label className="text-sm font-medium text-red-500">Error Message</label>
-                      <p className="mt-1 text-sm text-red-900 bg-red-50 p-3 rounded-lg">{selectedLog.errorMessage}</p>
+                      <label className="text-sm font-medium text-red-500 dark:text-red-400">Error Message</label>
+                      <p className="mt-1 text-sm text-red-900 dark:text-red-300 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">{selectedLog.errorMessage}</p>
                     </div>
                   )}
                   <div className="col-span-2">
-                    <label className="text-sm font-medium text-gray-500">User Agent (Browser)</label>
-                    <p className="mt-1 text-xs text-gray-900 break-all bg-gray-50 p-2 rounded">{selectedLog.userAgent}</p>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User Agent (Browser)</label>
+                    <p className="mt-1 text-xs text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">{selectedLog.userAgent}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200">
+              <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <button 
                   onClick={() => setSelectedLog(null)} 
                   className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"

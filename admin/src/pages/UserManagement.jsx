@@ -24,7 +24,6 @@ const UserManagement = () => {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  // Add audit log hook
   const { logAction, LOG_TYPES } = useAuditLog();
 
   useEffect(() => {
@@ -144,10 +143,8 @@ const UserManagement = () => {
       setIsLoading(true);
       
       if (selectedUser) {
-        // UPDATE USER
         await userService.updateUser(selectedUser.userId, formData);
         
-        // Log user update
         await logAction(
           LOG_TYPES.USER_UPDATED,
           `Updated user: ${formData.name} (${formData.email})${
@@ -173,7 +170,6 @@ const UserManagement = () => {
           }
         );
 
-        // If password was changed, log separately
         if (formData.password) {
           await logAction(
             LOG_TYPES.PASSWORD_CHANGED,
@@ -186,7 +182,6 @@ const UserManagement = () => {
           );
         }
 
-        // If role was changed, log separately
         if (selectedUser.role !== formData.role) {
           await logAction(
             LOG_TYPES.ROLE_CHANGED,
@@ -208,10 +203,8 @@ const UserManagement = () => {
         ));
         alert('User updated successfully!');
       } else {
-        // CREATE USER
         const newUser = await userService.createUser(formData);
         
-        // Log user creation
         await logAction(
           LOG_TYPES.USER_CREATED,
           `Created new user: ${formData.name} (${formData.email}) with role "${formData.role}"`,
@@ -236,7 +229,6 @@ const UserManagement = () => {
       console.error('Error saving user:', error);
       const errorMessage = error.response?.data?.error || 'Error saving user. Please try again.';
       
-      // Log failed action
       if (selectedUser) {
         await logAction(
           LOG_TYPES.USER_UPDATED,
@@ -275,7 +267,6 @@ const UserManagement = () => {
       setIsLoading(true);
       await userService.deleteUser(selectedUser.userId);
       
-      // Log user deletion
       await logAction(
         LOG_TYPES.USER_DELETED,
         `Deleted user: ${selectedUser.name} (${selectedUser.email})`,
@@ -299,7 +290,6 @@ const UserManagement = () => {
       console.error('Error deleting user:', error);
       const errorMessage = 'Error deleting user. Please try again.';
       
-      // Log failed deletion
       await logAction(
         LOG_TYPES.USER_DELETED,
         `Failed to delete user: ${selectedUser.name}`,
@@ -319,31 +309,31 @@ const UserManagement = () => {
 
   const getRoleBadgeColor = (role) => {
     const colors = {
-      'Admin': 'bg-purple-100 text-purple-800',
-      'Project Manager': 'bg-blue-100 text-blue-800',
-      'Site Engineer': 'bg-green-100 text-green-800',
-      'Vice President': 'bg-red-100 text-red-800',
+      'Admin': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+      'Project Manager': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      'Site Engineer': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      'Vice President': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600 mt-1">Manage system users and their roles</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">User Management</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage system users and their roles</p>
       </div>
 
       <Card>
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
             <input
               type="text"
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
           <Button
@@ -358,49 +348,49 @@ const UserManagement = () => {
         {isLoading && users.length === 0 ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Loading users...</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-4">Loading users...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-12">
-            <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No users found</p>
+            <Shield className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">No users found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Email
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredUsers.map((user) => (
-                  <tr key={user.userId} className="hover:bg-gray-50">
+                  <tr key={user.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                          <div className="h-10 w-10 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-white font-semibold">
                             {user.name?.charAt(0).toUpperCase()}
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.email}</div>
+                      <div className="text-sm text-gray-900 dark:text-gray-300">{user.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
@@ -410,13 +400,13 @@ const UserManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleOpenModal(user)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
                       >
                         <Edit className="w-5 h-5 inline" />
                       </button>
                       <button
                         onClick={() => handleDeleteClick(user)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                       >
                         <Trash2 className="w-5 h-5 inline" />
                       </button>
@@ -469,14 +459,14 @@ const UserManagement = () => {
           />
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Role <span className="text-red-500">*</span>
             </label>
             <select
               name="role"
               value={formData.role}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
             >
               {Object.values(USER_ROLES).map((role) => (
@@ -486,7 +476,7 @@ const UserManagement = () => {
               ))}
             </select>
             {formErrors.role && (
-              <p className="mt-1 text-sm text-red-500">{formErrors.role}</p>
+              <p className="mt-1 text-sm text-red-500 dark:text-red-400">{formErrors.role}</p>
             )}
           </div>
 
@@ -515,10 +505,10 @@ const UserManagement = () => {
         size="sm"
       >
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-            <Trash2 className="h-6 w-6 text-red-600" />
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+            <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
           </div>
-          <p className="text-gray-700 mb-6">
+          <p className="text-gray-700 dark:text-gray-300 mb-6">
             Are you sure you want to delete <strong>{selectedUser?.name}</strong>? This action cannot be undone.
           </p>
           <div className="flex justify-center space-x-3">

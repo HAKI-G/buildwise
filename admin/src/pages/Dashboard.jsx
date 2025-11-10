@@ -125,11 +125,11 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Welcome back! Here's what's happening today.</p>
         </div>
         {lastUpdated && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
             <Clock className="w-4 h-4" />
             <span>Updated {formatTimeAgo(lastUpdated)}</span>
           </div>
@@ -138,7 +138,7 @@ const Dashboard = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 rounded-lg">
           <div className="flex items-center">
             <AlertCircle className="w-5 h-5 mr-2" />
             <p className="font-medium">{error}</p>
@@ -181,20 +181,20 @@ const Dashboard = () => {
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
-            <p className="text-sm text-gray-600 mt-1">Latest system events</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Activity</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Latest system events</p>
           </div>
           <div className="p-6">
             {loading ? (
               <div className="space-y-4">
                 {Array(4).fill(0).map((_, i) => (
                   <div key={i} className="flex items-start gap-3 animate-pulse">
-                    <div className="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full mt-2"></div>
                     <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mt-2"></div>
                     </div>
                   </div>
                 ))}
@@ -204,15 +204,15 @@ const Dashboard = () => {
                 {recentActivities.map((activity, index) => (
                   <div 
                     key={activity.id} 
-                    className={`flex items-start gap-3 pb-4 ${index !== recentActivities.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    className={`flex items-start gap-3 pb-4 ${index !== recentActivities.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''}`}
                   >
                     <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.action}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-600">by {activity.user}</span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500">{activity.time}</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">by {activity.user}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-600">•</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">{activity.time}</span>
                       </div>
                     </div>
                   </div>
@@ -220,33 +220,34 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="w-8 h-8 text-gray-400" />
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                 </div>
-                <p className="text-gray-600 font-medium">No recent activity</p>
-                <p className="text-sm text-gray-500 mt-1">Activity will appear here as users interact with the system</p>
+                <p className="text-gray-600 dark:text-gray-400 font-medium">No recent activity</p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Activity will appear here as users interact with the system</p>
               </div>
             )}
           </div>
         </div>
 
+
         {/* System Status */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900">System Status</h2>
-            <p className="text-sm text-gray-600 mt-1">Current system health</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">System Status</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Current system health</p>
           </div>
           <div className="p-6 space-y-5">
             {/* Server Status */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Server Status</span>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Server Status</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
                   Operational
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{ width: '100%' }}></div>
               </div>
             </div>
@@ -254,13 +255,13 @@ const Dashboard = () => {
             {/* Database */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Database</span>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Database</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
                   Connected
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{ width: '100%' }}></div>
               </div>
             </div>
@@ -268,12 +269,12 @@ const Dashboard = () => {
             {/* Total Users */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Total Users</span>
-                <span className="text-sm font-bold text-blue-600">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Users</span>
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
                   {loading ? '...' : stats.totalUsers}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500" 
                   style={{ width: `${Math.min(stats.totalUsers * 2, 100)}%` }}
@@ -284,12 +285,12 @@ const Dashboard = () => {
             {/* Active Projects */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Active Projects</span>
-                <span className="text-sm font-bold text-green-600">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Projects</span>
+                <span className="text-sm font-bold text-green-600 dark:text-green-400">
                   {loading ? '...' : stats.activeProjects}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-500" 
                   style={{ width: `${Math.min(stats.activeProjects * 8, 100)}%` }}
