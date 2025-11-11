@@ -19,23 +19,27 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import MilestoneStatusPage from './pages/MilestoneStatusPage';
 import TaskPriorityPage from './pages/TaskPriorityPage';
 import PendingTasksPage from './pages/PendingTasksPage';
-import ProjectMilestonesPage from './pages/ProjectMilestonesPage';
-import ProjectUpdatesPage from './pages/ProjectUpdatesPage';
+
+// ✅ NEW: Dedicated View Pages (accessed from sidebar)
+import MilestonesViewPage from './pages/MilestonesViewPage.jsx';
+import UpdatesViewPage from './pages/UpdatesViewPage.jsx';
+import PhotosViewPage from './pages/PhotosViewPage.jsx';
+import ReportsViewPage from './pages/ReportsViewPage.jsx';
+import CommentsViewPage from './pages/CommentsViewPage.jsx';
+import DocumentsViewPage from './pages/DocumentsViewPage.jsx';
+import MapsViewPage from './pages/MapsViewPage.jsx';
 
 function App() {
   const location = useLocation();
   
-  // ✅ Get user role from localStorage
   const userRole = localStorage.getItem('userRole');
   const isAdmin = userRole === 'Admin';
   
   const { isMaintenanceMode, loading } = useMaintenanceMode();
 
-  // ✅ Always allow login and register pages
   const publicPaths = ['/login', '/register'];
   const isPublicPath = publicPaths.includes(location.pathname);
 
-  // Show loading while checking maintenance status
   if (loading && !isPublicPath) {
     return (
       <ThemeProvider>
@@ -46,10 +50,6 @@ function App() {
     );
   }
 
-  // ✅ Show maintenance screen if:
-  // - Maintenance mode is ON
-  // - User is NOT on a public path (login/register)
-  // - User is NOT an admin
   const shouldShowMaintenance = isMaintenanceMode && !isPublicPath && !isAdmin;
 
   return (
@@ -58,18 +58,29 @@ function App() {
         <MaintenanceScreen />
       ) : (
         <Routes>
-          {/* Public Routes - Always accessible */}
+          {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           
-          {/* Protected Routes */}
+          {/* Dashboard */}
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/projects/:projectId/milestones" element={<ProjectMilestonesPage />} />
-          <Route path="/projects/:projectId/updates" element={<ProjectUpdatesPage />} />  
           
+          {/* Projects Routes */}
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId/:tab" element={<ProjectDetailPage />} />
+          <Route path="/projects/edit/:projectId" element={<UpdateProjectPage />} />
+          
+          {/* ✅ NEW: Dedicated View Routes (no tabs, no full header) */}
+          <Route path="/projects/:projectId/view/milestones" element={<MilestonesViewPage />} />
+          <Route path="/projects/:projectId/view/updates" element={<UpdatesViewPage />} />
+          <Route path="/projects/:projectId/view/photos" element={<PhotosViewPage />} />
+          <Route path="/projects/:projectId/view/reports" element={<ReportsViewPage />} />
+          <Route path="/projects/:projectId/view/comments" element={<CommentsViewPage />} />
+          <Route path="/projects/:projectId/view/documents" element={<DocumentsViewPage />} />
+          <Route path="/projects/:projectId/view/maps" element={<MapsViewPage />} />
           
           {/* Statistics Routes */}
           <Route path="/statistics" element={<StatisticsPage />} />
@@ -77,8 +88,8 @@ function App() {
           <Route path="/statistics/:projectId/milestone-status" element={<MilestoneStatusPage />} />
           <Route path="/statistics/:projectId/task-priority" element={<TaskPriorityPage />} />
           <Route path="/statistics/:projectId/pending-tasks" element={<PendingTasksPage />} />
-          <Route path="/project/:projectId" element={<ProjectDetailPage />} />
-          <Route path="/project/edit/:projectId" element={<UpdateProjectPage />} />
+          
+          {/* Settings */}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/setup-2fa" element={<Setup2FAPage />} />
         </Routes>
