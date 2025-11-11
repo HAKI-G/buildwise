@@ -18,7 +18,7 @@ function StatisticsPage() {
     const [project, setProject] = useState(null);
     const [milestones, setMilestones] = useState([]);
     const [expenses, setExpenses] = useState([]);
-    const [photos, setPhotos] = useState([]); // ✅ NEW: Added photos state
+    const [photos, setPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -78,7 +78,6 @@ function StatisticsPage() {
                     setExpenses([]);
                 }
 
-                // ✅ NEW: Fetch photos for pending items calculation
                 try {
                     const photosRes = await axios.get(`http://localhost:5001/api/photos/project/${selectedProjectId}`, config);
                     setPhotos(photosRes.data || []);
@@ -114,54 +113,57 @@ function StatisticsPage() {
         setProject(null);
     };
 
+    // ✅ FIXED: Milestone Status Data - Only count TASKS, not phases
     const milestoneStatusData = useMemo(() => {
-        if (milestones.length > 0) {
-            const statusCounts = milestones.reduce((acc, milestone) => {
-                const status = milestone.status || 'Unknown';
+        // Filter out phases - only count actual tasks
+        const tasks = milestones.filter(m => m.isPhase !== true);
+        
+        if (tasks.length > 0) {
+            const statusCounts = tasks.reduce((acc, task) => {
+                const status = task.status || 'Unknown';
                 acc[status] = (acc[status] || 0) + 1;
                 return acc;
             }, {});
             return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
         }
-        return [
-            { name: 'Completed', value: 2 },
-            { name: 'In Progress', value: 3 },
-            { name: 'Not Started', value: 5 },
-        ];
+        // ✅ Return empty array when no tasks exist
+        return [];
     }, [milestones]);
 
+    // ✅ FIXED: Task Priority Data - Only count TASKS, not phases
     const taskPriorityData = useMemo(() => {
-        if (milestones.length > 0) {
-            const priorityCounts = milestones.reduce((acc, milestone) => {
-                const priority = milestone.priority || 'Low';
-                acc[priority] = (acc[priority] || 0) + 1;
-                return acc;
-            }, {});
-            
-            return [
-                { name: 'High', value: priorityCounts['High'] || 0 },
-                { name: 'Medium', value: priorityCounts['Medium'] || 0 },
-                { name: 'Low', value: priorityCounts['Low'] || 0 },
-            ].filter(item => item.value > 0); // Only show priorities that exist
-        }
-        return [
-            { name: 'High', value: 5 },
-            { name: 'Medium', value: 8 },
-            { name: 'Low', value: 12 },
-        ];
-    }, [milestones]);
+    // Filter out phases - only count actual tasks
+    const tasks = milestones.filter(m => m.isPhase !== true);
     
-    // ✅ SIMPLIFIED: Only show Approvals from Reports.jsx
+    if (tasks.length > 0) {
+        // ✅ UPDATED: Only count tasks that are NOT completed
+        const incompleteTasks = tasks.filter(task => task.status !== 'completed');
+        
+        const priorityCounts = incompleteTasks.reduce((acc, task) => {
+            const priority = task.priority || 'Medium';
+            acc[priority] = (acc[priority] || 0) + 1;
+            return acc;
+        }, {});
+        
+        return [
+            { name: 'High', value: priorityCounts['High'] || 0 },
+            { name: 'Medium', value: priorityCounts['Medium'] || 0 },
+            { name: 'Low', value: priorityCounts['Low'] || 0 },
+        ].filter(item => item.value > 0);
+    }
+    // ✅ Return empty array when no tasks exist
+    return [];
+}, [milestones]);
+
+    
+    // Pending Items Data
     const pendingItemsData = useMemo(() => {
-        // ✅ Approvals - EXACT match with Reports.jsx
-        // Reports.jsx: const pending = photos.filter(p => p.confirmationStatus === 'pending' && p.aiProcessed);
         const pendingApprovals = photos.filter(p => 
             p.confirmationStatus === 'pending' && p.aiProcessed
         ).length;
         
-        console.log('📊 Pending Approvals:', pendingApprovals, '(matches Reports page)');
+        console.log('📊 Pending Approvals:', pendingApprovals);
         
-        // ✅ ONLY return Approvals
         return [
             { name: 'Approvals', value: pendingApprovals }
         ];
@@ -270,41 +272,59 @@ function StatisticsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {/* Milestone Status Chart */}
+                {/* ✅ FIXED: Milestone Status Chart with Empty State */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">MILESTONE STATUS</h2>
                     <div className="w-full h-64">
-                         <ResponsiveContainer>
-                            <PieChart>
-                                <Pie data={milestoneStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {milestoneStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_STATUS[index % PIE_COLORS_STATUS.length]} />)}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {milestoneStatusData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-gray-400 dark:text-slate-500">
+                                <div className="text-center">
+                                    <p className="text-lg mb-2">No milestones yet</p>
+                                    <p className="text-sm">Add milestones to see statistics</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie data={milestoneStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                        {milestoneStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_STATUS[index % PIE_COLORS_STATUS.length]} />)}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
-                {/* Task Priority Chart */}
+                {/* ✅ FIXED: Task Priority Chart with Empty State */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK PRIORITY</h2>
                     <div className="w-full h-64">
-                         <ResponsiveContainer>
-                            <PieChart>
-                                <Pie data={taskPriorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                    {taskPriorityData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_PRIORITY[index % PIE_COLORS_PRIORITY.length]} />)}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {taskPriorityData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-gray-400 dark:text-slate-500">
+                                <div className="text-center">
+                                    <p className="text-lg mb-2">No tasks yet</p>
+                                    <p className="text-sm">Add tasks to see priority distribution</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie data={taskPriorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                        {taskPriorityData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS_PRIORITY[index % PIE_COLORS_PRIORITY.length]} />)}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
                 {/* Pending Items Chart */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING ITEMS</h2>
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING ITEMS</h2>
                     <div className="w-full h-64">
                         <ResponsiveContainer>
                             <BarChart data={pendingItemsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>

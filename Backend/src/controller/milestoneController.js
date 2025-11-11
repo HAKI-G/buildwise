@@ -24,7 +24,7 @@ export const createMilestone = async (req, res) => {
     endDate,
     parentPhase,
     status,
-    assignedTo,
+    priority,        // ✅ ADDED: Extract priority field
     plannedCost,
     resourceRequirements,
     isPhase,
@@ -47,13 +47,13 @@ export const createMilestone = async (req, res) => {
       endDate: endDate || targetDate,
       parentPhase: parentPhase || null,
       status: status || 'not started',
-      assignedTo: assignedTo || 'Unassigned',
+      priority: priority || 'Medium',  // ✅ ADDED: Save priority to DynamoDB
       plannedCost: plannedCost || 0,
       resourceRequirements: resourceRequirements || '',
       isPhase: isPhase || false,
       isKeyMilestone: isKeyMilestone || false,
       phaseColor: phaseColor || '#3B82F6',
-      completedAt: null, // ✅ NEW: Track completion time
+      completedAt: null,
       createdAt: now,
       updatedAt: now
     },
@@ -104,12 +104,11 @@ export const getMilestonesForProject = async (req, res) => {
   }
 };
 
-// ✅ NEW: Check if phase can be completed
+// Check if phase can be completed
 export const canCompletePhase = async (req, res) => {
   const { projectId, phaseId } = req.params;
   
   try {
-    // Get all milestones for this project
     const params = {
       TableName: tableName,
       KeyConditionExpression: "projectId = :pid",
@@ -121,12 +120,10 @@ export const canCompletePhase = async (req, res) => {
     const data = await docClient.send(new QueryCommand(params));
     const milestones = data.Items || [];
     
-    // Find tasks in this phase
     const tasksInPhase = milestones.filter(m => 
       m.parentPhase === phaseId && m.isPhase !== true
     );
     
-    // Check if all tasks are completed
     const allTasksCompleted = tasksInPhase.length > 0 && 
       tasksInPhase.every(task => task.status === 'completed');
     
@@ -147,12 +144,11 @@ export const canCompletePhase = async (req, res) => {
   }
 };
 
-// ✅ NEW: Complete a phase (with validation)
+// Complete a phase (with validation)
 export const completePhase = async (req, res) => {
   const { projectId, phaseId } = req.params;
   
   try {
-    // First, check if all tasks are completed
     const params = {
       TableName: tableName,
       KeyConditionExpression: "projectId = :pid",
@@ -179,7 +175,6 @@ export const completePhase = async (req, res) => {
       });
     }
     
-    // Update phase to completed
     const now = new Date().toISOString();
     const updateParams = {
       TableName: tableName,
@@ -222,12 +217,12 @@ export const updateMilestone = async (req, res) => {
   delete updateData.milestoneId;
   delete updateData.createdAt;
   
-  // ✅ If status is being set to 'completed', add completedAt timestamp
+  // If status is being set to 'completed', add completedAt timestamp
   if (updateData.status === 'completed' && !updateData.completedAt) {
     updateData.completedAt = new Date().toISOString();
   }
   
-  // ✅ If status is NOT completed, remove completedAt
+  // If status is NOT completed, remove completedAt
   if (updateData.status && updateData.status !== 'completed') {
     updateData.completedAt = null;
   }

@@ -36,7 +36,6 @@ const Milestones = () => {
     const [viewMode, setViewMode] = useState('table');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // ✅ NEW: Phase completion states
     const [completingPhase, setCompletingPhase] = useState(null);
     const [phaseCompletionStatus, setPhaseCompletionStatus] = useState({});
     
@@ -48,14 +47,15 @@ const Milestones = () => {
         phaseColor: '#3B82F6',
         parentPhaseId: '',
         status: 'not started',
-        assignedTo: '',
+        priority: 'Medium', // ✅ CHANGED: From assignedTo to priority
         plannedCost: '',
         resources: '',
         isPhase: false,
         isMilestone: false
     });
 
-    const teamMembers = ['Unassigned', 'glenn', 'john', 'mike', 'sarah'];
+    // ✅ CHANGED: Removed teamMembers, added priorities
+    const priorities = ['High', 'Medium', 'Low'];
     const statuses = ['not started', 'in progress', 'completed', 'on hold'];
     
     const phaseColors = [
@@ -125,17 +125,14 @@ const Milestones = () => {
                 isMilestone: task.isKeyMilestone || task.isMilestone || false,
                 isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
                 status: task.status || 'not started',
-                assignedTo: task.assignedTo || 'Unassigned',
+                priority: task.priority || 'Medium', // ✅ CHANGED: Load priority instead of assignedTo
                 plannedCost: task.plannedCost || 0,
                 isPhase: task.isPhase || false,
-                completedAt: task.completedAt || null // ✅ NEW
+                completedAt: task.completedAt || null
             }));
             
             setTasks(mappedTasks);
-            
-            // ✅ NEW: Check phase completion status for all phases
             await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
-            
             setError('');
         } catch (err) {
             console.error('Error fetching tasks:', err);
@@ -150,7 +147,6 @@ const Milestones = () => {
         }
     };
 
-    // ✅ NEW: Check if phases can be completed
     const checkAllPhasesCompletionStatus = async (phasesList, config) => {
         const statusMap = {};
         
@@ -174,7 +170,6 @@ const Milestones = () => {
         fetchProjectTasks();
     }, [projectId]);
 
-    // ✅ NEW: Quick complete task
     const handleQuickCompleteTask = async (task) => {
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -188,14 +183,13 @@ const Milestones = () => {
                 config
             );
             
-            await fetchProjectTasks(); // Refresh to update phase status
+            await fetchProjectTasks();
         } catch (err) {
             console.error('Error updating task:', err);
             alert('Failed to update task status');
         }
     };
 
-    // ✅ NEW: Complete phase with validation
     const handleCompletePhase = async (phaseId) => {
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -210,7 +204,7 @@ const Milestones = () => {
             );
             
             alert('✅ Phase completed successfully!');
-            await fetchProjectTasks(); // Refresh
+            await fetchProjectTasks();
         } catch (err) {
             console.error('Error completing phase:', err);
             const errorMsg = err.response?.data?.message || 'Failed to complete phase';
@@ -229,7 +223,7 @@ const Milestones = () => {
             phaseColor: '#3B82F6',
             parentPhaseId: '',
             status: 'not started',
-            assignedTo: 'Unassigned',
+            priority: 'Medium', // ✅ CHANGED: Default priority
             plannedCost: '',
             resources: '',
             isPhase: false,
@@ -248,7 +242,7 @@ const Milestones = () => {
             phaseColor: task.phaseColor || '#3B82F6',
             parentPhaseId: task.parentPhase || task.parentPhaseId || '',
             status: task.status || 'not started',
-            assignedTo: task.assignedTo || 'Unassigned',
+            priority: task.priority || 'Medium', // ✅ CHANGED: Load priority
             plannedCost: task.plannedCost || '',
             resources: task.resourceRequirements || task.resources || '',
             isPhase: task.isPhase || false,
@@ -288,7 +282,7 @@ const Milestones = () => {
                 targetDate: taskForm.endDate,
                 parentPhase: taskForm.parentPhaseId || null,
                 status: taskForm.status,
-                assignedTo: taskForm.assignedTo,
+                priority: taskForm.priority, // ✅ CHANGED: Save priority instead of assignedTo
                 plannedCost: parseFloat(parseCurrency(taskForm.plannedCost)) || 0,
                 resourceRequirements: taskForm.resources,
                 isPhase: taskForm.isPhase,
@@ -336,6 +330,21 @@ const Milestones = () => {
         }
     };
 
+    // ✅ CHANGED: Priority badge component
+    const PriorityBadge = ({ priority }) => {
+        const colors = {
+            'High': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+            'Medium': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+            'Low': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+        };
+        
+        return (
+            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${colors[priority] || colors['Medium']}`}>
+                {priority}
+            </span>
+        );
+    };
+
     const renderHierarchicalView = () => {
         const groupedTasks = getTasksByPhase();
         
@@ -367,7 +376,6 @@ const Milestones = () => {
                                 ? 'border-green-500 dark:border-green-600' 
                                 : 'border-gray-200 dark:border-slate-700'
                         }`}>
-                            {/* Phase Header */}
                             <div className="flex items-center p-3 border-l-4 bg-white dark:bg-slate-800" 
                                  style={{ borderLeftColor: phase.phaseColor }}>
                                 <div className="w-6 h-3 mr-3 rounded" style={{ backgroundColor: phase.phaseColor }}></div>
@@ -378,7 +386,6 @@ const Milestones = () => {
                                             {phase.milestoneName || phase.name || 'Unnamed Phase'}
                                         </span>
                                         
-                                        {/* ✅ Phase Completed Badge */}
                                         {isPhaseCompleted && (
                                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -388,7 +395,6 @@ const Milestones = () => {
                                             </span>
                                         )}
                                         
-                                        {/* Task Progress Indicator */}
                                         {!isPhaseCompleted && phaseStatus.totalTasks > 0 && (
                                             <span className="text-xs text-gray-500 dark:text-slate-400">
                                                 ({phaseStatus.completedTasks}/{phaseStatus.totalTasks} tasks)
@@ -398,7 +404,6 @@ const Milestones = () => {
                                 </div>
                                 
                                 <div className="ml-auto flex items-center space-x-2">
-                                    {/* ✅ Complete Phase Button */}
                                     {phase.milestoneId !== 'unassigned' && !isPhaseCompleted && (
                                         <button
                                             onClick={() => handleCompletePhase(phase.milestoneId)}
@@ -437,7 +442,6 @@ const Milestones = () => {
                                 </div>
                             </div>
                             
-                            {/* Phase Tasks */}
                             <div className="bg-gray-50 dark:bg-slate-900/50">
                                 {phaseTasks.map((task) => {
                                     const isTaskCompleted = task.status === 'completed';
@@ -446,7 +450,6 @@ const Milestones = () => {
                                         <div key={task.milestoneId} className={`flex items-center p-2 pl-12 border-b border-gray-200 dark:border-slate-700 last:border-b-0 ${
                                             isTaskCompleted ? 'bg-green-50/50 dark:bg-green-900/10' : ''
                                         }`}>
-                                            {/* ✅ Complete Task Checkbox */}
                                             <button
                                                 onClick={() => handleQuickCompleteTask(task)}
                                                 className={`mr-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
@@ -464,7 +467,7 @@ const Milestones = () => {
                                             </button>
                                             
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center">
+                                                <div className="flex items-center gap-2">
                                                     {task.isKeyMilestone && (
                                                         <span className="mr-2 text-yellow-500 text-sm">♦</span>
                                                     )}
@@ -485,8 +488,11 @@ const Milestones = () => {
                                                     </span>
                                                 </div>
                                                 <div className="flex space-x-4 text-xs text-gray-500 dark:text-slate-400 mt-1">
-                                                    {task.assignedTo && task.assignedTo !== 'Unassigned' && (
-                                                        <span>Assigned: {task.assignedTo}</span>
+                                                    {/* ✅ CHANGED: Show priority instead of assignedTo */}
+                                                    {task.priority && (
+                                                        <span className="flex items-center gap-1">
+                                                            Priority: <PriorityBadge priority={task.priority} />
+                                                        </span>
                                                     )}
                                                     {task.endDate && (
                                                         <span>Due: {new Date(task.endDate).toLocaleDateString()}</span>
@@ -885,6 +891,7 @@ const Milestones = () => {
                                     </select>
                                 </div>
 
+                                {/* ✅ CHANGED: Status and Priority side by side */}
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Status</label>
@@ -900,15 +907,16 @@ const Milestones = () => {
                                             ))}
                                         </select>
                                     </div>
+                                    {/* ✅ NEW: Task Priority dropdown */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Assigned To</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Task Priority</label>
                                         <select
-                                            value={taskForm.assignedTo}
-                                            onChange={(e) => setTaskForm({...taskForm, assignedTo: e.target.value})}
+                                            value={taskForm.priority}
+                                            onChange={(e) => setTaskForm({...taskForm, priority: e.target.value})}
                                             className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
-                                            {teamMembers.map(member => (
-                                                <option key={member} value={member}>{member}</option>
+                                            {priorities.map(priority => (
+                                                <option key={priority} value={priority}>{priority}</option>
                                             ))}
                                         </select>
                                     </div>
