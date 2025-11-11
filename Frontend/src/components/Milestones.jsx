@@ -695,7 +695,7 @@ const Milestones = () => {
     const totalPhases = phases.length;
     const completedTasks = tasks.filter(t => t.isPhase !== true && t.status === 'completed').length;
     const inProgressTasks = tasks.filter(t => t.isPhase !== true && t.status === 'in progress').length;
-    const totalBudget = tasks.reduce((sum, t) => sum + (parseFloat(t.plannedCost) || 0), 0);
+    const totalBudget = phases.reduce((sum, phase) => sum + (parseFloat(phase.plannedCost) || 0), 0);
 
     if (loading) {
         return (

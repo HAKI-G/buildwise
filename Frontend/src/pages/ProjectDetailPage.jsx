@@ -15,13 +15,36 @@ import Reports from '../components/Reports.jsx';
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
 
-// Reusable component for the key-value pairs in the project profile
-const ProfileItem = ({ label, value }) => (
-    <div>
-        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">{label}</div>
-        <div className="text-lg font-medium text-gray-800 dark:text-white truncate">{value}</div>
-    </div>
-);
+// ✅ Custom ProfileItem component with styled Tailwind tooltip
+const ProfileItem = ({ label, value }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    return (
+        <div 
+            className="group relative"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+        >
+            <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                {label}
+            </div>
+            <div className="text-lg font-medium text-gray-800 dark:text-white truncate">
+                {value}
+            </div>
+            
+            {/* ✅ Custom Tailwind Tooltip - appears above the field */}
+            <div className={`absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 dark:bg-slate-700 rounded-lg shadow-xl border border-gray-700 dark:border-slate-600 whitespace-nowrap pointer-events-none transition-all duration-200 ${
+                showTooltip && value && value !== 'N/A' ? 'opacity-100 visible' : 'opacity-0 invisible'
+            }`}>
+                {value}
+                {/* Tooltip Arrow */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                    <div className="border-[6px] border-transparent border-t-gray-900 dark:border-t-slate-700"></div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // Reusable component for the tab buttons
 const TabButton = ({ label, activeTab, setActiveTab }) => (
@@ -38,7 +61,7 @@ const TabButton = ({ label, activeTab, setActiveTab }) => (
 );
 
 function ProjectDetailPage() {
-    const { projectId } = useParams(); // ✅ Get projectId from URL
+    const { projectId } = useParams();
     const navigate = useNavigate();
 
     // --- State Management ---
@@ -46,6 +69,13 @@ function ProjectDetailPage() {
     const [activeTab, setActiveTab] = useState('milestones');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    // ✅ Helper function to format numbers with commas
+    const formatNumberWithCommas = (value) => {
+        if (!value) return 'N/A';
+        const number = value.toString().replace(/\D/g, '');
+        return number.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
 
     // ✅ Debug: Log projectId to console
     useEffect(() => {
@@ -64,7 +94,6 @@ function ProjectDetailPage() {
 
         setLoading(true);
         try {
-            // Fetch project data
             const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
             setProject(projectRes.data);
             console.log('✅ Project data loaded:', projectRes.data);
@@ -86,7 +115,6 @@ function ProjectDetailPage() {
     }, [fetchProjectData]);
 
     // --- Render Tab Content ---
-    // ✅ CRITICAL: Pass projectId to ALL components
     const renderTabContent = () => {
         console.log('🎯 Rendering tab:', activeTab, 'with projectId:', projectId);
         
@@ -96,7 +124,7 @@ function ProjectDetailPage() {
             case 'updates':
                 return <Updates projectId={projectId} />;
             case 'photos':
-                return <Photos projectId={projectId} />; // ✅ CRITICAL LINE
+                return <Photos projectId={projectId} />;
             case 'reports':
                 return <Reports projectId={projectId} />;
             case 'comments':
@@ -124,11 +152,12 @@ function ProjectDetailPage() {
                 <ProfileItem label="Contractor" value={project?.contractor || 'N/A'} />
                 <ProfileItem label="Date Started" value={project?.dateStarted ? new Date(project.dateStarted).toLocaleDateString() : 'N/A'} />
                 <ProfileItem label="Completion Date" value={project?.contractCompletionDate ? new Date(project.contractCompletionDate).toLocaleDateString() : 'N/A'} />
-                <ProfileItem label="Contract Cost (PHP)" value={`₱${project?.contractCost?.toLocaleString() || 'N/A'}`} />
+                {/* ✅ Updated Contract Cost with comma formatting */}
+                <ProfileItem label="Contract Cost (PHP)" value={`₱${formatNumberWithCommas(project?.contractCost)}`} />
                 <ProfileItem label="Construction Consultant" value={project?.constructionConsultant || 'N/A'} />
                 <ProfileItem label="Implementing Office" value={project?.implementingOffice || 'N/A'} />
                 <ProfileItem label="Sources of Fund" value={project?.sourcesOfFund || 'N/A'} />
-                <ProfileItem label="Project Manager" value={project?.projectManager || 'N/A'} />
+                <ProfileItem label="Project Engineer" value={project?.projectManager || 'N/A'} />
             </div>
 
             {/* --- Interactive Tabs Section --- */}
