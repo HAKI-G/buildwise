@@ -47,28 +47,48 @@ const ProfileItem = ({ label, value }) => {
 };
 
 // Reusable component for the tab buttons
-const TabButton = ({ label, activeTab, setActiveTab }) => (
-    <button
-        onClick={() => setActiveTab(label.toLowerCase())}
-        className={`px-4 py-2 font-semibold text-sm rounded-t-lg focus:outline-none transition-colors duration-200 ${
-            activeTab === label.toLowerCase()
-                ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-slate-600'
-        }`}
-    >
-        {label}
-    </button>
-);
+const TabButton = ({ label, activeTab, setActiveTab, projectId }) => {
+    const navigate = useNavigate();
+    const tabName = label.toLowerCase();
+    
+    const handleClick = () => {
+        setActiveTab(tabName);
+        navigate(`/projects/${projectId}/${tabName}`);
+    };
+    
+    return (
+        <button
+            onClick={handleClick}
+            className={`px-4 py-2 font-semibold text-sm rounded-t-lg focus:outline-none transition-colors duration-200 ${
+                activeTab === tabName
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-slate-600'
+            }`}
+        >
+            {label}
+        </button>
+    );
+};
 
 function ProjectDetailPage() {
-    const { projectId } = useParams();
+    const { projectId, tab } = useParams(); // ✅ FIXED: Read tab from URL
     const navigate = useNavigate();
 
     // --- State Management ---
     const [project, setProject] = useState(null);
-    const [activeTab, setActiveTab] = useState('milestones');
+    const [activeTab, setActiveTab] = useState(tab || 'milestones'); // ✅ FIXED: Initialize from URL param
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    // ✅ FIXED: Update active tab when URL changes
+    useEffect(() => {
+        if (tab) {
+            setActiveTab(tab);
+        } else {
+            // If no tab in URL, default to milestones and update URL
+            navigate(`/projects/${projectId}/milestones`, { replace: true });
+        }
+    }, [tab, projectId, navigate]);
 
     // ✅ Helper function to format numbers with commas
     const formatNumberWithCommas = (value) => {
@@ -81,7 +101,8 @@ function ProjectDetailPage() {
     useEffect(() => {
         console.log('🔍 ProjectDetailPage loaded');
         console.log('📁 projectId from URL:', projectId);
-    }, [projectId]);
+        console.log('📑 tab from URL:', tab);
+    }, [projectId, tab]);
 
     // --- Data Fetching ---
     const fetchProjectData = useCallback(async () => {
@@ -97,6 +118,9 @@ function ProjectDetailPage() {
             const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
             setProject(projectRes.data);
             console.log('✅ Project data loaded:', projectRes.data);
+            
+            // ✅ Store last selected project ID
+            localStorage.setItem('lastSelectedProjectId', projectId);
             
         } catch (err) {
             if (err.response && err.response.status === 401) {
@@ -164,13 +188,13 @@ function ProjectDetailPage() {
             <div>
                 <div className="border-b border-gray-200 dark:border-slate-700">
                     <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                        <TabButton label="Milestones" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Updates" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Reports" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} />
+                        <TabButton label="Milestones" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Updates" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Photos" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Reports" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Comments" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Documents" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
+                        <TabButton label="Maps" activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
                     </nav>
                 </div>
 

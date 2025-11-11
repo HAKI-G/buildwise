@@ -12,11 +12,11 @@ const ProjectActionButtons = ({ projectId, projectName, onProjectDeleted, showPr
     };
 
     const handleViewDetails = (projectId) => {
-        navigate(`/project/${projectId}`);
+        navigate(`/projects/${projectId}`);
     };
 
     const handleUpdateProject = (projectId) => {
-        navigate(`/project/edit/${projectId}`);
+        navigate(`/projects/edit/${projectId}`);
     };
 
     const handleDeleteProject = async (projectId) => {

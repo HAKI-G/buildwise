@@ -66,15 +66,21 @@ function Layout({ title, children, headerContent }) {
         projects: true
     });
 
-    // Get current project ID from URL or localStorage
+    // ✅ FIXED: Get current project ID from URL
     const getCurrentProjectId = () => {
         const pathParts = location.pathname.split('/');
-        if (pathParts.includes('statistics') && pathParts[2]) {
+        
+        // Check for /statistics/:projectId or /statistics/:projectId/...
+        if (pathParts[1] === 'statistics' && pathParts[2]) {
             return pathParts[2];
         }
-        if (pathParts.includes('projects') && pathParts[2]) {
+        
+        // Check for /projects/:projectId or /projects/:projectId/...
+        if (pathParts[1] === 'projects' && pathParts[2] && pathParts[2] !== 'edit') {
             return pathParts[2];
         }
+        
+        // Fall back to localStorage
         return localStorage.getItem('lastSelectedProjectId');
     };
 
@@ -120,26 +126,38 @@ function Layout({ title, children, headerContent }) {
             .slice(0, 2);
     };
 
-    // Handle submenu click - navigate to project selection if no project selected
+    // ✅ Handle statistics submenu click
     const handleStatSubmenuClick = (page) => {
         if (currentProjectId) {
             navigate(`/statistics/${currentProjectId}/${page}`);
         } else {
+            // If no project selected, go to statistics page to select one
             navigate('/statistics');
         }
     };
 
+    // ✅ NEW: Handle project submenu click - Navigate to dedicated view pages
     const handleProjectSubmenuClick = (section) => {
         if (currentProjectId) {
-            navigate(`/projects/${currentProjectId}/${section}`);
+            // Navigate to dedicated view page (no tabs, no full header)
+            navigate(`/projects/${currentProjectId}/view/${section}`);
         } else {
+            // If no project selected, go to projects list
             navigate('/projects');
         }
+    };
+
+    // ✅ NEW: Check if a submenu item is active (for dedicated view routes)
+    const isProjectSubmenuActive = (section) => {
+        const pathParts = location.pathname.split('/');
+        // Check for /projects/:projectId/view/:section
+        return pathParts[1] === 'projects' && pathParts[3] === 'view' && pathParts[4] === section;
     };
 
     const navLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors";
     const activeNavLinkClasses = "w-full text-left flex items-center space-x-3 p-3 rounded-lg font-bold bg-white dark:bg-slate-700 text-black dark:text-white shadow-sm";
     const subMenuLinkClasses = "w-full text-left flex items-center space-x-2 pl-12 pr-3 py-2 rounded-lg text-sm text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors cursor-pointer";
+    const activeSubMenuLinkClasses = "w-full text-left flex items-center space-x-2 pl-12 pr-3 py-2 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white cursor-pointer";
 
     return (
         <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white transition-colors duration-200">
@@ -177,15 +195,24 @@ function Layout({ title, children, headerContent }) {
                             {/* Statistics Submenu */}
                             {openMenus.statistics && (
                                 <div className="space-y-1 mt-1">
-                                    <div onClick={() => handleStatSubmenuClick('milestone-status')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleStatSubmenuClick('milestone-status')} 
+                                        className={location.pathname.includes('milestone-status') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <PieChart className="w-4 h-4" />
                                         <span>Milestone Status</span>
                                     </div>
-                                    <div onClick={() => handleStatSubmenuClick('task-priority')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleStatSubmenuClick('task-priority')} 
+                                        className={location.pathname.includes('task-priority') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <CheckSquare className="w-4 h-4" />
                                         <span>Task Priority</span>
                                     </div>
-                                    <div onClick={() => handleStatSubmenuClick('pending-tasks')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleStatSubmenuClick('pending-tasks')} 
+                                        className={location.pathname.includes('pending-tasks') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <Clock className="w-4 h-4" />
                                         <span>Pending Tasks</span>
                                     </div>
@@ -211,34 +238,55 @@ function Layout({ title, children, headerContent }) {
                                 )}
                             </button>
                             
-                            {/* Projects Submenu */}
+                            {/* ✅ Projects Submenu - Dedicated view pages */}
                             {openMenus.projects && (
                                 <div className="space-y-1 mt-1">
-                                    <div onClick={() => handleProjectSubmenuClick('milestones')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('milestones')} 
+                                        className={isProjectSubmenuActive('milestones') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <Target className="w-4 h-4" />
                                         <span>Milestones</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('updates')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('updates')} 
+                                        className={isProjectSubmenuActive('updates') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <FileText className="w-4 h-4" />
                                         <span>Updates</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('photos')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('photos')} 
+                                        className={isProjectSubmenuActive('photos') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <Camera className="w-4 h-4" />
                                         <span>Photos</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('reports')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('reports')} 
+                                        className={isProjectSubmenuActive('reports') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <BarChart3 className="w-4 h-4" />
                                         <span>Reports</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('comments')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('comments')} 
+                                        className={isProjectSubmenuActive('comments') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <MessageSquare className="w-4 h-4" />
                                         <span>Comments</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('documents')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('documents')} 
+                                        className={isProjectSubmenuActive('documents') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <FolderOpen className="w-4 h-4" />
                                         <span>Documents</span>
                                     </div>
-                                    <div onClick={() => handleProjectSubmenuClick('maps')} className={subMenuLinkClasses}>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('maps')} 
+                                        className={isProjectSubmenuActive('maps') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
                                         <Map className="w-4 h-4" />
                                         <span>Maps</span>
                                     </div>
