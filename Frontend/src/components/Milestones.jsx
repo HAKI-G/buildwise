@@ -47,14 +47,13 @@ const Milestones = () => {
         phaseColor: '#3B82F6',
         parentPhaseId: '',
         status: 'not started',
-        priority: 'Medium', // ✅ CHANGED: From assignedTo to priority
+        priority: 'Medium',
         plannedCost: '',
         resources: '',
         isPhase: false,
         isMilestone: false
     });
 
-    // ✅ CHANGED: Removed teamMembers, added priorities
     const priorities = ['High', 'Medium', 'Low'];
     const statuses = ['not started', 'in progress', 'completed', 'on hold'];
     
@@ -125,7 +124,7 @@ const Milestones = () => {
                 isMilestone: task.isKeyMilestone || task.isMilestone || false,
                 isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
                 status: task.status || 'not started',
-                priority: task.priority || 'Medium', // ✅ CHANGED: Load priority instead of assignedTo
+                priority: task.priority || 'Medium',
                 plannedCost: task.plannedCost || 0,
                 isPhase: task.isPhase || false,
                 completedAt: task.completedAt || null
@@ -166,8 +165,12 @@ const Milestones = () => {
         setPhaseCompletionStatus(statusMap);
     };
 
+    // ✅ FIX: Added projectId check in useEffect
     useEffect(() => {
-        fetchProjectTasks();
+        if (projectId) {
+            fetchProjectTasks();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
     const handleQuickCompleteTask = async (task) => {
@@ -223,7 +226,7 @@ const Milestones = () => {
             phaseColor: '#3B82F6',
             parentPhaseId: '',
             status: 'not started',
-            priority: 'Medium', // ✅ CHANGED: Default priority
+            priority: 'Medium',
             plannedCost: '',
             resources: '',
             isPhase: false,
@@ -242,7 +245,7 @@ const Milestones = () => {
             phaseColor: task.phaseColor || '#3B82F6',
             parentPhaseId: task.parentPhase || task.parentPhaseId || '',
             status: task.status || 'not started',
-            priority: task.priority || 'Medium', // ✅ CHANGED: Load priority
+            priority: task.priority || 'Medium',
             plannedCost: task.plannedCost || '',
             resources: task.resourceRequirements || task.resources || '',
             isPhase: task.isPhase || false,
@@ -282,7 +285,7 @@ const Milestones = () => {
                 targetDate: taskForm.endDate,
                 parentPhase: taskForm.parentPhaseId || null,
                 status: taskForm.status,
-                priority: taskForm.priority, // ✅ CHANGED: Save priority instead of assignedTo
+                priority: taskForm.priority,
                 plannedCost: parseFloat(parseCurrency(taskForm.plannedCost)) || 0,
                 resourceRequirements: taskForm.resources,
                 isPhase: taskForm.isPhase,
@@ -330,7 +333,6 @@ const Milestones = () => {
         }
     };
 
-    // ✅ CHANGED: Priority badge component
     const PriorityBadge = ({ priority }) => {
         const colors = {
             'High': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -488,7 +490,6 @@ const Milestones = () => {
                                                     </span>
                                                 </div>
                                                 <div className="flex space-x-4 text-xs text-gray-500 dark:text-slate-400 mt-1">
-                                                    {/* ✅ CHANGED: Show priority instead of assignedTo */}
                                                     {task.priority && (
                                                         <span className="flex items-center gap-1">
                                                             Priority: <PriorityBadge priority={task.priority} />
@@ -891,7 +892,6 @@ const Milestones = () => {
                                     </select>
                                 </div>
 
-                                {/* ✅ CHANGED: Status and Priority side by side */}
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Status</label>
@@ -907,7 +907,6 @@ const Milestones = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    {/* ✅ NEW: Task Priority dropdown */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Task Priority</label>
                                         <select

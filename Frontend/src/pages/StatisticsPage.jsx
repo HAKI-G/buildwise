@@ -229,7 +229,7 @@ function StatisticsPage() {
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="font-medium">Budget:</span>
-                                                <span className="text-right">₱{proj.contractCost?.toLocaleString() || 'N/A'}</span>
+                                                <span className="text-right">₱{proj.contractCost ? parseInt(proj.contractCost).toLocaleString() : 'N/A'}</span>
                                             </div>
                                             <div className="flex justify-between items-center pt-2">
                                                 <span className="font-medium">Status:</span>
@@ -324,7 +324,7 @@ function StatisticsPage() {
 
                 {/* Pending Items Chart */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING ITEMS</h2>
+                    <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING TASK</h2>
                     <div className="w-full h-64">
                         <ResponsiveContainer>
                             <BarChart data={pendingItemsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
