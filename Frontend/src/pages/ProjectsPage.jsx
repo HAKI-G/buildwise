@@ -3,18 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
 import ProjectActionButtons from '../components/ProjectActionButtons';
+import { Upload, X } from 'lucide-react';
 
 // Helper to get auth token
 const getToken = () => localStorage.getItem('token');
 
-// Project list item component
+// Project list item component with image
 const ProjectListItem = ({ project, onDelete }) => (
     <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm mb-3 hover:shadow-md transition-shadow duration-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Project Image */}
+            {project.projectImage && (
+                <div className="flex-shrink-0">
+                    <img 
+                        src={project.projectImage} 
+                        alt={project.name}
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-slate-600"
+                    />
+                </div>
+            )}
+            
+            {/* Project Info */}
             <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-400 truncate">{project.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5 truncate">{project.location}</p>
+                <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-400 truncate">
+                    {project.name}
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5 truncate">
+                    {project.location}
+                </p>
             </div>
+            
+            {/* Action Buttons */}
             <div className="flex-shrink-0">
                 <ProjectActionButtons 
                     projectId={project.projectId}
@@ -44,6 +63,10 @@ function ProjectsPage() {
     const [implementingOffice, setImplementingOffice] = useState('');
     const [sourcesOfFund, setSourcesOfFund] = useState('');
     const [projectManager, setProjectManager] = useState('');
+    
+    // ✅ Image upload states
+    const [projectImage, setProjectImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
 
     const navigate = useNavigate();
 
@@ -66,107 +89,149 @@ function ProjectsPage() {
         fetchProjects();
     }, [navigate]);
 
+    // ✅ Handle image selection
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (5MB max)
+            if (file.size > 5 * 1024 * 1024) {
+                setError('Image size should not exceed 5MB');
+                return;
+            }
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                setError('Please select a valid image file');
+                return;
+            }
+
+            setProjectImage(file);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+            setError('');
+        }
+    };
+
+    // ✅ Clear image selection
+    const clearImage = () => {
+        setProjectImage(null);
+        setImagePreview(null);
+    };
+
     // Handle project deletion
     const handleDelete = async (projectId) => {
-    // Confirmation
-    if (!window.confirm('Are you sure you want to delete this project?')) {
-        return;
-    }
-
-    const token = getToken();
-    if (!token) {
-        navigate('/login');
-        return;
-    }
-
-    const config = { headers: { Authorization: `Bearer ${token}` } };
-
-    try {
-        // Try to delete from backend
-        await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
-        
-        console.log('✅ Project deleted from database');
-    } catch (err) {
-        console.error('Delete error:', err);
-        
-        // ✅ If 404, project is already gone from database - that's fine!
-        if (err.response?.status !== 404) {
-            // Only show error if it's NOT a 404
-            alert('Failed to delete: ' + (err.response?.data?.message || 'Unknown error'));
-            return; // Don't update state if real error
+        if (!window.confirm('Are you sure you want to delete this project?')) {
+            return;
         }
-        
-        console.log('⚠️ Project already deleted from database');
-    }
 
-    // ✅ ALWAYS update frontend state after delete attempt
-    setProjects(prevProjects => prevProjects.filter(p => p.projectId !== projectId));
-    
-    // Optional: Send notification
-    try {
-        await axios.post('http://localhost:5001/api/notifications/send', {
-            type: 'PROJECT_DELETED',
-            title: 'Project Deleted',
-            message: 'Project has been deleted',
-            metadata: { projectId }
-        }, config);
-    } catch (notifErr) {
-        console.warn('Notification failed:', notifErr);
-    }
-};
+        const token = getToken();
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+
+        try {
+            await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
+            console.log('✅ Project deleted from database');
+        } catch (err) {
+            console.error('Delete error:', err);
+            
+            if (err.response?.status !== 404) {
+                alert('Failed to delete: ' + (err.response?.data?.message || 'Unknown error'));
+                return;
+            }
+            
+            console.log('⚠️ Project already deleted from database');
+        }
+
+        setProjects(prevProjects => prevProjects.filter(p => p.projectId !== projectId));
+        
+        try {
+            await axios.post('http://localhost:5001/api/notifications/send', {
+                type: 'PROJECT_DELETED',
+                title: 'Project Deleted',
+                message: 'Project has been deleted',
+                metadata: { projectId }
+            }, config);
+        } catch (notifErr) {
+            console.warn('Notification failed:', notifErr);
+        }
+    };
 
     // Handle project creation
     const handleCreateProject = async (e) => {
-        e.preventDefault();
-        setError('');
-        setIsSubmitting(true);
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    const token = getToken();
+    const config = { 
+        headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+        } 
+    };
 
-        const newProjectData = { 
-            name: projectName, 
-            location, 
-            contractor, 
-            dateStarted, 
-            contractCompletionDate, 
-            contractCost: Number(contractCost), 
-            constructionConsultant, 
-            implementingOffice, 
-            sourcesOfFund,
-            projectManager
-        };
+    const formData = new FormData();
+    formData.append('name', projectName);
+    formData.append('location', location);
+    formData.append('contractor', contractor);
+    formData.append('dateStarted', dateStarted);
+    formData.append('contractCompletionDate', contractCompletionDate);
+    formData.append('contractCost', contractCost);
+    formData.append('constructionConsultant', constructionConsultant);
+    formData.append('implementingOffice', implementingOffice);
+    formData.append('sourcesOfFund', sourcesOfFund);
+    formData.append('projectManager', projectManager);
+    
+    if (projectImage) {
+        formData.append('projectImage', projectImage);
+    }
 
+    try {
+        // Create project
+        const response = await axios.post('http://localhost:5001/api/projects', formData, config);
+        
+        setProjects(prev => [response.data.project, ...prev]);
+
+        // ✅ Try to send notification, but don't fail if it errors
         try {
-            // Create project (backend creates audit log automatically)
-            const response = await axios.post('http://localhost:5001/api/projects', newProjectData, config);
-            
-            setProjects(prev => [response.data.project, ...prev]);
-
-            // Send notification
             await axios.post('http://localhost:5001/api/notifications/send', {
                 type: 'PROJECT_CREATED',
                 title: 'New Project Created',
                 message: `${projectName} has been created`,
                 metadata: { projectId: response.data.project.projectId, projectName }
             }, config);
-
-            // Clear form
-            setProjectName(''); 
-            setLocation(''); 
-            setContractor(''); 
-            setDateStarted('');
-            setContractCompletionDate(''); 
-            setContractCost(''); 
-            setConstructionConsultant('');
-            setImplementingOffice(''); 
-            setSourcesOfFund('');
-            setProjectManager('');
-        } catch (err) {
-            setError(err.response ? err.response.data.message : 'Failed to create project.');
-        } finally {
-            setIsSubmitting(false);
+        } catch (notifErr) {
+            // ✅ Just log the error, don't show it to user
+            console.warn('⚠️ Notification failed (project still created):', notifErr.message);
         }
-    };
+
+        // Clear form
+        setProjectName(''); 
+        setLocation(''); 
+        setContractor(''); 
+        setDateStarted('');
+        setContractCompletionDate(''); 
+        setContractCost(''); 
+        setConstructionConsultant('');
+        setImplementingOffice(''); 
+        setSourcesOfFund('');
+        setProjectManager('');
+        clearImage();
+        
+    } catch (err) {
+        setError(err.response ? err.response.data.message : 'Failed to create project.');
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     return (
         <Layout title="Projects">
@@ -204,6 +269,50 @@ function ProjectsPage() {
                             Add a New Project
                         </h2>
                         <form onSubmit={handleCreateProject} className="space-y-3 sm:space-y-4">
+                            
+                            {/* ✅ Project Image Upload */}
+                            <div>
+                                <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                                    Project Image
+                                </label>
+                                
+                                {!imagePreview ? (
+                                    <div className="border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-6 text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors cursor-pointer">
+                                        <input
+                                            type="file"
+                                            id="projectImage"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="hidden"
+                                        />
+                                        <label htmlFor="projectImage" className="cursor-pointer flex flex-col items-center">
+                                            <Upload className="w-10 h-10 text-gray-400 dark:text-slate-500 mb-2" />
+                                            <span className="text-xs sm:text-sm text-gray-500 dark:text-slate-400">
+                                                Click to upload project image
+                                            </span>
+                                            <span className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                                                PNG, JPG up to 5MB
+                                            </span>
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <img 
+                                            src={imagePreview} 
+                                            alt="Preview" 
+                                            className="w-full h-48 object-cover rounded-lg border-2 border-gray-200 dark:border-slate-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={clearImage}
+                                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Project Name */}
                             <div>
                                 <label htmlFor="projectName" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -218,6 +327,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Location */}
                             <div>
                                 <label htmlFor="location" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -232,6 +342,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Contractor */}
                             <div>
                                 <label htmlFor="contractor" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -245,6 +356,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Dates */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
@@ -272,6 +384,7 @@ function ProjectsPage() {
                                     />
                                 </div>
                             </div>
+                            
                             {/* Contract Cost */}
                             <div>
                                 <label htmlFor="contractCost" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -286,6 +399,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Consultant */}
                             <div>
                                 <label htmlFor="constructionConsultant" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -299,6 +413,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Implementing Office */}
                             <div>
                                 <label htmlFor="implementingOffice" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -312,6 +427,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Sources of Fund */}
                             <div>
                                 <label htmlFor="sourcesOfFund" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -325,6 +441,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+                            
                             {/* Project Manager */}
                             <div>
                                 <label htmlFor="projectManager" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
