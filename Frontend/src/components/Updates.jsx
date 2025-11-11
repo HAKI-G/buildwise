@@ -13,25 +13,30 @@ const Updates = () => {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    const fetchExpenses = async () => {
-        const token = getToken();
-        if (!token) return;
-        
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        
-        try {
-            const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
-            setExpenses(expensesRes.data || []);
-            setError('');
-        } catch (expenseError) {
-            if (expenseError.response?.status === 404) {
-                console.warn('Expenses endpoint not found, setting empty array');
-                setExpenses([]);
-            } else {
-                console.error('Error fetching expenses:', expenseError);
+    // ✅ FIX: Move fetchExpenses inside useEffect to avoid dependency issues
+    useEffect(() => {
+        const fetchExpenses = async () => {
+            const token = getToken();
+            if (!token) return;
+            
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            
+            try {
+                const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
+                setExpenses(expensesRes.data || []);
+                setError('');
+            } catch (expenseError) {
+                if (expenseError.response?.status === 404) {
+                    console.warn('Expenses endpoint not found, setting empty array');
+                    setExpenses([]);
+                } else {
+                    console.error('Error fetching expenses:', expenseError);
+                }
             }
-        }
-    };
+        };
+
+        fetchExpenses();
+    }, [projectId]); // ✅ Only depends on projectId
 
     const handleAddExpense = async (e) => {
         e.preventDefault();
@@ -57,7 +62,10 @@ const Updates = () => {
             setExpenseDescription('');
             setExpenseAmount('');
             setSuccessMessage('Expense added successfully!');
-            await fetchExpenses();
+            
+            // ✅ FIX: Refetch expenses inline
+            const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
+            setExpenses(expensesRes.data || []);
             
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (err) {
@@ -73,10 +81,6 @@ const Updates = () => {
     };
 
     const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
-
-    useEffect(() => {
-        fetchExpenses();
-    }, [projectId]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

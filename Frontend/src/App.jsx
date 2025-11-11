@@ -16,6 +16,11 @@ import UpdateProjectPage from './pages/UpdateProjectPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import Setup2FAPage from './pages/Setup2FAPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import MilestoneStatusPage from './pages/MilestoneStatusPage';
+import TaskPriorityPage from './pages/TaskPriorityPage';
+import PendingTasksPage from './pages/PendingTasksPage';
+import ProjectMilestonesPage from './pages/ProjectMilestonesPage';
+import ProjectUpdatesPage from './pages/ProjectUpdatesPage';
 
 function App() {
   const location = useLocation();
@@ -62,12 +67,16 @@ function App() {
           {/* Protected Routes */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId/milestones" element={<ProjectMilestonesPage />} />
+          <Route path="/projects/:projectId/updates" element={<ProjectUpdatesPage />} />  
           
           
           {/* Statistics Routes */}
           <Route path="/statistics" element={<StatisticsPage />} />
           <Route path="/statistics/:projectId" element={<StatisticsPage />} />
-          
+          <Route path="/statistics/:projectId/milestone-status" element={<MilestoneStatusPage />} />
+          <Route path="/statistics/:projectId/task-priority" element={<TaskPriorityPage />} />
+          <Route path="/statistics/:projectId/pending-tasks" element={<PendingTasksPage />} />
           <Route path="/project/:projectId" element={<ProjectDetailPage />} />
           <Route path="/project/edit/:projectId" element={<UpdateProjectPage />} />
           <Route path="/settings" element={<SettingsPage />} />
