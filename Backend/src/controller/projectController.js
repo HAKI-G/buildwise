@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import { logAudit } from "./auditController.js"; // ✅ Import audit logger
+import { uploadToS3, deleteFromS3 } from "../utils/s3Upload.js"; // ✅ Import S3 utilities
 
 const client = new DynamoDBClient({
   region: "ap-southeast-1",
@@ -56,7 +57,9 @@ export const createProject = async (req, res) => {
 
   try {
     const userId = req.user.id;
-      const settingsParams = {
+    
+    // Check project limit
+    const settingsParams = {
       TableName: "BuildWiseSettings",
       FilterExpression: "category = :category AND #key = :key",
       ExpressionAttributeNames: { '#key': 'key' },
@@ -78,6 +81,22 @@ export const createProject = async (req, res) => {
         error: `You have reached the maximum limit of ${maxProjects} projects.`
       });
     }
+
+    // ✅ Handle image upload to S3
+    let projectImageUrl = null;
+    if (req.file) {
+      try {
+        projectImageUrl = await uploadToS3(req.file, "projects");
+        console.log("✅ Project image uploaded to S3:", projectImageUrl);
+      } catch (uploadError) {
+        console.error("❌ Image upload failed:", uploadError);
+        return res.status(500).json({ 
+          message: "Failed to upload project image", 
+          error: uploadError.message 
+        });
+      }
+    }
+
     const projectId = uuidv4();
     
     const projectItem = {
@@ -94,6 +113,7 @@ export const createProject = async (req, res) => {
       projectManager: projectManager && projectManager.trim() !== "" 
         ? projectManager.trim() 
         : "Juan Dela Cruz",
+      projectImage: projectImageUrl, // ✅ Store S3 URL
       status: "Not Started",
       createdAt: new Date().toISOString(),
       createdBy: userId,
@@ -113,7 +133,7 @@ export const createProject = async (req, res) => {
       actionDescription: `New project created: ${name}`,
       targetType: 'project',
       targetId: projectId,
-      changes: { name, location, contractor }
+      changes: { name, location, contractor, hasImage: !!projectImageUrl }
     });
 
     res.status(201).json({
@@ -201,6 +221,34 @@ export const updateProject = async (req, res) => {
 
   addUpdateField("status", status);
 
+  // ✅ Handle image update if new file is uploaded
+  if (req.file) {
+    try {
+      // Get existing project to delete old image
+      const getParams = {
+        TableName: tableName,
+        Key: { projectId: id },
+      };
+      const existingProject = await docClient.send(new GetCommand(getParams));
+      
+      // Delete old image if exists
+      if (existingProject.Item?.projectImage) {
+        await deleteFromS3(existingProject.Item.projectImage);
+      }
+
+      // Upload new image
+      const newImageUrl = await uploadToS3(req.file, "projects");
+      addUpdateField("projectImage", newImageUrl);
+      console.log("✅ Project image updated:", newImageUrl);
+    } catch (uploadError) {
+      console.error("❌ Image update failed:", uploadError);
+      return res.status(500).json({ 
+        message: "Failed to update project image", 
+        error: uploadError.message 
+      });
+    }
+  }
+
   const params = {
     TableName: tableName,
     Key: { projectId: id },
@@ -241,7 +289,7 @@ export const deleteProject = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Get project details first for audit log
+    // Get project details first for audit log and image deletion
     const getParams = {
       TableName: tableName,
       Key: { projectId: id },
@@ -251,6 +299,17 @@ export const deleteProject = async (req, res) => {
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
+    }
+
+    // ✅ Delete project image from S3 if exists
+    if (project.projectImage) {
+      try {
+        await deleteFromS3(project.projectImage);
+        console.log("✅ Project image deleted from S3");
+      } catch (s3Error) {
+        console.warn("⚠️ Could not delete image from S3:", s3Error.message);
+        // Continue with project deletion even if image deletion fails
+      }
     }
 
     // Delete project
