@@ -5,8 +5,10 @@ import Layout from '../components/Layout';
 import ProjectActionButtons from '../components/ProjectActionButtons';
 import { Upload, X } from 'lucide-react';
 
+
 // Helper to get auth token
 const getToken = () => localStorage.getItem('token');
+
 
 // Project list item component with image
 const ProjectListItem = ({ project, onDelete }) => (
@@ -47,10 +49,12 @@ const ProjectListItem = ({ project, onDelete }) => (
     </div>
 );
 
+
 function ProjectsPage() {
     const [projects, setProjects] = useState([]);
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
 
     // Form states
     const [projectName, setProjectName] = useState('');
@@ -68,7 +72,18 @@ function ProjectsPage() {
     const [projectImage, setProjectImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
 
+
     const navigate = useNavigate();
+
+    // ✅ Helper function to format numbers with commas
+    const formatNumberWithCommas = (value) => {
+        if (!value) return '';
+        // Remove all non-digit characters
+        const number = value.toString().replace(/\D/g, '');
+        // Add commas
+        return number.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
 
     // Fetch projects
     useEffect(() => {
@@ -89,6 +104,7 @@ function ProjectsPage() {
         fetchProjects();
     }, [navigate]);
 
+
     // ✅ Handle image selection
     const handleImageChange = (e) => {
         const file = e.target.files[0];
@@ -99,11 +115,13 @@ function ProjectsPage() {
                 return;
             }
 
+
             // Validate file type
             if (!file.type.startsWith('image/')) {
                 setError('Please select a valid image file');
                 return;
             }
+
 
             setProjectImage(file);
             
@@ -117,11 +135,13 @@ function ProjectsPage() {
         }
     };
 
+
     // ✅ Clear image selection
     const clearImage = () => {
         setProjectImage(null);
         setImagePreview(null);
     };
+
 
     // Handle project deletion
     const handleDelete = async (projectId) => {
@@ -129,13 +149,16 @@ function ProjectsPage() {
             return;
         }
 
+
         const token = getToken();
         if (!token) {
             navigate('/login');
             return;
         }
 
+
         const config = { headers: { Authorization: `Bearer ${token}` } };
+
 
         try {
             await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
@@ -151,6 +174,7 @@ function ProjectsPage() {
             console.log('⚠️ Project already deleted from database');
         }
 
+
         setProjects(prevProjects => prevProjects.filter(p => p.projectId !== projectId));
         
         try {
@@ -165,6 +189,7 @@ function ProjectsPage() {
         }
     };
 
+
     // Handle project creation
     const handleCreateProject = async (e) => {
     e.preventDefault();
@@ -178,13 +203,14 @@ function ProjectsPage() {
         } 
     };
 
+
     const formData = new FormData();
     formData.append('name', projectName);
     formData.append('location', location);
     formData.append('contractor', contractor);
     formData.append('dateStarted', dateStarted);
     formData.append('contractCompletionDate', contractCompletionDate);
-    formData.append('contractCost', contractCost);
+    formData.append('contractCost', contractCost); // Send raw number without commas
     formData.append('constructionConsultant', constructionConsultant);
     formData.append('implementingOffice', implementingOffice);
     formData.append('sourcesOfFund', sourcesOfFund);
@@ -194,11 +220,13 @@ function ProjectsPage() {
         formData.append('projectImage', projectImage);
     }
 
+
     try {
         // Create project
         const response = await axios.post('http://localhost:5001/api/projects', formData, config);
         
         setProjects(prev => [response.data.project, ...prev]);
+
 
         // ✅ Try to send notification, but don't fail if it errors
         try {
@@ -212,6 +240,7 @@ function ProjectsPage() {
             // ✅ Just log the error, don't show it to user
             console.warn('⚠️ Notification failed (project still created):', notifErr.message);
         }
+
 
         // Clear form
         setProjectName(''); 
@@ -232,6 +261,7 @@ function ProjectsPage() {
         setIsSubmitting(false);
     }
 };
+
 
     return (
         <Layout title="Projects">
@@ -261,6 +291,7 @@ function ProjectsPage() {
                         </div>
                     </div>
                 </div>
+
 
                 {/* Right Side - Add Project Form */}
                 <div className="xl:col-span-2">
@@ -312,6 +343,7 @@ function ProjectsPage() {
                                     </div>
                                 )}
                             </div>
+
 
                             {/* Project Name */}
                             <div>
@@ -385,17 +417,20 @@ function ProjectsPage() {
                                 </div>
                             </div>
                             
-                            {/* Contract Cost */}
+                            {/* ✅ Contract Cost with Comma Formatting */}
                             <div>
                                 <label htmlFor="contractCost" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                     Contract Cost (PHP)
                                 </label>
                                 <input 
-                                    type="number" 
+                                    type="text" 
                                     id="contractCost" 
-                                    value={contractCost} 
-                                    onChange={(e) => setContractCost(e.target.value)} 
-                                    placeholder="e.g., 1000000" 
+                                    value={formatNumberWithCommas(contractCost)} 
+                                    onChange={(e) => {
+                                        const rawValue = e.target.value.replace(/,/g, '');
+                                        setContractCost(rawValue);
+                                    }} 
+                                    placeholder="e.g., 100,000" 
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
@@ -442,10 +477,10 @@ function ProjectsPage() {
                                 />
                             </div>
                             
-                            {/* Project Manager */}
+                            {/* Project Engineer */}
                             <div>
                                 <label htmlFor="projectManager" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                                    Project Manager
+                                    Project Engineer
                                 </label>
                                 <input 
                                     type="text" 
@@ -455,6 +490,7 @@ function ProjectsPage() {
                                     className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+
 
                             {/* Submit Button */}
                             <div className="pt-2">
@@ -468,6 +504,7 @@ function ProjectsPage() {
                             </div>
                         </form>
 
+
                         {error && (
                             <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                                 <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-medium text-center">{error}</p>
@@ -479,5 +516,6 @@ function ProjectsPage() {
         </Layout>
     );
 }
+
 
 export default ProjectsPage;
