@@ -20,7 +20,10 @@ import MilestoneStatusPage from './pages/MilestoneStatusPage';
 import TaskPriorityPage from './pages/TaskPriorityPage';
 import PendingTasksPage from './pages/PendingTasksPage';
 
-// ✅ NEW: Dedicated View Pages (accessed from sidebar)
+// ✅ NEW: Project Selection Page (like Statistics selection)
+import ProjectSelectionPage from './pages/ProjectSelectionPage.jsx';
+
+// ✅ Dedicated View Pages (accessed from sidebar)
 import MilestonesViewPage from './pages/MilestonesViewPage.jsx';
 import UpdatesViewPage from './pages/UpdatesViewPage.jsx';
 import PhotosViewPage from './pages/PhotosViewPage.jsx';
@@ -28,7 +31,6 @@ import ReportsViewPage from './pages/ReportsViewPage.jsx';
 import CommentsViewPage from './pages/CommentsViewPage.jsx';
 import DocumentsViewPage from './pages/DocumentsViewPage.jsx';
 import MapsViewPage from './pages/MapsViewPage.jsx';
-import ProjectSelectionPage from './pages/ProjectSelectionPage.jsx';
 
 function App() {
   const location = useLocation();
@@ -73,9 +75,11 @@ function App() {
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/projects/:projectId/:tab" element={<ProjectDetailPage />} />
           <Route path="/projects/edit/:projectId" element={<UpdateProjectPage />} />
+          
+          {/* ✅ NEW: Project Selection Page (like Statistics) */}
           <Route path="/select-project" element={<ProjectSelectionPage />} />
           
-          {/* ✅ NEW: Dedicated View Routes (no tabs, no full header) */}
+          {/* ✅ Dedicated View Routes (no tabs, no full header) */}
           <Route path="/projects/:projectId/view/milestones" element={<MilestonesViewPage />} />
           <Route path="/projects/:projectId/view/updates" element={<UpdatesViewPage />} />
           <Route path="/projects/:projectId/view/photos" element={<PhotosViewPage />} />

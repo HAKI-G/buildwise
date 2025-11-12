@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import logo from '../images/logo.png';
 import { useTheme } from '../context/ThemeContext';
 import { 
     Settings, 
@@ -168,7 +169,15 @@ const getCurrentProjectId = () => {
         <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white transition-colors duration-200">
             <aside className="w-64 bg-stone-100 dark:bg-slate-800 p-6 flex flex-col justify-between border-r border-gray-200 dark:border-slate-700 transition-colors overflow-y-auto">
                 <div>
-                    <div className="text-3xl font-bold mb-12 text-gray-800 dark:text-white">BuildWise</div>
+                    <div className="flex items-center justify-center space-x-3 mb-12">
+                        <img
+                            src={logo}
+                            alt="BuildWise Logo"
+                            className="h-12 w-auto object-contain"
+                        />
+                        <h1 className="text-2xl font-semibold text-gray-800">BuildWise</h1>
+                        </div>
+
                     <nav className="space-y-2">
                         {/* Dashboard */}
                         <NavLink 

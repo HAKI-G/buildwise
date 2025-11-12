@@ -449,7 +449,7 @@ const TicketDetailModal = ({ ticket, onClose, onUpdate }) => {
               <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
                 <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              Customer Information
+              User
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white dark:bg-gray-900/50 rounded-xl p-3 border border-gray-200 dark:border-gray-700/30">

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
-import { ChevronRight } from 'lucide-react';
 
 const getToken = () => localStorage.getItem('token');
 
 function ProjectSelectionPage() {
     const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -41,7 +41,10 @@ function ProjectSelectionPage() {
                 const response = await axios.get('http://localhost:5001/api/projects', config);
                 setProjects(response.data);
             } catch (err) {
-                setError('Could not fetch projects.');
+                console.error('Error fetching projects:', err);
+                setError('Failed to load projects.');
+            } finally {
+                setLoading(false);
             }
         };
         fetchProjects();
@@ -61,84 +64,64 @@ function ProjectSelectionPage() {
     };
 
     return (
-        <Layout title="Select a Project">
-            <div className="max-w-4xl mx-auto">
-                {/* Header */}
-                <div className="mb-6">
-                    <p className="text-gray-600 dark:text-slate-400">
-                        {intendedSection 
-                            ? `Choose a project to view its ${getSectionDisplayName(intendedSection).toLowerCase()}.`
-                            : 'Choose a project to view its statistics and insights.'
-                        }
-                    </p>
-                </div>
-
-                {/* Error Message */}
-                {error && (
-                    <div className="mb-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
-                        <p className="text-red-400">{error}</p>
-                    </div>
-                )}
-
-                {/* Projects Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {projects.map((project) => (
-                        <button
-                            key={project.projectId}
-                            onClick={() => handleProjectSelect(project.projectId)}
-                            className="group bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-lg transition-all duration-200 text-left"
+        <Layout title={intendedSection ? getSectionDisplayName(intendedSection) : "Select a Project"}>
+            {/* ✅ MATCHES Statistics Page Design Exactly */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-slate-700 transition-colors">
+                <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Select a Project</h2>
+                <p className="text-gray-600 dark:text-slate-400 mb-8">
+                    {intendedSection 
+                        ? `Choose a project to view its ${getSectionDisplayName(intendedSection).toLowerCase()}.`
+                        : 'Choose a project to view its details.'
+                    }
+                </p>
+                
+                {loading ? (
+                    <p className="text-center py-8 text-gray-500 dark:text-slate-400">Loading projects...</p>
+                ) : error ? (
+                    <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
+                ) : projects.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-gray-500 dark:text-slate-400 mb-4">No projects found.</p>
+                        <button 
+                            onClick={() => navigate('/projects')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    {/* Project Name */}
-                                    <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                        {project.name}
-                                    </h3>
-                                    
-                                    {/* Location */}
-                                    <div className="space-y-1 mb-4">
-                                        <div className="flex items-center text-sm text-gray-600 dark:text-slate-400">
-                                            <span className="font-medium mr-2">Location:</span>
-                                            <span>{project.location}</span>
+                            Create Your First Project
+                        </button>
+                    </div>
+                ) : (
+                    /* ✅ EXACT SAME GRID AS STATISTICS PAGE */
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {projects.map((proj) => (
+                            <button
+                                key={proj.projectId}
+                                onClick={() => handleProjectSelect(proj.projectId)}
+                                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-200 overflow-hidden text-left"
+                            >
+                                <div className="p-6">
+                                    {/* ✅ EXACT SAME STYLING AS STATISTICS PAGE */}
+                                    <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-4">{proj.name}</h3>
+                                    <div className="text-sm text-gray-600 dark:text-slate-400 space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="font-medium">Location:</span>
+                                            <span className="text-right">{proj.location}</span>
                                         </div>
-                                        
-                                        {/* Budget */}
-                                        {project.contractCost && (
-                                            <div className="flex items-center text-sm text-gray-600 dark:text-slate-400">
-                                                <span className="font-medium mr-2">Budget:</span>
-                                                <span>₱{parseFloat(project.contractCost).toLocaleString()}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Status */}
-                                        <div className="flex items-center text-sm">
-                                            <span className="font-medium mr-2 text-gray-600 dark:text-slate-400">Status:</span>
-                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                                project.status === 'Not Started' 
-                                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                            }`}>
-                                                {project.status || 'Not Started'}
-                                            </span>
+                                        <div className="flex justify-between">
+                                            <span className="font-medium">Budget:</span>
+                                            <span className="text-right">₱{proj.contractCost ? parseInt(proj.contractCost).toLocaleString() : 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-2">
+                                            <span className="font-medium">Status:</span>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                proj.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                            }`}>{proj.status || 'Not Started'}</span>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {/* Arrow Icon */}
-                                <div className="ml-4">
-                                    <ChevronRight className="w-6 h-6 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
-                                </div>
-                            </div>
-                        </button>
-                    ))}
-                </div>
-
-                {/* No Projects Message */}
-                {projects.length === 0 && !error && (
-                    <div className="text-center py-12">
-                        <p className="text-gray-500 dark:text-slate-400">
-                            No projects available. Please create a project first.
-                        </p>
+                            </button>
+                        ))}
                     </div>
                 )}
             </div>
