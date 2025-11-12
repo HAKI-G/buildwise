@@ -5,7 +5,8 @@ import {
   createProject,
   getProjectById,
   updateProject,
-  deleteProject
+  deleteProject,
+  patchProject  // ✅ NEW: Import patch function
 } from '../controller/projectController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -30,9 +31,10 @@ const upload = multer({
 
 // --- Project API Endpoints ---
 router.get('/', protect, getAllProjects);
-router.post('/', protect, upload.single("projectImage"), createProject); // ✅ Changed field name to "projectImage"
+router.post('/', protect, upload.single("projectImage"), createProject);
 router.get('/:id', protect, getProjectById);
-router.put('/:id', protect, upload.single("projectImage"), updateProject); // ✅ Also support image updates
+router.put('/:id', protect, upload.single("projectImage"), updateProject);
+router.patch('/:id', protect, patchProject); // ✅ NEW: PATCH endpoint for partial updates (like status)
 router.delete('/:id', protect, deleteProject);
 
 export default router;

@@ -282,6 +282,95 @@ export const updateProject = async (req, res) => {
 };
 
 /**
+ * ✅ NEW FUNCTION
+ * @desc     Partially update a project (for quick updates like status)
+ * @route    PATCH /api/projects/:id
+ */
+export const patchProject = async (req, res) => {
+  console.log("📦 PATCH request body:", req.body);
+  const { id } = req.params;
+  const updateData = req.body;
+
+  // Validate that we have something to update
+  if (!updateData || Object.keys(updateData).length === 0) {
+    return res.status(400).json({ 
+      message: "Please provide at least one field to update" 
+    });
+  }
+
+  try {
+    // Get existing project first for audit logging
+    const getParams = {
+      TableName: tableName,
+      Key: { projectId: id },
+    };
+    const existingProject = await docClient.send(new GetCommand(getParams));
+    
+    if (!existingProject.Item) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Build dynamic update expression
+    let updateExp = "set";
+    const expAttrNames = {};
+    const expAttrValues = {};
+    
+    Object.keys(updateData).forEach((field, index) => {
+      const placeholder = `#field${index}`;
+      const valuePlaceholder = `:val${index}`;
+      
+      if (updateExp !== "set") {
+        updateExp += ",";
+      }
+      
+      updateExp += ` ${placeholder} = ${valuePlaceholder}`;
+      expAttrNames[placeholder] = field;
+      expAttrValues[valuePlaceholder] = updateData[field];
+    });
+
+    const updateParams = {
+      TableName: tableName,
+      Key: { projectId: id },
+      UpdateExpression: updateExp,
+      ExpressionAttributeNames: expAttrNames,
+      ExpressionAttributeValues: expAttrValues,
+      ReturnValues: "ALL_NEW",
+    };
+
+    const result = await docClient.send(new UpdateCommand(updateParams));
+
+    // ✅ Create audit log
+    const actionDescription = updateData.status 
+      ? `Project status changed to: ${updateData.status}`
+      : `Project fields updated: ${Object.keys(updateData).join(', ')}`;
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'PROJECT_UPDATED',
+      actionDescription: actionDescription,
+      targetType: 'project',
+      targetId: id,
+      changes: updateData
+    });
+
+    console.log(`✅ Project ${id} patched successfully`);
+    res.status(200).json({
+      success: true,
+      message: `Project updated successfully`,
+      project: result.Attributes,
+    });
+
+  } catch (error) {
+    console.error(`❌ Error patching project with ID ${id}:`, error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to update project", 
+      error: error.message 
+    });
+  }
+};
+
+/**
  * @desc     Delete a project
  * @route    DELETE /api/projects/:id
  */
