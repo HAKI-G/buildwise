@@ -66,23 +66,28 @@ function Layout({ title, children, headerContent }) {
         projects: true
     });
 
-    // ✅ FIXED: Get current project ID from URL
-    const getCurrentProjectId = () => {
-        const pathParts = location.pathname.split('/');
-        
-        // Check for /statistics/:projectId or /statistics/:projectId/...
-        if (pathParts[1] === 'statistics' && pathParts[2]) {
-            return pathParts[2];
-        }
-        
-        // Check for /projects/:projectId or /projects/:projectId/...
-        if (pathParts[1] === 'projects' && pathParts[2] && pathParts[2] !== 'edit') {
-            return pathParts[2];
-        }
-        
-        // Fall back to localStorage
-        return localStorage.getItem('lastSelectedProjectId');
-    };
+    // ✅ FIXED: Get current project ID from URL ONLY
+const getCurrentProjectId = () => {
+    const pathParts = location.pathname.split('/');
+    
+    // Check for /statistics/:projectId or /statistics/:projectId/...
+    if (pathParts[1] === 'statistics' && pathParts[2]) {
+        return pathParts[2];
+    }
+    
+    // Check for /projects/:projectId/view/:section (our dedicated view routes)
+    if (pathParts[1] === 'projects' && pathParts[3] === 'view' && pathParts[2]) {
+        return pathParts[2];
+    }
+    
+    // Check for /projects/:projectId (project detail page, but NOT /projects list)
+    if (pathParts[1] === 'projects' && pathParts[2] && pathParts[2] !== 'edit' && pathParts.length > 2) {
+        return pathParts[2];
+    }
+    
+    // ✅ Don't use localStorage as fallback - return null if not on a project page
+    return null;
+};
 
     const currentProjectId = getCurrentProjectId();
 
@@ -136,14 +141,14 @@ function Layout({ title, children, headerContent }) {
         }
     };
 
-    // ✅ NEW: Handle project submenu click - Navigate to dedicated view pages
+    // ✅ UPDATED: Handle project submenu click with project selection
     const handleProjectSubmenuClick = (section) => {
         if (currentProjectId) {
             // Navigate to dedicated view page (no tabs, no full header)
             navigate(`/projects/${currentProjectId}/view/${section}`);
         } else {
-            // If no project selected, go to projects list
-            navigate('/projects');
+            // If no project selected, go to project selection page with section parameter
+            navigate(`/select-project?section=${section}`);
         }
     };
 

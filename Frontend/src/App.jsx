@@ -28,6 +28,7 @@ import ReportsViewPage from './pages/ReportsViewPage.jsx';
 import CommentsViewPage from './pages/CommentsViewPage.jsx';
 import DocumentsViewPage from './pages/DocumentsViewPage.jsx';
 import MapsViewPage from './pages/MapsViewPage.jsx';
+import ProjectSelectionPage from './pages/ProjectSelectionPage.jsx';
 
 function App() {
   const location = useLocation();
@@ -72,6 +73,7 @@ function App() {
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/projects/:projectId/:tab" element={<ProjectDetailPage />} />
           <Route path="/projects/edit/:projectId" element={<UpdateProjectPage />} />
+          <Route path="/select-project" element={<ProjectSelectionPage />} />
           
           {/* ✅ NEW: Dedicated View Routes (no tabs, no full header) */}
           <Route path="/projects/:projectId/view/milestones" element={<MilestonesViewPage />} />
