@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const Reports = ({ projectId }) => { // ✅ ADD projectId prop
+const Reports = ({ projectId }) => {
     const [pendingPhotos, setPendingPhotos] = useState([]);
     const [confirmedPhotos, setConfirmedPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -13,6 +13,15 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
     
     const API_URL = 'http://localhost:5001/api';
 
+    // ✅ GET AUTH TOKEN - This was missing!
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+    };
+
     // Milestone weights
     const MILESTONE_WEIGHTS = {
         'Foundation': 15,
@@ -22,33 +31,43 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
         'MEP Systems': 15
     };
 
-    // ✅ Load photos when projectId changes
     useEffect(() => {
         if (projectId) {
             loadPhotos();
         }
     }, [projectId]);
 
-    // ✅ Load photos for THIS project only
+    // ✅ FIXED: Added authentication headers
     const loadPhotos = async () => {
         if (!projectId) return;
 
         setLoading(true);
         try {
-            // ✅ Get photos for this specific project
-            const response = await axios.get(`${API_URL}/photos/project/${projectId}`);
+            console.log('🔄 Loading photos for project:', projectId);
+            
+            // ✅ CRITICAL FIX: Added headers with auth token
+            const response = await axios.get(
+                `${API_URL}/photos/project/${projectId}`,
+                { headers: getAuthHeaders() }
+            );
+            
             const photos = response.data || [];
 
-            // Separate pending and confirmed
             const pending = photos.filter(p => p.confirmationStatus === 'pending' && p.aiProcessed);
             const confirmed = photos.filter(p => p.confirmationStatus === 'confirmed');
 
             setPendingPhotos(pending);
             setConfirmedPhotos(confirmed);
             
-            console.log(`✅ Loaded ${pending.length} pending and ${confirmed.length} confirmed photos for project ${projectId}`);
+            console.log(`✅ Loaded ${pending.length} pending and ${confirmed.length} confirmed photos`);
         } catch (error) {
-            console.error('Error loading photos:', error);
+            console.error('❌ Error loading photos:', error);
+            if (error.response?.status === 401) {
+                console.error('🔒 Authentication failed - token may be invalid or expired');
+                alert('Session expired. Please login again.');
+                // Optionally redirect to login
+                // window.location.href = '/login';
+            }
         } finally {
             setLoading(false);
         }
@@ -60,6 +79,7 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
         setShowConfirmModal(true);
     };
 
+    // ✅ FIXED: Added authentication headers
     const handleConfirm = async (confirmed) => {
         if (!selectedPhoto) return;
 
@@ -71,24 +91,38 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
         setIsSubmitting(true);
 
         try {
-            // ✅ Use user-selected milestone if available, fallback to AI suggestion
             const milestoneToConfirm = selectedPhoto.userSelectedMilestone || selectedPhoto.aiSuggestion.milestone;
             
-            await axios.post(`${API_URL}/photos/${selectedPhoto.photoId}/confirm`, {
-                updateId: selectedPhoto.updateId,
-                milestone: milestoneToConfirm,  // ✅ Send user's selection
-                userPercentage: parseInt(userPercentage),
-                confirmed: confirmed
+            console.log('📤 Confirming photo:', {
+                photoId: selectedPhoto.photoId,
+                milestone: milestoneToConfirm,
+                percentage: userPercentage
             });
+
+            // ✅ CRITICAL FIX: Added headers with auth token
+            await axios.post(
+                `${API_URL}/photos/${selectedPhoto.photoId}/confirm`,
+                {
+                    updateId: selectedPhoto.updateId,
+                    milestone: milestoneToConfirm,
+                    userPercentage: parseInt(userPercentage),
+                    confirmed: confirmed
+                },
+                { headers: getAuthHeaders() }
+            );
 
             alert(confirmed ? 'Progress confirmed successfully!' : 'Photo rejected');
             setShowConfirmModal(false);
             setSelectedPhoto(null);
             setUserPercentage('');
-            await loadPhotos(); // Reload photos
+            await loadPhotos();
         } catch (error) {
-            console.error('Error confirming photo:', error);
-            alert('Failed to save confirmation. Please try again.');
+            console.error('❌ Error confirming photo:', error);
+            if (error.response?.status === 401) {
+                alert('Session expired. Please login again.');
+            } else {
+                alert('Failed to save confirmation. Please try again.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -302,7 +336,6 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
         );
     };
 
-    // ✅ Show message if no project selected
     if (!projectId) {
         return (
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg">
@@ -371,7 +404,13 @@ const Reports = ({ projectId }) => { // ✅ ADD projectId prop
 
             {/* Content */}
             <div className="mt-6">
-                {activeTab === 'pending' ? renderPendingPhotos() : renderConfirmedPhotos()}
+                {loading ? (
+                    <div className="flex justify-center items-center py-16">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                ) : (
+                    activeTab === 'pending' ? renderPendingPhotos() : renderConfirmedPhotos()
+                )}
             </div>
 
             {/* Confirmation Modal */}

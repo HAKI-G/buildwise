@@ -12,7 +12,7 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
-const AI_API_URL = 'http://52.77.238.176:5000';
+const AI_API_URL = 'http://54.179.236.172:5000'; // ✅ EC2 endpoint - NO trailing slash
 
 // --- Multer S3 Upload Middleware ---
 export const upload = multer({
@@ -63,13 +63,20 @@ export const uploadPhotoForUpdate = async (req, res) => {
     console.log('🔗 Photo URL:', publicUrl);
     console.log('📁 Project ID:', projectId);
     console.log('🏗️ User-selected milestone:', milestone);
+    console.log('🤖 Attempting AI analysis at:', AI_API_URL);
 
     // AI Analysis
     let aiAnalysis = null;
     let aiProcessed = false;
 
     try {
-      const imageResponse = await axios.get(publicUrl, { responseType: 'arraybuffer', timeout: 15000 });
+      console.log('⏳ Fetching image from S3...');
+      const imageResponse = await axios.get(publicUrl, { 
+        responseType: 'arraybuffer', 
+        timeout: 15000 
+      });
+      
+      console.log('✅ Image fetched, preparing FormData...');
       const FormData = (await import('form-data')).default;
       const formData = new FormData();
       formData.append('image', Buffer.from(imageResponse.data), {
@@ -77,6 +84,7 @@ export const uploadPhotoForUpdate = async (req, res) => {
         contentType: req.file.mimetype
       });
 
+      console.log('🚀 Sending to AI endpoint:', `${AI_API_URL}/analyze`);
       const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
         headers: formData.getHeaders(),
         timeout: 30000
@@ -84,9 +92,20 @@ export const uploadPhotoForUpdate = async (req, res) => {
 
       aiAnalysis = aiResponse.data;
       aiProcessed = aiAnalysis && aiAnalysis.success;
+      console.log('✅ AI Analysis successful:', aiProcessed);
     } catch (aiError) {
       console.error('❌ AI Analysis failed:', aiError.message);
-      aiAnalysis = { error: true, message: aiError.message, timestamp: new Date().toISOString() };
+      console.error('🔍 Error details:', {
+        code: aiError.code,
+        response: aiError.response?.data,
+        status: aiError.response?.status
+      });
+      aiAnalysis = { 
+        error: true, 
+        message: aiError.message,
+        code: aiError.code,
+        timestamp: new Date().toISOString() 
+      };
       aiProcessed = false;
     }
 
@@ -139,6 +158,11 @@ export const confirmAISuggestion = async (req, res) => {
   }
 
   try {
+    console.log('🔄 Confirming AI suggestion...');
+    console.log('📊 Milestone:', milestone);
+    console.log('📈 User Percentage:', userPercentage);
+    console.log('✅ Confirmed:', confirmed);
+
     const confirmResponse = await axios.post(`${AI_API_URL}/confirm`, {
       milestone,
       user_percentage: parseFloat(userPercentage),
