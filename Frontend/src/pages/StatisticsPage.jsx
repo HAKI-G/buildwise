@@ -113,9 +113,81 @@ function StatisticsPage() {
         setProject(null);
     };
 
-    // ✅ FIXED: Milestone Status Data - Only count TASKS, not phases
+    // ✅ NEW: Calculate overall project completion from task completion percentages
+    // ✅ UPDATED: Calculate overall project completion from PHASE averages
+const projectProgress = useMemo(() => {
+    const phases = milestones.filter(m => m.isPhase === true);
+    const tasks = milestones.filter(m => m.isPhase !== true);
+    
+    if (phases.length === 0) {
+        // If no phases, fall back to task average
+        if (tasks.length === 0) {
+            return {
+                overallCompletion: 0,
+                completedPhases: 0,
+                totalPhases: 0,
+                inProgressPhases: 0,
+                phaseDetails: []
+            };
+        }
+        
+        const taskAvg = Math.round(
+            tasks.reduce((sum, t) => sum + (t.completionPercentage || 0), 0) / tasks.length
+        );
+        
+        return {
+            overallCompletion: taskAvg,
+            completedPhases: 0,
+            totalPhases: 0,
+            inProgressPhases: 0,
+            phaseDetails: []
+        };
+    }
+    
+    // ✅ Calculate completion for each phase
+    const phaseDetails = phases.map(phase => {
+        const phaseTasks = tasks.filter(t => t.parentPhase === phase.milestoneId);
+        
+        if (phaseTasks.length === 0) {
+            return {
+                phaseId: phase.milestoneId,
+                phaseName: phase.milestoneName,
+                completion: 0,
+                taskCount: 0
+            };
+        }
+        
+        const phaseCompletion = Math.round(
+            phaseTasks.reduce((sum, t) => sum + (t.completionPercentage || 0), 0) / phaseTasks.length
+        );
+        
+        return {
+            phaseId: phase.milestoneId,
+            phaseName: phase.milestoneName,
+            completion: phaseCompletion,
+            taskCount: phaseTasks.length
+        };
+    });
+    
+    // ✅ Calculate overall completion from phase averages
+    const overallCompletion = Math.round(
+        phaseDetails.reduce((sum, p) => sum + p.completion, 0) / phases.length
+    );
+    
+    const completedPhases = phaseDetails.filter(p => p.completion >= 100).length;
+    const inProgressPhases = phaseDetails.filter(p => p.completion > 0 && p.completion < 100).length;
+    
+    return {
+        overallCompletion,
+        completedPhases,
+        totalPhases: phases.length,
+        inProgressPhases,
+        phaseDetails
+    };
+}, [milestones]);
+
+    // Milestone Status Data - Only count TASKS, not phases
     const milestoneStatusData = useMemo(() => {
-        // Filter out phases - only count actual tasks
         const tasks = milestones.filter(m => m.isPhase !== true);
         
         if (tasks.length > 0) {
@@ -126,36 +198,31 @@ function StatisticsPage() {
             }, {});
             return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
         }
-        // ✅ Return empty array when no tasks exist
         return [];
     }, [milestones]);
 
-    // ✅ FIXED: Task Priority Data - Only count TASKS, not phases
+    // Task Priority Data - Only count INCOMPLETE tasks
     const taskPriorityData = useMemo(() => {
-    // Filter out phases - only count actual tasks
-    const tasks = milestones.filter(m => m.isPhase !== true);
-    
-    if (tasks.length > 0) {
-        // ✅ UPDATED: Only count tasks that are NOT completed
-        const incompleteTasks = tasks.filter(task => task.status !== 'completed');
+        const tasks = milestones.filter(m => m.isPhase !== true);
         
-        const priorityCounts = incompleteTasks.reduce((acc, task) => {
-            const priority = task.priority || 'Medium';
-            acc[priority] = (acc[priority] || 0) + 1;
-            return acc;
-        }, {});
-        
-        return [
-            { name: 'High', value: priorityCounts['High'] || 0 },
-            { name: 'Medium', value: priorityCounts['Medium'] || 0 },
-            { name: 'Low', value: priorityCounts['Low'] || 0 },
-        ].filter(item => item.value > 0);
-    }
-    // ✅ Return empty array when no tasks exist
-    return [];
-}, [milestones]);
+        if (tasks.length > 0) {
+            const incompleteTasks = tasks.filter(task => (task.completionPercentage || 0) < 100);
+            
+            const priorityCounts = incompleteTasks.reduce((acc, task) => {
+                const priority = task.priority || 'Medium';
+                acc[priority] = (acc[priority] || 0) + 1;
+                return acc;
+            }, {});
+            
+            return [
+                { name: 'High', value: priorityCounts['High'] || 0 },
+                { name: 'Medium', value: priorityCounts['Medium'] || 0 },
+                { name: 'Low', value: priorityCounts['Low'] || 0 },
+            ].filter(item => item.value > 0);
+        }
+        return [];
+    }, [milestones]);
 
-    
     // Pending Items Data
     const pendingItemsData = useMemo(() => {
         const pendingApprovals = photos.filter(p => 
@@ -271,8 +338,54 @@ function StatisticsPage() {
                 </div>
             </div>
 
+            {/* ✅ NEW: Overall Project Progress Card */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 p-6 rounded-xl shadow-lg mb-6 text-white">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-2xl font-bold mb-1">Overall Project Progress</h2>
+                        <p className="text-blue-100 text-sm">Based on task completion percentages</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-5xl font-bold">{projectProgress.overallCompletion}%</div>
+                        <p className="text-sm text-blue-100 mt-1">
+                            {projectProgress.completedTasks} of {projectProgress.totalTasks} tasks completed
+                        </p>
+                    </div>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-white/20 rounded-full h-4 overflow-hidden">
+                    <div 
+                        className="bg-white h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                        style={{ width: `${projectProgress.overallCompletion}%` }}
+                    >
+                        {projectProgress.overallCompletion > 10 && (
+                            <span className="text-xs font-bold text-blue-600">
+                                {projectProgress.overallCompletion}%
+                            </span>
+                        )}
+                    </div>
+                </div>
+                
+                {/* Task Breakdown */}
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">{projectProgress.completedTasks}</div>
+                        <div className="text-xs text-blue-100">Completed</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">{projectProgress.inProgressTasks}</div>
+                        <div className="text-xs text-blue-100">In Progress</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">{projectProgress.notStartedTasks}</div>
+                        <div className="text-xs text-blue-100">Not Started</div>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {/* ✅ FIXED: Milestone Status Chart with Empty State */}
+                {/* Milestone Status Chart */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">MILESTONE STATUS</h2>
                     <div className="w-full h-64">
@@ -297,15 +410,15 @@ function StatisticsPage() {
                     </div>
                 </div>
 
-                {/* ✅ FIXED: Task Priority Chart with Empty State */}
+                {/* Task Priority Chart */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK PRIORITY</h2>
                     <div className="w-full h-64">
                         {taskPriorityData.length === 0 ? (
                             <div className="flex items-center justify-center h-full text-gray-400 dark:text-slate-500">
                                 <div className="text-center">
-                                    <p className="text-lg mb-2">No tasks yet</p>
-                                    <p className="text-sm">Add tasks to see priority distribution</p>
+                                    <p className="text-lg mb-2">No incomplete tasks</p>
+                                    <p className="text-sm">All tasks completed or none exist</p>
                                 </div>
                             </div>
                         ) : (
@@ -522,6 +635,19 @@ function StatisticsPage() {
                                         ))}
                                     </div>
                                 )}
+                        <div className="mt-4 space-y-2">
+                            {projectProgress.phaseDetails.map(phase => (
+                                <div key={phase.phaseId} className="bg-white/10 rounded-lg p-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-blue-100">{phase.phaseName}</span>
+                                        <span className="text-lg font-bold text-white">{phase.completion}%</span>
+                                    </div>
+                                <div className="text-xs text-blue-200 mt-1">
+                                        {phase.taskCount} {phase.taskCount === 1 ? 'task' : 'tasks'}
+                                </div>
+                            </div>
+                            ))}
+                        </div>
                             </div>
                         );
                     })()}

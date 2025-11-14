@@ -4,10 +4,8 @@ import axios from "axios";
 
 const API_URL = "http://localhost:5001/api";
 
-// ✅ Helper function to get auth token
 const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
 
-// ✅ Helper function to get auth headers
 const getAuthHeaders = () => ({
   'Authorization': `Bearer ${getToken()}`,
   'Content-Type': 'application/json'
@@ -19,23 +17,16 @@ const Photos = ({ projectId }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [caption, setCaption] = useState("");
-  const [selectedMilestone, setSelectedMilestone] = useState("");
+  const [selectedTask, setSelectedTask] = useState(""); // ✅ Just task selection
+  const [tasks, setTasks] = useState([]);
   const [viewModal, setViewModal] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
 
-  // ✅ Milestone options matching your YOLOv11 model
-  const MILESTONES = [
-    { value: "", label: "Select Milestone" },
-    { value: "excavation_earthwork", label: "Excavation/Earthwork" },
-    { value: "foundation", label: "Foundation" },
-    { value: "rebar_installation", label: "Rebar Installation" },
-    { value: "structural_frame", label: "Structural Frame" },
-    { value: "roofing", label: "Roofing" },
-    { value: "drywall_interior_walls", label: "Drywall/Interior Walls" },
-    { value: "hvac_systems", label: "HVAC Systems" },
-    { value: "electrical_conduits_wiring", label: "Electrical Conduits/Wiring" },
-    { value: "piping_plumbing", label: "Piping/Plumbing" }
-  ];
+  useEffect(() => {
+    if (projectId && showUploadForm) {
+      fetchProjectTasks();
+    }
+  }, [projectId, showUploadForm]);
 
   useEffect(() => {
     if (projectId) {
@@ -43,7 +34,25 @@ const Photos = ({ projectId }) => {
     }
   }, [projectId]);
 
-  // ✅ Fetch ONLY confirmed photos for this specific project
+  const fetchProjectTasks = async () => {
+    try {
+      console.log('📋 Fetching tasks for project:', projectId);
+      
+      const response = await axios.get(
+        `${API_URL}/milestones/project/${projectId}`,
+        { headers: getAuthHeaders() }
+      );
+      
+      // ✅ Filter only tasks (not phases)
+      const tasksOnly = response.data.filter(item => item.isPhase !== true);
+      
+      setTasks(tasksOnly);
+      console.log(`✅ Loaded ${tasksOnly.length} tasks`);
+    } catch (err) {
+      console.error("❌ Error fetching tasks:", err);
+    }
+  };
+
   const fetchConfirmedPhotosForProject = async () => {
     if (!projectId) return;
 
@@ -53,10 +62,9 @@ const Photos = ({ projectId }) => {
       
       const response = await axios.get(
         `${API_URL}/photos/project/${projectId}`,
-        { headers: getAuthHeaders() } // ✅ Added auth headers
+        { headers: getAuthHeaders() }
       );
       
-      // ✅ FILTER: Only show confirmed photos
       const confirmedOnly = response.data.filter(
         photo => photo.confirmationStatus === 'confirmed'
       );
@@ -81,22 +89,21 @@ const Photos = ({ projectId }) => {
     }
   };
 
-  // ✅ Generate unique Update ID
   const generateUpdateId = () => {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
     return `UPD-${timestamp}-${random}`;
   };
 
-  // ✅ Upload photo with AI analysis
+  // ✅ UPDATED: No completion percentage during upload
   const handleUpload = async () => {
     if (!selectedFile || !projectId) {
       alert("Please select a file");
       return;
     }
 
-    if (!selectedMilestone) {
-      alert("Please select a milestone");
+    if (!selectedTask) {
+      alert("Please select a task");
       return;
     }
 
@@ -105,11 +112,15 @@ const Photos = ({ projectId }) => {
     const updateId = generateUpdateId();
     console.log('📤 Uploading photo with Update ID:', updateId);
 
+    const taskDetails = tasks.find(t => t.milestoneId === selectedTask);
+
     const formData = new FormData();
     formData.append("photo", selectedFile); 
     formData.append("caption", caption);
     formData.append("projectId", projectId);
-    formData.append("milestone", selectedMilestone);
+    formData.append("taskId", selectedTask);
+    formData.append("taskName", taskDetails?.milestoneName || "Unknown Task");
+    // ✅ REMOVED: completionPercentage - AI will suggest it in Reports tab
 
     try {
       console.log('🚀 Sending to backend for AI analysis...');
@@ -119,7 +130,7 @@ const Photos = ({ projectId }) => {
         formData, 
         {
           headers: {
-            Authorization: `Bearer ${getToken()}`, // ✅ Auth header
+            Authorization: `Bearer ${getToken()}`,
             "Content-Type": "multipart/form-data",
           },
         }
@@ -131,16 +142,16 @@ const Photos = ({ projectId }) => {
       // Reset form
       setSelectedFile(null);
       setCaption("");
-      setSelectedMilestone("");
+      setSelectedTask("");
       setShowUploadForm(false);
       document.querySelector('input[type="file"]').value = "";
 
-      // ✅ Success message
       alert(
         `✅ Photo uploaded successfully!\n\n` +
         `Update ID: ${updateId}\n` +
+        `Task: ${taskDetails?.milestoneName}\n` +
         `AI Status: ${response.data.aiAnalysis?.success ? 'Analyzed ✓' : 'Failed'}\n\n` +
-        `📝 Go to the REPORTS tab to review and approve.`
+        `📝 Go to the REPORTS tab to review AI suggestions and approve.`
       );
     } catch (err) {
       console.error("❌ Upload failed:", err);
@@ -154,7 +165,6 @@ const Photos = ({ projectId }) => {
     }
   };
 
-  // ✅ Delete photo
   const handleDelete = async (photo) => {
     if (!confirm("Are you sure you want to delete this photo?")) return;
 
@@ -162,7 +172,7 @@ const Photos = ({ projectId }) => {
       await axios.delete(
         `${API_URL}/photos/${photo.photoId}`, 
         {
-          headers: getAuthHeaders(), // ✅ Auth header
+          headers: getAuthHeaders(),
           data: {
             updateId: photo.updateId,
             s3Key: photo.s3Key,
@@ -209,8 +219,9 @@ const Photos = ({ projectId }) => {
             <p className="text-sm text-blue-800 dark:text-blue-300 flex items-start gap-2">
               <span>ℹ️</span>
               <span>
-                <strong>AI-Powered Analysis:</strong> Your photo will be analyzed by our YOLOv11 model on AWS EC2. 
-                After upload, go to the <strong>REPORTS tab</strong> to review AI suggestions and approve the photo.
+                <strong>AI-Powered Analysis:</strong> Select a task and upload a photo. 
+                Our YOLOv11 model will analyze it and suggest a completion percentage. 
+                Go to the <strong>REPORTS tab</strong> to review, edit, and approve.
               </span>
             </p>
           </div>
@@ -234,24 +245,25 @@ const Photos = ({ projectId }) => {
               )}
             </div>
 
-            {/* Milestone Dropdown */}
+            {/* ✅ UPDATED: Task Dropdown WITHOUT completion percentage */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Milestone <span className="text-red-500">*</span>
+                Select Task <span className="text-red-500">*</span>
               </label>
               <select
-                value={selectedMilestone}
-                onChange={(e) => setSelectedMilestone(e.target.value)}
+                value={selectedTask}
+                onChange={(e) => setSelectedTask(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {MILESTONES.map((milestone) => (
-                  <option key={milestone.value} value={milestone.value}>
-                    {milestone.label}
+                <option value="">-- Select a Task --</option>
+                {tasks.map((task) => (
+                  <option key={task.milestoneId} value={task.milestoneId}>
+                    {task.milestoneName}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                AI will verify if the photo matches this construction phase
+                AI will analyze this photo and suggest completion percentage in Reports
               </p>
             </div>
 
@@ -272,7 +284,7 @@ const Photos = ({ projectId }) => {
             {/* Upload Button */}
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || !selectedMilestone || uploading}
+              disabled={!selectedFile || !selectedTask || uploading}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium"
             >
               {uploading ? (
@@ -330,7 +342,6 @@ const Photos = ({ projectId }) => {
                 key={photo.photoId}
                 className="bg-slate-700 dark:bg-slate-900 rounded-lg overflow-hidden border-2 border-green-500"
               >
-                {/* Photo Image */}
                 <div className="relative">
                   <img
                     src={photo.fileURL}
@@ -343,30 +354,23 @@ const Photos = ({ projectId }) => {
                   </div>
                 </div>
 
-                {/* Photo Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-white mb-1 truncate">
                     {photo.caption || "No caption"}
                   </h3>
+                  {photo.taskName && (
+                    <p className="text-xs text-blue-400 mb-1">
+                      📋 {photo.taskName}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-400 mb-1">
                     Update: {photo.updateId}
                   </p>
                   <p className="text-xs text-slate-400 mb-1">
                     Uploaded: {new Date(photo.uploadedAt).toLocaleDateString()}
                   </p>
-                  {photo.userConfirmedMilestone && (
-                    <p className="text-xs text-blue-400 mb-1">
-                      ✓ {photo.userConfirmedMilestone}
-                    </p>
-                  )}
-                  {photo.userInputPercentage && (
-                    <p className="text-xs text-green-400 mb-3">
-                      Progress: {photo.userInputPercentage}%
-                    </p>
-                  )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => openViewModal(photo)}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
@@ -419,18 +423,10 @@ const Photos = ({ projectId }) => {
 
             <div className="space-y-2 text-sm text-slate-300">
               <p><strong>Update ID:</strong> {viewModal.updateId}</p>
+              {viewModal.taskName && (
+                <p><strong>Task:</strong> {viewModal.taskName}</p>
+              )}
               <p><strong>Uploaded:</strong> {new Date(viewModal.uploadedAt).toLocaleString()}</p>
-              {viewModal.userConfirmedMilestone && (
-                <p><strong>Milestone:</strong> {viewModal.userConfirmedMilestone}</p>
-              )}
-              {viewModal.userInputPercentage && (
-                <p><strong>Completion:</strong> {viewModal.userInputPercentage}%</p>
-              )}
-              {viewModal.overallProgressPercent && (
-                <p className="text-green-400">
-                  <strong>Overall Progress:</strong> {viewModal.overallProgressPercent}%
-                </p>
-              )}
               {viewModal.confirmedAt && (
                 <p><strong>Approved:</strong> {new Date(viewModal.confirmedAt).toLocaleString()}</p>
               )}

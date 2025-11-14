@@ -45,6 +45,9 @@ import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
 import twoFactorRoutes from './routes/twoFactorRoutes.js';
 import registrationRoutes from './routes/registrationRoutes.js';
 
+// ✅ Import cron job
+import { startOverdueCronJob } from './utils/checkOverdueProjects.js';
+
 // Middleware
 import { protect, requireAdmin } from './middleware/authMiddleware.js';
 import { checkMaintenanceMode } from './middleware/maintenanceMiddleware.js';
@@ -151,10 +154,14 @@ app.use('/api/audit-logs', protect, auditRoutes);
 scheduleAuditLogCleanup();
 console.log('📅 Audit log cleanup scheduled');
 
-// Start server
+// ✅ Start overdue checker cron job
+startOverdueCronJob();
+
+// ✅ Start server (ONLY ONE TIME)
 app.listen(port, () => {
   console.log(`\n✅ BuildWise server started successfully!`);
   console.log(`🌐 Server running on: http://localhost:${port}`);
   console.log(`🔧 Health check: http://localhost:${port}/api/health`);
-  console.log(`📧 Email service: ${process.env.EMAIL_USER ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}\n`);
-}); 
+  console.log(`📧 Email service: ${process.env.EMAIL_USER ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`);
+  console.log(`✅ Overdue projects checker is active\n`);
+});

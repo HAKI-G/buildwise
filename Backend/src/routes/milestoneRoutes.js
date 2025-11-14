@@ -4,8 +4,10 @@ import {
   getMilestonesForProject,
   updateMilestone,
   deleteMilestone,
-  canCompletePhase,      // ✅ NEW
-  completePhase          // ✅ NEW
+  canCompletePhase,
+  completePhase,
+  updateTaskCompletion,  // ✅ NEW
+  getProjectProgress      // ✅ NEW
 } from '../controller/milestoneController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -15,6 +17,12 @@ const router = express.Router();
 // @route   GET /api/milestones/project/:projectId
 // @access  Private
 router.get('/project/:projectId', protect, getMilestonesForProject);
+
+// ✅ NEW: Get overall project progress
+// @desc    Get project progress statistics
+// @route   GET /api/milestones/:projectId/progress
+// @access  Private
+router.get('/:projectId/progress', protect, getProjectProgress);
 
 // @desc    Create a new milestone/task for a project
 // @route   POST /api/milestones/:projectId
@@ -26,18 +34,22 @@ router.post('/:projectId', protect, createMilestone);
 // @access  Private
 router.put('/:projectId/:milestoneId', protect, updateMilestone);
 
+// ✅ NEW: Update task completion percentage
+// @desc    Update task completion percentage (0-100)
+// @route   PUT /api/milestones/:projectId/task/:taskId/completion
+// @access  Private
+router.put('/:projectId/task/:taskId/completion', protect, updateTaskCompletion);
+
 // @desc    Delete a milestone/task
 // @route   DELETE /api/milestones/:projectId/:milestoneId
 // @access  Private
 router.delete('/:projectId/:milestoneId', protect, deleteMilestone);
 
-// ✅ NEW: Check if phase can be completed
-// @desc    Check if all tasks in phase are completed
+// @desc    Check if phase can be completed
 // @route   GET /api/milestones/:projectId/phase/:phaseId/can-complete
 // @access  Private
 router.get('/:projectId/phase/:phaseId/can-complete', protect, canCompletePhase);
 
-// ✅ NEW: Complete a phase (validates all tasks completed first)
 // @desc    Mark phase as completed (only if all tasks done)
 // @route   POST /api/milestones/:projectId/phase/:phaseId/complete
 // @access  Private

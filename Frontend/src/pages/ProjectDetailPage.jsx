@@ -161,6 +161,85 @@ function ProjectDetailPage() {
                 return <Milestones projectId={projectId} />;
         }
     };
+    
+const [projectStatus, setProjectStatus] = useState('Not Started');
+const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+// Load current status
+useEffect(() => {
+    if (project) {
+        setProjectStatus(project.status || 'Not Started');
+    }
+}, [project]);
+
+// Handle status change
+const handleStatusChange = async (newStatus) => {
+    if (!project) return;
+    
+    // Confirm for critical status changes
+    if (newStatus === 'Completed') {
+        const confirm = window.confirm(
+            'Are you sure you want to mark this project as COMPLETED? ' +
+            'This should only be done after final VP approval.'
+        );
+        if (!confirm) return;
+    }
+    
+    setIsUpdatingStatus(true);
+    
+    try {
+        await axios.patch(
+            `http://localhost:5001/api/projects/${project.projectId}/status`,
+            { status: newStatus },
+            { headers: getAuthHeaders() }
+        );
+        
+        setProjectStatus(newStatus);
+        alert(`✅ Project status updated to: ${newStatus}`);
+        
+        // Refresh project data
+        fetchProject();
+        
+    } catch (error) {
+        console.error('Error updating status:', error);
+        alert('❌ Failed to update project status');
+    } finally {
+        setIsUpdatingStatus(false);
+    }
+};
+
+// Status dropdown JSX
+<div className="relative">
+    <select
+        value={projectStatus}
+        onChange={(e) => handleStatusChange(e.target.value)}
+        disabled={isUpdatingStatus}
+        className={`px-4 py-2 rounded-lg font-medium text-white border-2 cursor-pointer
+            ${projectStatus === 'Not Started' ? 'bg-gray-500 border-gray-600' : ''}
+            ${projectStatus === 'In Progress' ? 'bg-blue-600 border-blue-700' : ''}
+            ${projectStatus === 'On Hold' ? 'bg-yellow-600 border-yellow-700' : ''}
+            ${projectStatus === 'Overdue' ? 'bg-red-600 border-red-700' : ''}
+            ${projectStatus === 'Completed' ? 'bg-green-600 border-green-700' : ''}
+            ${isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}
+        `}
+    >
+        <option value="Not Started">Not Started</option>
+        <option value="In Progress">In Progress</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Overdue">Overdue</option>
+        <option value="Completed">Completed</option>
+    </select>
+    
+    {/* Status Helper Text */}
+    <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">
+        {projectStatus === 'Not Started' && 'Project created, no activity yet'}
+        {projectStatus === 'In Progress' && 'Work is ongoing'}
+        {projectStatus === 'On Hold' && 'Paused for review/approval'}
+        {projectStatus === 'Overdue' && 'Past due date or requirements not met'}
+        {projectStatus === 'Completed' && 'Project finished and approved'}
+    </p>
+</div>
+
 
     // --- Render Logic ---
     if (loading) return <Layout title="Loading..."><p className="text-center p-8 text-gray-500 dark:text-slate-400">Loading project details...</p></Layout>;
