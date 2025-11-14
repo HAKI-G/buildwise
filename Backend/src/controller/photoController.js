@@ -1,10 +1,11 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, DeleteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, DeleteCommand, UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb"; // ✅ ADD GetCommand
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import multerS3 from 'multer-s3';
 import axios from 'axios';
+import { autoUpdateProjectStatus } from './projectController.js';
 
 // --- AWS Client Setup ---
 const s3 = new S3Client({ region: "ap-southeast-1" });
@@ -25,25 +26,35 @@ export const upload = multer({
 });
 
 // --- Upload Photo for Update (Updated) ---
+// ✅ UPDATED: Upload Photo WITHOUT completion percentage
+// ✅ UPDATED: Store phase information with photos
 export const uploadPhotoForUpdate = async (req, res) => {
   let { updateId } = req.params;
-  const { caption, projectId, milestone } = req.body;
+  const { caption, projectId, taskId, taskName } = req.body;
   const photoId = uuidv4();
 
-  // Validate file
   if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
-
-  // Validate projectId
   if (!projectId) return res.status(400).json({ message: 'Project ID is required.' });
+  if (!taskId) return res.status(400).json({ message: 'Task selection is required.' });
 
-  // Validate milestone
-  if (!milestone) return res.status(400).json({ message: 'Milestone is required.' });
-
-  // Generate updateId if missing
   if (!updateId) updateId = `UPD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
   try {
-    // Enforce max photos per update
+    // ✅ Fetch task details to get phase information
+    const taskParams = {
+      TableName: 'BuildWiseMilestones',
+      Key: {
+        projectId: projectId,
+        milestoneId: taskId
+      }
+    };
+    
+    const taskResult = await docClient.send(new GetCommand(taskParams));
+    const task = taskResult.Item;
+    
+    const phaseId = task?.parentPhase || null;
+    const phaseName = task?.parentPhaseName || 'No Phase';
+
     const existingPhotos = await docClient.send(new QueryCommand({
       TableName: 'BuildWisePhotos',
       KeyConditionExpression: 'updateId = :updateId',
@@ -62,21 +73,21 @@ export const uploadPhotoForUpdate = async (req, res) => {
     console.log('📸 Photo uploaded to S3:', req.file.originalname);
     console.log('🔗 Photo URL:', publicUrl);
     console.log('📁 Project ID:', projectId);
-    console.log('🏗️ User-selected milestone:', milestone);
-    console.log('🤖 Attempting AI analysis at:', AI_API_URL);
+    console.log('📋 Task ID:', taskId);
+    console.log('📝 Task Name:', taskName);
+    console.log('🏗️ Phase ID:', phaseId);
+    console.log('🏷️ Phase Name:', phaseName);
 
     // AI Analysis
     let aiAnalysis = null;
     let aiProcessed = false;
 
     try {
-      console.log('⏳ Fetching image from S3...');
       const imageResponse = await axios.get(publicUrl, { 
         responseType: 'arraybuffer', 
         timeout: 15000 
       });
       
-      console.log('✅ Image fetched, preparing FormData...');
       const FormData = (await import('form-data')).default;
       const formData = new FormData();
       formData.append('image', Buffer.from(imageResponse.data), {
@@ -84,7 +95,6 @@ export const uploadPhotoForUpdate = async (req, res) => {
         contentType: req.file.mimetype
       });
 
-      console.log('🚀 Sending to AI endpoint:', `${AI_API_URL}/analyze`);
       const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
         headers: formData.getHeaders(),
         timeout: 30000
@@ -95,11 +105,6 @@ export const uploadPhotoForUpdate = async (req, res) => {
       console.log('✅ AI Analysis successful:', aiProcessed);
     } catch (aiError) {
       console.error('❌ AI Analysis failed:', aiError.message);
-      console.error('🔍 Error details:', {
-        code: aiError.code,
-        response: aiError.response?.data,
-        status: aiError.response?.status
-      });
       aiAnalysis = { 
         error: true, 
         message: aiError.message,
@@ -109,19 +114,22 @@ export const uploadPhotoForUpdate = async (req, res) => {
       aiProcessed = false;
     }
 
-    // Save to database
+    // ✅ Save WITH phase information
     const params = {
       TableName: 'BuildWisePhotos',
       Item: {
         updateId,
         photoId,
         projectId,
+        taskId,
+        taskName,
+        phaseId,        // ✅ NEW: Store phase ID
+        phaseName,      // ✅ NEW: Store phase name
         fileURL: publicUrl,
         s3Key: req.file.key,
         caption: caption || 'No caption',
         fileName: req.file.originalname,
         uploadedAt: new Date().toISOString(),
-        userSelectedMilestone: milestone,
         aiAnalysis,
         aiProcessed,
         aiSuggestion: aiAnalysis?.ai_suggestion || null,
@@ -148,13 +156,17 @@ export const uploadPhotoForUpdate = async (req, res) => {
   }
 };
 
-// --- Confirm AI Suggestion ---
+// ✅ UPDATED: Confirm AI Suggestion (now updates task completion)
 export const confirmAISuggestion = async (req, res) => {
   const { photoId } = req.params;
-  const { updateId, milestone, userPercentage, confirmed } = req.body;
+  const { updateId, milestone, userPercentage, confirmed, taskId, projectId } = req.body;
 
   if (!photoId || !updateId || !milestone || userPercentage === undefined) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  if (!taskId || !projectId) {
+    return res.status(400).json({ message: 'Task ID and Project ID are required to update task completion' });
   }
 
   try {
@@ -162,6 +174,8 @@ export const confirmAISuggestion = async (req, res) => {
     console.log('📊 Milestone:', milestone);
     console.log('📈 User Percentage:', userPercentage);
     console.log('✅ Confirmed:', confirmed);
+    console.log('📋 Task ID:', taskId);
+    console.log('🏗️ Project ID:', projectId);
 
     const confirmResponse = await axios.post(`${AI_API_URL}/confirm`, {
       milestone,
@@ -171,7 +185,8 @@ export const confirmAISuggestion = async (req, res) => {
 
     const calculation = confirmResponse.data;
 
-    const params = {
+    // Update photo confirmation status
+    const photoParams = {
       TableName: 'BuildWisePhotos',
       Key: { updateId, photoId },
       UpdateExpression: `SET 
@@ -194,12 +209,58 @@ export const confirmAISuggestion = async (req, res) => {
       ReturnValues: 'ALL_NEW'
     };
 
-    const result = await docClient.send(new UpdateCommand(params));
+    const photoResult = await docClient.send(new UpdateCommand(photoParams));
+
+    // Update task completion percentage
+    if (confirmed && taskId && projectId) {
+      try {
+        console.log('📋 Updating task completion percentage...');
+        
+        const now = new Date().toISOString();
+        const isCompleted = parseFloat(userPercentage) >= 100;
+        
+        const taskUpdateParams = {
+          TableName: 'BuildWiseMilestones',
+          Key: {
+            projectId: projectId,
+            milestoneId: taskId
+          },
+          UpdateExpression: `SET 
+            completionPercentage = :percentage,
+            #status = :status,
+            completedAt = :completedAt,
+            updatedAt = :now`,
+          ExpressionAttributeNames: {
+            '#status': 'status'
+          },
+          ExpressionAttributeValues: {
+            ':percentage': parseFloat(userPercentage),
+            ':status': isCompleted ? 'completed' : (parseFloat(userPercentage) > 0 ? 'in progress' : 'not started'),
+            ':completedAt': isCompleted ? now : null,
+            ':now': now
+          },
+          ReturnValues: 'ALL_NEW'
+        };
+        
+        const taskResult = await docClient.send(new UpdateCommand(taskUpdateParams));
+        
+        console.log('✅ Task completion updated successfully!');
+        console.log(`   Task: ${taskResult.Attributes.milestoneName}`);
+        console.log(`   Completion: ${taskResult.Attributes.completionPercentage}%`);
+        
+        // ✅ Auto-update project status
+        await autoUpdateProjectStatus(projectId);
+        
+      } catch (taskError) {
+        console.error('⚠️ Warning: Failed to update task completion:', taskError.message);
+      }
+    }
 
     res.status(200).json({
       message: 'Confirmation saved successfully',
-      photo: result.Attributes,
-      calculation
+      photo: photoResult.Attributes,
+      calculation,
+      taskUpdated: confirmed && taskId && projectId
     });
 
   } catch (error) {

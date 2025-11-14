@@ -6,16 +6,181 @@ import {
   GetCommand,
   UpdateCommand,
   DeleteCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { logAudit } from "./auditController.js"; // ✅ Import audit logger
-import { uploadToS3, deleteFromS3 } from "../utils/s3Upload.js"; // ✅ Import S3 utilities
+import { logAudit } from "./auditController.js";
+import { uploadToS3, deleteFromS3 } from "../utils/s3Upload.js";
 
 const client = new DynamoDBClient({
   region: "ap-southeast-1",
 });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = "buildwiseProjects";
+
+// ==================== STATUS MANAGEMENT FUNCTIONS ====================
+
+// ✅ Calculate project status automatically
+export const calculateProjectStatus = async (projectId) => {
+    try {
+        const projectParams = {
+            TableName: tableName,
+            Key: { projectId }
+        };
+        const projectResult = await docClient.send(new GetCommand(projectParams));
+        const project = projectResult.Item;
+        
+        if (!project) return null;
+        
+        // Get milestones/tasks
+        const milestonesParams = {
+            TableName: 'BuildWiseMilestones',
+            KeyConditionExpression: 'projectId = :projectId',
+            ExpressionAttributeValues: {
+                ':projectId': projectId
+            }
+        };
+        const milestonesResult = await docClient.send(new QueryCommand(milestonesParams));
+        const milestones = milestonesResult.Items || [];
+        
+        const tasks = milestones.filter(m => m.isPhase !== true);
+        const phases = milestones.filter(m => m.isPhase === true);
+        
+        // Get photos
+        let photos = [];
+        try {
+            const photosParams = {
+                TableName: 'BuildWisePhotos',
+                FilterExpression: 'projectId = :projectId',
+                ExpressionAttributeValues: {
+                    ':projectId': projectId
+                }
+            };
+            const photosResult = await docClient.send(new ScanCommand(photosParams));
+            photos = photosResult.Items || [];
+        } catch (error) {
+            console.warn('Could not fetch photos:', error.message);
+        }
+        
+        let calculatedStatus = project.status || 'Not Started';
+        
+        // Don't override manual statuses
+        if (project.status === 'On Hold' || project.status === 'Completed') {
+            return project.status;
+        }
+        
+        // 1. NOT STARTED: No tasks, no phases, no photos
+        if (tasks.length === 0 && phases.length === 0 && photos.length === 0) {
+            calculatedStatus = 'Not Started';
+        }
+        // 2. IN PROGRESS: Has tasks/phases/photos
+        else if (tasks.length > 0 || phases.length > 0 || photos.length > 0) {
+            const allTasksComplete = tasks.length > 0 && tasks.every(t => (t.completionPercentage || 0) >= 100);
+            calculatedStatus = allTasksComplete ? 'In Progress' : 'In Progress';
+        }
+        
+        // 3. OVERDUE: Past due date
+        if (project.contractCompletionDate || project.targetDate) {
+            const dueDate = new Date(project.contractCompletionDate || project.targetDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            dueDate.setHours(0, 0, 0, 0);
+            
+            if (today > dueDate && calculatedStatus !== 'Completed' && project.status !== 'On Hold') {
+                calculatedStatus = 'Overdue';
+            }
+        }
+        
+        return calculatedStatus;
+        
+    } catch (error) {
+        console.error('Error calculating project status:', error);
+        return null;
+    }
+};
+
+// ✅ Auto-update project status
+export const autoUpdateProjectStatus = async (projectId) => {
+    try {
+        const newStatus = await calculateProjectStatus(projectId);
+        
+        if (!newStatus) return;
+        
+        const params = {
+            TableName: tableName,
+            Key: { projectId },
+            UpdateExpression: 'SET #status = :status',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':status': newStatus
+            }
+        };
+        
+        await docClient.send(new UpdateCommand(params));
+        
+        console.log(`✅ Project ${projectId} status auto-updated to: ${newStatus}`);
+        
+    } catch (error) {
+        console.error('Error auto-updating project status:', error);
+    }
+};
+
+// ✅ Manual update project status endpoint
+export const updateProjectStatus = async (req, res) => {
+    const { projectId } = req.params;
+    const { status } = req.body;
+    
+    const validStatuses = ['Not Started', 'In Progress', 'On Hold', 'Overdue', 'Completed'];
+    
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ 
+            message: 'Invalid status',
+            validStatuses 
+        });
+    }
+    
+    try {
+        const params = {
+            TableName: tableName,
+            Key: { projectId },
+            UpdateExpression: 'SET #status = :status',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':status': status
+            },
+            ReturnValues: 'ALL_NEW'
+        };
+        
+        const result = await docClient.send(new UpdateCommand(params));
+        
+        // Create audit log
+        await logAudit({
+            userId: req.user.id,
+            action: 'PROJECT_STATUS_UPDATED',
+            actionDescription: `Project status changed to: ${status}`,
+            targetType: 'project',
+            targetId: projectId,
+            changes: { status }
+        });
+        
+        console.log(`✅ Project status manually updated to: ${status}`);
+        
+        res.status(200).json({
+            message: 'Project status updated successfully',
+            project: result.Attributes
+        });
+        
+    } catch (error) {
+        console.error('Error updating project status:', error);
+        res.status(500).json({ message: 'Failed to update project status', error: error.message });
+    }
+};
+
+// ==================== EXISTING CRUD FUNCTIONS ====================
 
 /**
  * @desc     Get all projects
@@ -82,7 +247,7 @@ export const createProject = async (req, res) => {
       });
     }
 
-    // ✅ Handle image upload to S3
+    // Handle image upload to S3
     let projectImageUrl = null;
     if (req.file) {
       try {
@@ -113,7 +278,7 @@ export const createProject = async (req, res) => {
       projectManager: projectManager && projectManager.trim() !== "" 
         ? projectManager.trim() 
         : "Juan Dela Cruz",
-      projectImage: projectImageUrl, // ✅ Store S3 URL
+      projectImage: projectImageUrl,
       status: "Not Started",
       createdAt: new Date().toISOString(),
       createdBy: userId,
@@ -126,7 +291,7 @@ export const createProject = async (req, res) => {
 
     await docClient.send(new PutCommand(putParams));
 
-    // ✅ Create audit log
+    // Create audit log
     await logAudit({
       userId: userId,
       action: 'PROJECT_CREATED',
@@ -221,22 +386,19 @@ export const updateProject = async (req, res) => {
 
   addUpdateField("status", status);
 
-  // ✅ Handle image update if new file is uploaded
+  // Handle image update if new file is uploaded
   if (req.file) {
     try {
-      // Get existing project to delete old image
       const getParams = {
         TableName: tableName,
         Key: { projectId: id },
       };
       const existingProject = await docClient.send(new GetCommand(getParams));
       
-      // Delete old image if exists
       if (existingProject.Item?.projectImage) {
         await deleteFromS3(existingProject.Item.projectImage);
       }
 
-      // Upload new image
       const newImageUrl = await uploadToS3(req.file, "projects");
       addUpdateField("projectImage", newImageUrl);
       console.log("✅ Project image updated:", newImageUrl);
@@ -261,7 +423,7 @@ export const updateProject = async (req, res) => {
   try {
     const data = await docClient.send(new UpdateCommand(params));
 
-    // ✅ Create audit log
+    // Create audit log
     await logAudit({
       userId: req.user.id,
       action: 'PROJECT_UPDATED',
@@ -282,7 +444,6 @@ export const updateProject = async (req, res) => {
 };
 
 /**
- * ✅ NEW FUNCTION
  * @desc     Partially update a project (for quick updates like status)
  * @route    PATCH /api/projects/:id
  */
@@ -291,7 +452,6 @@ export const patchProject = async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
 
-  // Validate that we have something to update
   if (!updateData || Object.keys(updateData).length === 0) {
     return res.status(400).json({ 
       message: "Please provide at least one field to update" 
@@ -299,7 +459,6 @@ export const patchProject = async (req, res) => {
   }
 
   try {
-    // Get existing project first for audit logging
     const getParams = {
       TableName: tableName,
       Key: { projectId: id },
@@ -310,7 +469,6 @@ export const patchProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    // Build dynamic update expression
     let updateExp = "set";
     const expAttrNames = {};
     const expAttrValues = {};
@@ -339,7 +497,6 @@ export const patchProject = async (req, res) => {
 
     const result = await docClient.send(new UpdateCommand(updateParams));
 
-    // ✅ Create audit log
     const actionDescription = updateData.status 
       ? `Project status changed to: ${updateData.status}`
       : `Project fields updated: ${Object.keys(updateData).join(', ')}`;
@@ -378,7 +535,6 @@ export const deleteProject = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Get project details first for audit log and image deletion
     const getParams = {
       TableName: tableName,
       Key: { projectId: id },
@@ -390,25 +546,21 @@ export const deleteProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    // ✅ Delete project image from S3 if exists
     if (project.projectImage) {
       try {
         await deleteFromS3(project.projectImage);
         console.log("✅ Project image deleted from S3");
       } catch (s3Error) {
         console.warn("⚠️ Could not delete image from S3:", s3Error.message);
-        // Continue with project deletion even if image deletion fails
       }
     }
 
-    // Delete project
     const deleteParams = {
       TableName: tableName,
       Key: { projectId: id },
     };
     await docClient.send(new DeleteCommand(deleteParams));
 
-    // ✅ Create audit log
     await logAudit({
       userId: req.user.id,
       action: 'PROJECT_DELETED',
