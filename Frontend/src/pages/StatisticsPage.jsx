@@ -22,6 +22,15 @@ function StatisticsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // Auto-set task status filter based on project status
+    const taskStatusFilter = useMemo(() => {
+        if (!project) return 'all';
+        if (project.status === 'Completed') return 'completed';
+        if (project.status === 'In Progress') return 'in-progress';
+        if (project.status === 'Not Started') return 'not-started';
+        return 'all';
+    }, [project]);
+
     // Fetch all projects for selection
     useEffect(() => {
         const fetchAllProjects = async () => {
@@ -244,13 +253,17 @@ const projectProgress = useMemo(() => {
         const total = project?.contractCost || 0;
         const spent = totalSpent;
         const remaining = total - spent;
+        const isOverBudget = remaining < 0;
+        const overage = Math.abs(remaining);
         
         return {
             total,
             spent,
-            remaining: remaining > 0 ? remaining : 0,
-            percentSpent: total > 0 ? ((spent / total) * 100).toFixed(1) : 0,
-            percentRemaining: total > 0 ? ((remaining / total) * 100).toFixed(1) : 0
+            remaining: remaining,
+            isOverBudget,
+            overage,
+            percentSpent: total > 0 ? Math.min(((spent / total) * 100), 100).toFixed(1) : 0,
+            percentRemaining: total > 0 ? ((Math.max(remaining, 0) / total) * 100).toFixed(1) : 0
         };
     }, [project, totalSpent]);
 
@@ -367,17 +380,35 @@ const projectProgress = useMemo(() => {
                     </div>
                 </div>
                 
-                {/* Task Breakdown */}
+                {/* Task Breakdown - Auto-Highlighted Based on Project Status */}
                 <div className="grid grid-cols-3 gap-4 mt-4">
-                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <div
+                        className={`rounded-lg p-3 text-center transition-all ${
+                            taskStatusFilter === 'completed'
+                                ? 'bg-white/30 border-2 border-white'
+                                : 'bg-white/10 border-2 border-transparent'
+                        }`}
+                    >
                         <div className="text-2xl font-bold">{projectProgress.completedTasks}</div>
                         <div className="text-xs text-blue-100">Completed</div>
                     </div>
-                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <div
+                        className={`rounded-lg p-3 text-center transition-all ${
+                            taskStatusFilter === 'in-progress'
+                                ? 'bg-white/30 border-2 border-white'
+                                : 'bg-white/10 border-2 border-transparent'
+                        }`}
+                    >
                         <div className="text-2xl font-bold">{projectProgress.inProgressTasks}</div>
                         <div className="text-xs text-blue-100">In Progress</div>
                     </div>
-                    <div className="bg-white/10 rounded-lg p-3 text-center">
+                    <div
+                        className={`rounded-lg p-3 text-center transition-all ${
+                            taskStatusFilter === 'not-started'
+                                ? 'bg-white/30 border-2 border-white'
+                                : 'bg-white/10 border-2 border-transparent'
+                        }`}
+                    >
                         <div className="text-2xl font-bold">{projectProgress.notStartedTasks}</div>
                         <div className="text-xs text-blue-100">Not Started</div>
                     </div>
@@ -464,23 +495,37 @@ const projectProgress = useMemo(() => {
                             <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Spent ({budgetData.percentSpent}%)</p>
                             <p className="text-xl font-bold text-red-900 dark:text-red-300">₱{budgetData.spent.toLocaleString()}</p>
                         </div>
-                        <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
-                            <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Remaining ({budgetData.percentRemaining}%)</p>
-                            <p className="text-xl font-bold text-green-900 dark:text-green-300">₱{budgetData.remaining.toLocaleString()}</p>
+                        <div className={`text-center p-4 rounded-lg border transition-colors ${
+                            budgetData.isOverBudget
+                                ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-800'
+                                : 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800'
+                        }`}>
+                            <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">
+                                {budgetData.isOverBudget ? `Over Budget (${budgetData.percentRemaining}%)` : `Remaining (${budgetData.percentRemaining}%)`}
+                            </p>
+                            <p className={`text-xl font-bold ${
+                                budgetData.isOverBudget
+                                    ? 'text-orange-900 dark:text-orange-300'
+                                    : 'text-green-900 dark:text-green-300'
+                            }`}>
+                                {budgetData.isOverBudget ? '-₱' : '₱'}{Math.abs(budgetData.remaining).toLocaleString()}
+                            </p>
                         </div>
                     </div>
 
                     <div className="w-full h-16 bg-gray-200 dark:bg-slate-700 rounded-lg overflow-hidden flex">
                         {budgetData.spent > 0 && (
                             <div 
-                                className="bg-red-500 flex items-center justify-center text-white text-sm font-medium"
-                                style={{ width: `${budgetData.percentSpent}%` }}
+                                className={`flex items-center justify-center text-white text-sm font-medium ${
+                                    budgetData.isOverBudget ? 'bg-orange-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${Math.min(budgetData.percentSpent, 100)}%` }}
                                 title={`Spent: ₱${budgetData.spent.toLocaleString()}`}
                             >
-                                {budgetData.percentSpent > 10 && `${budgetData.percentSpent}%`}
+                                {budgetData.percentSpent > 10 && `${Math.min(budgetData.percentSpent, 100).toFixed(0)}%`}
                             </div>
                         )}
-                        {budgetData.remaining > 0 && (
+                        {budgetData.remaining > 0 && !budgetData.isOverBudget && (
                             <div 
                                 className="bg-green-500 flex items-center justify-center text-white text-sm font-medium"
                                 style={{ width: `${budgetData.percentRemaining}%` }}
@@ -489,17 +534,34 @@ const projectProgress = useMemo(() => {
                                 {budgetData.percentRemaining > 10 && `${budgetData.percentRemaining}%`}
                             </div>
                         )}
+                        {budgetData.isOverBudget && (
+                            <div 
+                                className="bg-red-600 flex items-center justify-center text-white text-sm font-medium"
+                                style={{ width: '100%' }}
+                                title={`Over Budget by: -₱${budgetData.overage.toLocaleString()}`}
+                            >
+                                OVER BUDGET
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-center gap-6 mt-4">
                         <div className="flex items-center">
-                            <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                            <div className={`w-4 h-4 rounded mr-2 ${budgetData.isOverBudget ? 'bg-orange-500' : 'bg-red-500'}`}></div>
                             <span className="text-sm text-gray-600 dark:text-slate-400">Spent</span>
                         </div>
-                        <div className="flex items-center">
-                            <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
-                            <span className="text-sm text-gray-600 dark:text-slate-400">Remaining</span>
-                        </div>
+                        {!budgetData.isOverBudget && (
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                                <span className="text-sm text-gray-600 dark:text-slate-400">Remaining</span>
+                            </div>
+                        )}
+                        {budgetData.isOverBudget && (
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 bg-red-600 rounded mr-2"></div>
+                                <span className="text-sm text-gray-600 dark:text-slate-400">Over Budget</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="text-center mt-4 text-sm text-gray-500 dark:text-slate-400">
@@ -511,17 +573,26 @@ const projectProgress = useMemo(() => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors">
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK TIMELINE - GANTT CHART</h2>
                     {(() => {
-                        const tasksWithDates = milestones.filter(m => 
+                        let tasksWithDates = milestones.filter(m => 
                             !m.isPhase && 
                             m.startDate && 
                             (m.endDate || m.targetDate || m.dueDate) &&
                             (m.milestoneName || m.title)
                         );
 
+                        // Apply task status filter
+                        if (taskStatusFilter === 'completed') {
+                            tasksWithDates = tasksWithDates.filter(t => t.status === 'completed');
+                        } else if (taskStatusFilter === 'in-progress') {
+                            tasksWithDates = tasksWithDates.filter(t => t.status === 'in-progress');
+                        } else if (taskStatusFilter === 'not-started') {
+                            tasksWithDates = tasksWithDates.filter(t => t.status === 'not-started');
+                        }
+
                         if (tasksWithDates.length === 0) {
                             return (
                                 <div className="text-center py-12 text-gray-400 dark:text-slate-500">
-                                    <p>No tasks to display in Gantt chart.</p>
+                                    <p>No tasks to display{taskStatusFilter !== 'all' ? ` with status "${taskStatusFilter}"` : ''} in Gantt chart.</p>
                                     <p className="text-sm mt-2">Add tasks with start and end dates in the project detail view.</p>
                                 </div>
                             );

@@ -11,7 +11,7 @@ const getAuthHeaders = () => ({
   'Content-Type': 'application/json'
 });
 
-const Photos = ({ projectId }) => {
+const Photos = ({ projectId, readonly = false }) => {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -166,6 +166,10 @@ const Photos = ({ projectId }) => {
   };
 
   const handleDelete = async (photo) => {
+    if (readonly) {
+      alert("🔒 Cannot delete photos in view-only mode");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this photo?")) return;
 
     try {
@@ -202,7 +206,7 @@ const Photos = ({ projectId }) => {
   return (
     <div className="space-y-6">
       {/* Upload Form */}
-      {showUploadForm && (
+      {showUploadForm && !readonly && (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-gray-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Upload Photo for AI Analysis</h3>
@@ -315,13 +319,20 @@ const Photos = ({ projectId }) => {
               {photos.length} AI-verified and confirmed photos
             </p>
           </div>
-          <button
-            onClick={() => setShowUploadForm(!showUploadForm)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Photo
-          </button>
+          {readonly && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
+              🔒 View Only
+            </div>
+          )}
+          {!readonly && (
+            <button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Photo
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -380,7 +391,12 @@ const Photos = ({ projectId }) => {
                     </button>
                     <button
                       onClick={() => handleDelete(photo)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                      disabled={readonly}
+                      className={`flex-1 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1 transition-colors ${
+                        readonly
+                          ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
                     >
                       <Trash2 className="w-3 h-3" />
                       Delete
@@ -400,56 +416,59 @@ const Photos = ({ projectId }) => {
           onClick={closeViewModal}
         >
           <div
-            className="bg-slate-800 rounded-lg max-w-4xl w-full p-6"
+            className="bg-slate-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-white">
+            <div className="flex justify-between items-start mb-4 p-6 border-b border-slate-700 sticky top-0 bg-slate-800 rounded-t-lg">
+              <h3 className="text-xl font-bold text-white flex-1 break-words pr-4">
                 {viewModal.caption || "Photo Details"}
               </h3>
               <button
                 onClick={closeViewModal}
-                className="text-white hover:text-gray-300 text-2xl"
+                className="text-white hover:text-gray-300 text-3xl flex-shrink-0 leading-none w-8 h-8 flex items-center justify-center"
+                title="Close"
               >
                 ×
               </button>
             </div>
 
-            <img
-              src={viewModal.fileURL}
-              alt={viewModal.caption}
-              className="w-full max-h-[60vh] object-contain rounded-lg mb-4"
-            />
+            <div className="px-6 pb-6">
+              <img
+                src={viewModal.fileURL}
+                alt={viewModal.caption}
+                className="w-full max-h-[50vh] object-contain rounded-lg mb-6"
+              />
 
-            <div className="space-y-2 text-sm text-slate-300">
-              <p><strong>Update ID:</strong> {viewModal.updateId}</p>
-              {viewModal.taskName && (
-                <p><strong>Task:</strong> {viewModal.taskName}</p>
-              )}
-              <p><strong>Uploaded:</strong> {new Date(viewModal.uploadedAt).toLocaleString()}</p>
-              {viewModal.confirmedAt && (
-                <p><strong>Approved:</strong> {new Date(viewModal.confirmedAt).toLocaleString()}</p>
-              )}
-              {viewModal.aiAnalysis && (
-                <div className="mt-4 p-4 bg-blue-900/30 rounded-lg">
-                  <p className="font-bold text-blue-300 mb-2">AI Analysis:</p>
-                  <p><strong>Objects Detected:</strong> {viewModal.totalObjects || 0}</p>
-                  {viewModal.aiSuggestion && (
-                    <>
-                      <p><strong>AI Suggested:</strong> {viewModal.aiSuggestion.milestone}</p>
-                      <p><strong>Confidence:</strong> {viewModal.aiSuggestion.confidence}</p>
-                    </>
-                  )}
-                </div>
-              )}
+              <div className="space-y-2 text-sm text-slate-300">
+                <p><strong>Update ID:</strong> {viewModal.updateId}</p>
+                {viewModal.taskName && (
+                  <p><strong>Task:</strong> {viewModal.taskName}</p>
+                )}
+                <p><strong>Uploaded:</strong> {new Date(viewModal.uploadedAt).toLocaleString()}</p>
+                {viewModal.confirmedAt && (
+                  <p><strong>Approved:</strong> {new Date(viewModal.confirmedAt).toLocaleString()}</p>
+                )}
+                {viewModal.aiAnalysis && (
+                  <div className="mt-4 p-4 bg-blue-900/30 rounded-lg">
+                    <p className="font-bold text-blue-300 mb-2">AI Analysis:</p>
+                    <p><strong>Objects Detected:</strong> {viewModal.totalObjects || 0}</p>
+                    {viewModal.aiSuggestion && (
+                      <>
+                        <p><strong>AI Suggested:</strong> {viewModal.aiSuggestion.milestone}</p>
+                        <p><strong>Confidence:</strong> {viewModal.aiSuggestion.confidence}</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={closeViewModal}
+                className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg transition-colors"
+              >
+                Close
+              </button>
             </div>
-
-            <button
-              onClick={closeViewModal}
-              className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}

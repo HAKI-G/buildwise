@@ -616,14 +616,21 @@ const Reports = ({ projectId }) => {
                             <button
                                 onClick={() => handleConfirm(false)}
                                 disabled={isSubmitting}
-                                className="px-6 py-2 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50"
+                                className="px-6 py-2 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                             >
-                                Reject
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-400"></div>
+                                        Rejecting...
+                                    </>
+                                ) : (
+                                    'Reject'
+                                )}
                             </button>
                             <button
                                 onClick={() => handleConfirm(true)}
                                 disabled={isSubmitting || !userPercentage || userPercentage <= 0 || userPercentage > 100}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                             >
                                 {isSubmitting ? (
                                     <>
