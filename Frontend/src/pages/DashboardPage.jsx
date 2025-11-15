@@ -6,6 +6,27 @@ import { Search, RefreshCw } from 'lucide-react';
 
 const getToken = () => localStorage.getItem('token');
 
+// ✅ NEW: Format large numbers intelligently
+const formatBudget = (value) => {
+  if (!value || value === 0) return '₱0';
+  const isNegative = value < 0;
+  const num = Math.abs(value);
+  const sign = isNegative ? '-' : '';
+  
+  // Handle extremely large numbers (trillions and beyond)
+  if (num >= 1000000000000) {
+    return `${sign}₱${(num / 1000000000000).toFixed(2)}T`;
+  } else if (num >= 1000000000) {
+    return `${sign}₱${(num / 1000000000).toFixed(2)}B`;
+  } else if (num >= 1000000) {
+    return `${sign}₱${(num / 1000000).toFixed(2)}M`;
+  } else if (num >= 1000) {
+    return `${sign}₱${(num / 1000).toFixed(2)}K`;
+  } else {
+    return `${sign}₱${num.toFixed(2)}`;
+  }
+};
+
 const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
   <div className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300">
     <div className="flex items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm mb-4">
@@ -62,9 +83,9 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
         </span>
       </div>
 
-      <div className="w-20 hidden sm:block">
+      <div className="whitespace-nowrap hidden sm:block">
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
+          className={`px-3 py-1 rounded-full text-xs font-semibold inline-block ${
             project.status === 'Completed'
               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
               : project.status === 'In Progress'
@@ -230,33 +251,56 @@ function DashboardPage() {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Total Projects</p>
-          <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.totalProjects}</p>
+        {/* Total Projects Card */}
+        <div className="bg-gradient-to-br from-slate-100 to-gray-100 dark:from-slate-700/40 dark:to-slate-800/40 p-4 rounded-xl border border-gray-300 dark:border-slate-600/50 shadow-md transition-all hover:shadow-lg">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">📊 Total Projects</p>
+          <div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+              {stats.totalProjects}
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Across all categories</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Active Projects</p>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {stats.activeProjects}
-          </p>
+        {/* Active Projects Card */}
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700/50 shadow-md transition-all hover:shadow-lg">
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-3">🚀 Active Projects</p>
+          <div>
+            <p className="text-3xl font-bold text-blue-900 dark:text-blue-300">
+              {stats.activeProjects}
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Currently in progress</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Total Budget</p>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-            ₱{(stats.totalBudget / 1000000).toFixed(1)}M
-          </p>
-          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-            Spent: ₱{(stats.totalSpent / 1000000).toFixed(1)}M
-          </p>
+        {/* Total Budget Card */}
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700/50 shadow-md transition-all hover:shadow-lg">
+          <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-3">💰 Total Budget</p>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-green-600 dark:text-green-300 font-semibold mb-1">Allocated</p>
+              <p className="text-2xl font-bold text-green-700 dark:text-green-300 truncate">
+                {formatBudget(stats.totalBudget)}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-green-200 dark:border-green-700/50">
+              <p className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">Spent</p>
+              <p className="text-lg font-bold text-green-600 dark:text-green-400 truncate">
+                {formatBudget(stats.totalSpent)}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">Avg. Completion</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {stats.avgCompletion}%
-          </p>
+        {/* Avg. Completion Card */}
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-700/50 shadow-md transition-all hover:shadow-lg">
+          <p className="text-sm font-medium text-purple-700 dark:text-purple-400 mb-3">⚡ Avg. Completion</p>
+          <div>
+            <p className="text-3xl font-bold text-purple-900 dark:text-purple-300">
+              {stats.avgCompletion}%
+            </p>
+            <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">Overall progress</p>
+          </div>
         </div>
       </div>
 
@@ -268,49 +312,97 @@ function DashboardPage() {
       )}
 
       <div>
-        <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
-          {searchQuery
-            ? `SEARCH RESULTS (${filteredProjects.length})`
-            : `ACTIVE PROJECTS (${projects.length})`}
-        </p>
-
-        {loading && (
-          <p className="text-center py-8 text-gray-500 dark:text-slate-400">
-            Loading projects...
+        {/* Active Projects Section */}
+        <div>
+          <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
+            {searchQuery
+              ? `SEARCH RESULTS (${filteredProjects.filter(p => p.status !== 'Completed').length})`
+              : `ACTIVE PROJECTS (${projects.filter(p => p.status !== 'Completed').length})`}
           </p>
-        )}
-        {error && (
-          <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
-        )}
 
-        {!loading && !error && (
-          <div>
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project) => (
-                <ProjectRow
-                  key={project.projectId}
-                  project={project}
-                  taskProgress={project.taskProgress}
-                  budgetProgress={project.budgetProgress}
-                />
-              ))
-            ) : (
-              <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
-                <p className="text-gray-500 dark:text-slate-400 mb-4">
-                  {searchQuery
-                    ? 'No projects match your search.'
-                    : 'No projects found. Create one on the Projects page!'}
-                </p>
-                {!searchQuery && (
-                  <button
-                    onClick={() => navigate('/projects')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Create Your First Project
-                  </button>
-                )}
-              </div>
-            )}
+          {loading && (
+            <p className="text-center py-8 text-gray-500 dark:text-slate-400">
+              Loading projects...
+            </p>
+          )}
+          {error && (
+            <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
+          )}
+
+          {!loading && !error && (
+            <div>
+              {filteredProjects.filter(p => p.status !== 'Completed').length > 0 ? (
+                filteredProjects.filter(p => p.status !== 'Completed').map((project) => (
+                  <ProjectRow
+                    key={project.projectId}
+                    project={project}
+                    taskProgress={project.taskProgress}
+                    budgetProgress={project.budgetProgress}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
+                  <p className="text-gray-500 dark:text-slate-400 mb-4">
+                    {searchQuery
+                      ? 'No active projects match your search.'
+                      : 'No active projects found. Create one on the Projects page!'}
+                  </p>
+                  {!searchQuery && (
+                    <button
+                      onClick={() => navigate('/projects')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Create Your First Project
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Completed Projects Section */}
+        {!searchQuery && !loading && !error && projectsWithProgress.filter(p => p.status === 'Completed').length > 0 && (
+          <div className="mt-8">
+            <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
+              COMPLETED PROJECTS ({projectsWithProgress.filter(p => p.status === 'Completed').length})
+            </p>
+            <div>
+              {projectsWithProgress.filter(p => p.status === 'Completed').map((project) => (
+                <div key={project.projectId} className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300">
+                  <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm mb-4">
+                    <div className="flex items-center flex-1 min-w-0">
+                      {project.projectImage ? (
+                        <img
+                          src={project.projectImage}
+                          alt={project.name}
+                          className="w-12 h-12 rounded-lg mr-4 object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200 dark:bg-slate-600 flex-shrink-0"></div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                      <div className="hidden sm:block text-center">
+                        <span className="text-xs text-gray-500 dark:text-slate-400">Completed</span>
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">✓</p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/projects/${project.projectId}`)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
