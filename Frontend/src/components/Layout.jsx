@@ -1,3 +1,5 @@
+Layout.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import logo from '../images/logo.png';
@@ -17,7 +19,8 @@ import {
     BarChart3,
     MessageSquare,
     FolderOpen,
-    Map
+    Map,
+    Sparkles
 } from 'lucide-react';
 
 const DashboardIcon = () => (
@@ -303,6 +306,14 @@ const getCurrentProjectId = () => {
                                     >
                                         <Map className="w-4 h-4" />
                                         <span>Maps</span>
+                                    </div>
+                                    {/* ✅ Generate Report */}
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('generate-report')} 
+                                        className={isProjectSubmenuActive('generate-report') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        <span>Generate Report</span>
                                     </div>
                                 </div>
                             )}
