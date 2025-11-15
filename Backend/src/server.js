@@ -51,6 +51,7 @@ import { startOverdueCronJob } from './utils/checkOverdueProjects.js';
 // Middleware
 import { protect, requireAdmin } from './middleware/authMiddleware.js';
 import { checkMaintenanceMode } from './middleware/maintenanceMiddleware.js';
+import reportRoutes from './routes/reportRoutes.js';
 
 // Jobs
 import { scheduleAuditLogCleanup } from './jobs/auditLogCleanup.js';
@@ -156,6 +157,7 @@ console.log('📅 Audit log cleanup scheduled');
 
 // ✅ Start overdue checker cron job
 startOverdueCronJob();
+app.use('/api/reports', protect, checkMaintenanceMode, reportRoutes);
 
 // ✅ Start server (ONLY ONE TIME)
 app.listen(port, () => {
