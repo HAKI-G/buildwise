@@ -713,10 +713,10 @@ const projectProgress = useMemo(() => {
                                         <span className="text-sm text-blue-100">{phase.phaseName}</span>
                                         <span className="text-lg font-bold text-white">{phase.completion}%</span>
                                     </div>
-                                <div className="text-xs text-blue-200 mt-1">
+                                    <div className="text-xs text-blue-200 mt-1">
                                         {phase.taskCount} {phase.taskCount === 1 ? 'task' : 'tasks'}
+                                    </div>
                                 </div>
-                            </div>
                             ))}
                         </div>
                             </div>

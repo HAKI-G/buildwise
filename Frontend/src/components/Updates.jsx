@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 
 const getToken = () => localStorage.getItem('token');
 
-const Updates = () => {
+const Updates = ({ readonly }) => {
     const { projectId } = useParams();
     const [expenses, setExpenses] = useState([]);
     const [expenseDescription, setExpenseDescription] = useState('');
@@ -87,6 +87,12 @@ const Updates = () => {
             <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                 <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add New Expense</h2>
                 
+                {readonly && (
+                    <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300 rounded-lg text-sm">
+                        ⛔ This project is completed. Expenses cannot be added.
+                    </div>
+                )}
+                
                 {successMessage && (
                     <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 rounded-lg text-sm">
                         {successMessage}
@@ -109,7 +115,8 @@ const Updates = () => {
                             id="description" 
                             value={expenseDescription} 
                             onChange={(e) => setExpenseDescription(e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={isSubmitting || readonly}
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                             placeholder="e.g., Cement Purchase" 
                         />
                     </div>
@@ -122,14 +129,15 @@ const Updates = () => {
                             id="amount" 
                             value={expenseAmount} 
                             onChange={(e) => setExpenseAmount(e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={isSubmitting || readonly}
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                             placeholder="e.g., 50000"
                             step="0.01"
                         />
                     </div>
                     <button 
                         type="submit" 
-                        disabled={isSubmitting} 
+                        disabled={isSubmitting || readonly} 
                         className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
                     >
                         {isSubmitting ? 'Adding...' : 'Add Expense'}
