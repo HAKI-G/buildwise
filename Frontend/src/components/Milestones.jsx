@@ -174,24 +174,31 @@ const Milestones = ({ readonly }) => {
     }, [projectId]);
 
     const handleQuickCompleteTask = async (task) => {
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
+    const token = getToken();
+    const config = { headers: { Authorization: `Bearer ${token}` } };
+
+    try {
+        const newStatus = task.status === "completed" ? "in progress" : "completed";
+        const newCompletion = newStatus === "completed" ? 100 : (task.completionPercentage || 0);
         
-        try {
-            const newStatus = task.status === 'completed' ? 'in progress' : 'completed';
-            
-            await axios.put(
-                `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
-                { status: newStatus },
-                config
-            );
-            
-            await fetchProjectTasks();
-        } catch (err) {
-            console.error('Error updating task:', err);
-            alert('Failed to update task status');
-        }
-    };
+        // ✅ FIXED: Update BOTH status AND completionPercentage
+        await axios.put(
+        `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
+        { 
+            status: newStatus,
+            completionPercentage: newCompletion  // ✅ THIS IS THE KEY!
+        },
+        config
+        );
+
+        console.log('✅ Task updated - Email should be sent');
+        await fetchProjectTasks();
+    } catch (err) {
+        console.error("Error updating task:", err);
+        alert("Failed to update task status");
+    }
+};
+
 
     const handleCompletePhase = async (phaseId) => {
         const token = getToken();
@@ -702,7 +709,9 @@ const Milestones = ({ readonly }) => {
     const totalPhases = phases.length;
     const completedTasks = tasks.filter(t => t.isPhase !== true && t.status === 'completed').length;
     const inProgressTasks = tasks.filter(t => t.isPhase !== true && t.status === 'in progress').length;
-    const totalBudget = phases.reduce((sum, phase) => sum + (parseFloat(phase.plannedCost) || 0), 0);
+    const totalBudget = tasks.reduce((sum, task) => sum + (parseFloat(task.plannedCost) || 0), 0);
+
+
 
     if (loading) {
         return (
