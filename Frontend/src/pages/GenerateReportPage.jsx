@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import Layout from '../components/Layout.jsx';
 import { 
     Sparkles, 
@@ -11,7 +9,6 @@ import {
     Calendar, 
     Loader, 
     FileText,
-    Download,
     Trash2,
     AlertCircle,
     TrendingUp,
@@ -22,20 +19,28 @@ import {
 
 const getToken = () => localStorage.getItem('token');
 
+// Utility to clean gibberish from AI text results
+const cleanText = text =>
+  (text || '')
+    .replace(/&[a-z]{1,20}&/gi, ' ')
+    .replace(/&[a-z0-9]+/gi, ' ')
+    .replace(/[&]{2,}/g, ' ')
+    .replace(/[#=]+/g, ' ')
+    .replace(/(\s?[a-zA-Z0-9]\s?&)+/g, ' ')
+    .replace(/&/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
 function GenerateReportPage() {
     const { projectId } = useParams();
     const navigate = useNavigate();
     const [project, setProject] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // Report generation state
     const [generating, setGenerating] = useState(false);
-    const [reportType, setReportType] = useState('daily');
+    const [reportType, setReportType] = useState('Daily Progress');
     const [reports, setReports] = useState([]);
     const [loadingReports, setLoadingReports] = useState(false);
-    
-    // Modal state for viewing report
     const [selectedReport, setSelectedReport] = useState(null);
     const [showModal, setShowModal] = useState(false);
 
@@ -52,7 +57,6 @@ function GenerateReportPage() {
             navigate('/login');
             return;
         }
-
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -69,9 +73,11 @@ function GenerateReportPage() {
     const fetchReports = async () => {
         setLoadingReports(true);
         try {
+            const token = getToken();
+            const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
                 `http://localhost:5001/api/reports/project/${projectId}`,
-                { headers: { Authorization: `Bearer ${getToken()}` } }
+                config
             );
             setReports(response.data || []);
         } catch (err) {
@@ -86,20 +92,19 @@ function GenerateReportPage() {
             setError('Project ID is missing');
             return;
         }
-
         setGenerating(true);
         setError('');
-
         try {
+            const token = getToken();
+            const config = { 
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 120000
+            };
             await axios.post(
                 `http://localhost:5001/api/reports/generate/${projectId}`,
                 { reportType },
-                { 
-                    headers: { Authorization: `Bearer ${getToken()}` },
-                    timeout: 120000
-                }
+                config
             );
-
             alert('✅ Report generated successfully!');
             await fetchReports();
         } catch (err) {
@@ -110,13 +115,12 @@ function GenerateReportPage() {
         }
     };
 
-    // View report in modal
     const handleViewReport = (report) => {
         setSelectedReport(report);
         setShowModal(true);
     };
 
-    // Download as PDF
+    // PDF Download (uses cleaned text)
     const handleDownloadPDF = (report) => {
         try {
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -138,17 +142,14 @@ function GenerateReportPage() {
             // Header
             doc.setFillColor(37, 99, 235);
             doc.rect(0, 0, pageWidth, 40, 'F');
-            
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(20);
             doc.setFont('helvetica', 'bold');
             doc.text('BuildWise Construction Report', margin, 18);
-            
             doc.setFontSize(11);
             doc.setFont('helvetica', 'normal');
             doc.text(`${report.projectName}`, margin, 28);
-            doc.text(`${report.reportType.toUpperCase()} REPORT`, margin, 35);
-            
+            doc.text(`${report.reportType.toUpperCase()}`, margin, 35);
             yPosition = 50;
 
             // Report Info
@@ -156,37 +157,7 @@ function GenerateReportPage() {
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
             doc.text(`Generated: ${new Date(report.createdAt).toLocaleString()}`, margin, yPosition);
-            doc.text(`AI Model: Claude 3.5 Sonnet`, pageWidth - margin, yPosition, { align: 'right' });
-            
             yPosition += 10;
-
-            // Statistics Table
-            if (report.dataSnapshot) {
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Project Statistics', margin, yPosition);
-                yPosition += 6;
-
-                const statsData = [
-                    ['Metric', 'Value'],
-                    ['Tasks Completed', `${report.dataSnapshot.completedMilestones}/${report.dataSnapshot.totalMilestones}`],
-                    ['Tasks In Progress', `${report.dataSnapshot.inProgressMilestones || 0}`],
-                    ['AI Photos Analyzed', `${report.dataSnapshot.aiProcessedPhotos}/${report.dataSnapshot.totalPhotos}`],
-                    ['Total Expenses', `₱${report.dataSnapshot.totalExpenses.toLocaleString()}`]
-                ];
-
-                doc.autoTable({
-                    startY: yPosition,
-                    head: [statsData[0]],
-                    body: statsData.slice(1),
-                    theme: 'grid',
-                    headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontSize: 9 },
-                    bodyStyles: { fontSize: 9 },
-                    margin: { left: margin, right: margin }
-                });
-
-                yPosition = doc.lastAutoTable.finalY + 10;
-            }
 
             // Report Content
             checkAndAddPage(15);
@@ -195,7 +166,8 @@ function GenerateReportPage() {
             doc.text('Report Content', margin, yPosition);
             yPosition += 8;
 
-            const lines = report.generatedText.split('\n');
+            const reportText = cleanText(report.generatedText || 'No content available');
+            const lines = reportText.split('\n');
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
 
@@ -204,37 +176,10 @@ function GenerateReportPage() {
                     yPosition += 3;
                     return;
                 }
-
-                if (line.startsWith('# ')) {
-                    checkAndAddPage(12);
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    const text = line.replace('# ', '');
-                    doc.text(text, margin, yPosition);
-                    yPosition += 8;
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'normal');
-                } else if (line.startsWith('## ')) {
-                    checkAndAddPage(10);
-                    doc.setFontSize(12);
-                    doc.setFont('helvetica', 'bold');
-                    const text = line.replace('## ', '');
-                    doc.text(text, margin, yPosition);
-                    yPosition += 7;
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'normal');
-                } else if (line.startsWith('- ') || line.startsWith('* ')) {
-                    checkAndAddPage(6);
-                    const text = line.replace(/^[- *] /, '• ');
-                    const splitText = doc.splitTextToSize(text, contentWidth - 5);
-                    doc.text(splitText, margin + 3, yPosition);
-                    yPosition += splitText.length * 5;
-                } else {
-                    checkAndAddPage(6);
-                    const splitText = doc.splitTextToSize(line, contentWidth);
-                    doc.text(splitText, margin, yPosition);
-                    yPosition += splitText.length * 5;
-                }
+                checkAndAddPage(6);
+                const splitText = doc.splitTextToSize(line, contentWidth);
+                doc.text(splitText, margin, yPosition);
+                yPosition += splitText.length * 5;
             });
 
             // Footer
@@ -252,30 +197,28 @@ function GenerateReportPage() {
             }
 
             doc.save(`${report.projectName}_${report.reportType}_${new Date(report.createdAt).toISOString().split('T')[0]}.pdf`);
-            
+            alert('✅ PDF downloaded successfully!');
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF');
+            alert('❌ Failed to generate PDF: ' + error.message);
         }
     };
 
     const handleDelete = async (reportId) => {
         if (!window.confirm('Are you sure you want to delete this report?')) return;
-
         try {
-            await axios.delete(`http://localhost:5001/api/reports/${reportId}`, {
-                headers: { Authorization: `Bearer ${getToken()}` }
-            });
-            
+            const token = getToken();
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.delete(`http://localhost:5001/api/reports/${reportId}`, config);
             setReports(reports.filter(r => r.reportId !== reportId));
             if (selectedReport?.reportId === reportId) {
                 setShowModal(false);
                 setSelectedReport(null);
             }
-            alert('Report deleted successfully');
+            alert('✅ Report deleted successfully');
         } catch (err) {
             console.error('Error deleting report:', err);
-            alert('Failed to delete report');
+            alert('❌ Failed to delete report');
         }
     };
 
@@ -322,11 +265,10 @@ function GenerateReportPage() {
                                 AI-Powered Report Generation
                             </h3>
                             <p className="text-sm text-gray-600 dark:text-slate-400">
-                                Generate comprehensive construction reports using Claude AI
+                                Generate comprehensive construction reports using Claude AI with ALL project data
                             </p>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
@@ -338,22 +280,22 @@ function GenerateReportPage() {
                                 disabled={generating}
                                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                             >
-                                <option value="daily">Daily Progress Report</option>
-                                <option value="weekly">Weekly Summary Report</option>
-                                <option value="monthly">Monthly Comprehensive Report</option>
+                                <option value="Daily Progress">Daily Progress Report</option>
+                                <option value="Weekly Summary">Weekly Summary Report</option>
+                                <option value="Monthly Report">Monthly Comprehensive Report</option>
+                                <option value="Final Report">Final Project Report</option>
                             </select>
                         </div>
-
                         <div className="flex items-end">
                             <button
                                 onClick={handleGenerateReport}
                                 disabled={generating}
-                                className="w-full px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                className="w-full px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg transition-colors"
                             >
                                 {generating ? (
                                     <>
                                         <Loader className="w-5 h-5 animate-spin" />
-                                        Generating...
+                                        Generating with AI...
                                     </>
                                 ) : (
                                     <>
@@ -364,18 +306,16 @@ function GenerateReportPage() {
                             </button>
                         </div>
                     </div>
-
                     {error && (
                         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
                             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
                         </div>
                     )}
-
                     {generating && (
                         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <p className="text-sm text-blue-700 dark:text-blue-300">
-                                🤖 Claude AI is analyzing your project data. This may take 30-60 seconds...
+                                🤖 Claude AI is analyzing milestones, updates, photos, expenses, comments, and documents. This may take 30-60 seconds...
                             </p>
                         </div>
                     )}
@@ -389,7 +329,6 @@ function GenerateReportPage() {
                             Generated Reports ({reports.length})
                         </h3>
                     </div>
-
                     {loadingReports ? (
                         <div className="flex justify-center py-8">
                             <Loader className="w-8 h-8 animate-spin text-blue-600" />
@@ -416,33 +355,34 @@ function GenerateReportPage() {
                                             <div className="flex items-center gap-3 mb-2">
                                                 <FileText className="w-5 h-5 text-blue-600" />
                                                 <h4 className="font-semibold text-gray-900 dark:text-white capitalize">
-                                                    {report.reportType} Report
+                                                    {report.reportType}
                                                 </h4>
                                             </div>
-                                            <div className="text-sm text-gray-500 dark:text-slate-400">
-                                                <Calendar className="w-4 h-4 inline mr-1" />
-                                                {new Date(report.createdAt).toLocaleString()}
+                                            <div className="text-sm text-gray-500 dark:text-slate-400 space-y-1">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar className="w-4 h-4 inline" />
+                                                    {new Date(report.createdAt).toLocaleString()}
+                                                </div>
                                             </div>
                                         </div>
-
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleViewReport(report)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
+                                                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                                 title="View Report"
                                             >
                                                 <Eye className="w-5 h-5" />
                                             </button>
                                             <button
                                                 onClick={() => handleDownloadPDF(report)}
-                                                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
+                                                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
                                                 title="Download PDF"
                                             >
                                                 <FileDown className="w-5 h-5" />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(report.reportId)}
-                                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                                 title="Delete"
                                             >
                                                 <Trash2 className="w-5 h-5" />
@@ -469,7 +409,7 @@ function GenerateReportPage() {
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <h2 className="text-2xl font-bold text-white capitalize mb-2">
-                                            {selectedReport.reportType} Report
+                                            {selectedReport.reportType}
                                         </h2>
                                         <p className="text-blue-100 text-sm">
                                             Generated: {new Date(selectedReport.createdAt).toLocaleString()}
@@ -478,26 +418,27 @@ function GenerateReportPage() {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => handleDownloadPDF(selectedReport)}
-                                            className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg"
+                                            className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
                                             title="Download PDF"
                                         >
                                             <FileDown className="w-5 h-5" />
                                         </button>
                                         <button
                                             onClick={() => setShowModal(false)}
-                                            className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg"
+                                            className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
                                         >
                                             <X className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>
                             </div>
-
                             {/* Modal Content */}
                             <div className="p-8 max-h-[70vh] overflow-y-auto">
-                                <pre className="whitespace-pre-wrap text-gray-800 dark:text-slate-200 font-sans text-sm leading-relaxed">
-                                    {selectedReport.generatedText}
-                                </pre>
+                                <div className="prose prose-lg max-w-none">
+                                    <div className="whitespace-pre-wrap text-gray-800 dark:text-slate-200 leading-relaxed">
+                                        {cleanText(selectedReport.generatedText || '')}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
