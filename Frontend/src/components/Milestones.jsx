@@ -23,7 +23,7 @@ const extractPhaseNumber = (phaseName) => {
     return match ? parseInt(match[1]) : null;
 };
 
-const Milestones = () => {
+const Milestones = ({ readonly }) => {
     const { projectId } = useParams();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -744,10 +744,17 @@ const Milestones = () => {
                 </div>
                 <button 
                     onClick={openAddTaskModal}
-                    className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700"
+                    disabled={readonly}
+                    className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                    title={readonly ? "Project is completed - cannot add tasks" : "Add new task"}
                 >
                     Add Task
                 </button>
+                {readonly && (
+                    <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
+                        ⛔ Project completed - editing disabled
+                    </span>
+                )}
             </div>
 
             {/* Summary Stats */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom'; // ✅ Add this import
 import api from '../services/api';
 
-const Comments = () => {
+const Comments = ({ readonly }) => {
     const { projectId } = useParams(); // ✅ Get projectId from URL
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
@@ -103,18 +103,23 @@ const Comments = () => {
             {/* Add Comment */}
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                 <h3 className="font-medium mb-3 text-gray-900 dark:text-white">Add Comment</h3>
+                {readonly && (
+                    <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300 rounded text-sm">
+                        ⛔ This project is completed. Comments cannot be added.
+                    </div>
+                )}
                 <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
+                    disabled={readonly || isPosting}
                     placeholder="Share an update or leave a note..."
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                     rows="3"
-                    disabled={isPosting}
                 />
                 <div className="mt-3 flex justify-end">
                     <button
                         onClick={handleAddComment}
-                        disabled={!newComment.trim() || isPosting}
+                        disabled={!newComment.trim() || isPosting || readonly}
                         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed"
                     >
                         {isPosting ? 'Posting...' : 'Post Comment'}
