@@ -151,7 +151,19 @@ export const generateAIReport = async (req, res) => {
             }]
         });
 
-        const generatedReport = message.content[0].text;
+        let generatedReport = message.content[0].text;
+        // Remove "words" made from single letter &-joined nonsense
+        generatedReport = generatedReport.replace(/(&[a-zA-Z];)+/g, ' ');
+        // Remove multi-letters joined by &
+        generatedReport = generatedReport.replace(/(&[a-zA-Z0-9]+)+/g, ' ');
+        // Remove any remaining ampersand-word gibberish (including no semicolons)
+        generatedReport = generatedReport.replace(/&[a-zA-Z0-9]+&?/g, ' ');
+        // Remove repeated stray special characters
+        generatedReport = generatedReport.replace(/[&=#]+/g, ' ');
+        // Remove multiple spaces
+        generatedReport = generatedReport.replace(/\s{2,}/g, ' ');
+
+
 
         // 10. Save Report to DynamoDB
         const reportId = uuidv4();
