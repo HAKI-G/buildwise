@@ -1,7 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { autoUpdateProjectStatus } from './projectController.js';
-import { sendMilestoneCompletionEmail } from '../services/emailService.js'; // ✅ ONLY NEW IMPORT
+import { sendMilestoneCompletionEmail } from '../services/emailService.js';
 
 import {
   DynamoDBDocumentClient,
@@ -39,7 +39,7 @@ export const createMilestone = async (req, res) => {
   const milestoneId = uuidv4();
 
   const params = {
-    TableName: 'BuildWiseMilestones',
+    TableName: tableName,
     Item: {
       projectId,
       milestoneId,
@@ -49,7 +49,7 @@ export const createMilestone = async (req, res) => {
       targetDate: targetDate || null,
       dueDate: targetDate || null,
       endDate: targetDate || null,
-      estimatedCost: estimatedCost || 0,
+      estimatedCost: parseFloat(estimatedCost) || 0,
       priority: priority || 'Medium',
       status: 'not started',
       completionPercentage: 0,
@@ -105,7 +105,7 @@ export const getMilestonesForProject = async (req, res) => {
   }
 };
 
-// ✅ NEW: Update task completion percentage
+// Update task completion percentage
 export const updateTaskCompletion = async (req, res) => {
   const { projectId, taskId } = req.params;
   const { completionPercentage } = req.body;
@@ -152,7 +152,7 @@ export const updateTaskCompletion = async (req, res) => {
   }
 };
 
-// ✅ NEW: Get overall project progress
+// Get overall project progress
 export const getProjectProgress = async (req, res) => {
   const { projectId } = req.params;
 
@@ -168,7 +168,6 @@ export const getProjectProgress = async (req, res) => {
     const data = await docClient.send(new QueryCommand(params));
     const allItems = data.Items || [];
 
-    // Filter only tasks (not phases)
     const tasks = allItems.filter(item => item.isPhase !== true);
 
     if (tasks.length === 0) {
@@ -182,7 +181,6 @@ export const getProjectProgress = async (req, res) => {
       });
     }
 
-    // Calculate statistics
     const totalCompletion = tasks.reduce((sum, task) => sum + (task.completionPercentage || 0), 0);
     const averageCompletion = Math.round(totalCompletion / tasks.length);
 
@@ -253,6 +251,81 @@ export const canCompletePhase = async (req, res) => {
   }
 };
 
+// ✅ Email helper with CORRECT table names
+const sendCompletionEmail = async (projectId, milestoneName, completionType = "milestone") => {
+  console.log(`\n🔍 === Starting ${completionType} email process ===`);
+  console.log(`📋 Project ID: ${projectId}`);
+  console.log(`📌 Milestone: ${milestoneName}`);
+  
+  try {
+    // 1. Fetch project
+    console.log(`\n🔎 STEP 1: Fetching project...`);
+    const projectParams = {
+      TableName: "buildwiseProjects",  // ✅ CORRECT - lowercase b and w
+      Key: { projectId }
+    };
+    
+    const projectResult = await docClient.send(new GetCommand(projectParams));
+    
+    if (!projectResult.Item) {
+      console.log(`❌ Project not found: ${projectId}`);
+      return false;
+    }
+
+    const project = projectResult.Item;
+    console.log(`✅ Project: "${project.name || project.projectName}"`);
+    
+    // 2. Get user ID
+    const userId = project.projectManagerId || project.createdBy || project.userId || project.ownerId;
+    
+    if (!userId) {
+      console.log(`❌ No user ID in project`);
+      return false;
+    }
+
+    console.log(`✅ User ID: ${userId}`);
+
+    // 3. Fetch user
+    console.log(`\n🔎 STEP 2: Fetching user...`);
+    const userParams = {
+      TableName: "BuildWiseUsers",  // ✅ CORRECT - capital B and W
+      Key: { userId }
+    };
+    
+    const userResult = await docClient.send(new GetCommand(userParams));
+    
+    if (!userResult.Item) {
+      console.log(`❌ User not found: ${userId}`);
+      return false;
+    }
+
+    const user = userResult.Item;
+    
+    if (!user.email) {
+      console.log(`❌ No email found`);
+      return false;
+    }
+
+    console.log(`✅ Sending to: ${user.email}`);
+
+    // 4. Send email
+    await sendMilestoneCompletionEmail(
+      user.email,
+      user.name || user.username || "Project Manager",
+      project.name || project.projectName || "Your Project",
+      milestoneName + (completionType === "phase" ? " (Phase)" : ""),
+      new Date().toISOString()
+    );
+
+    console.log(`✅✅✅ Email sent successfully!\n`);
+    return true;
+    
+  } catch (error) {
+    console.error(`❌ Error sending ${completionType} email:`, error.message);
+    return false;
+  }
+};
+
 // Complete a phase (with validation)
 export const completePhase = async (req, res) => {
   const { projectId, phaseId } = req.params;
@@ -304,54 +377,8 @@ export const completePhase = async (req, res) => {
 
     const result = await docClient.send(new UpdateCommand(updateParams));
 
-    // ✅ NEW: Send email notification for phase completion
-    // ✅ FIXED: Send email notification for phase completion
-try {
-  const projectParams = {
-    TableName: "BuildWiseProjects",
-    Key: { projectId }
-  };
-  const projectResult = await docClient.send(new GetCommand(projectParams));
-
-  if (projectResult.Item) {
-    const project = projectResult.Item;
-    
-    // ✅ Check if user ID exists
-    const userId = project.projectManagerId || project.createdBy;
-    
-    if (!userId) {
-      console.log('⚠️ No project manager ID found, skipping phase email');
-    } else {
-      try {
-        const userParams = {
-          TableName: "BuildWiseUsers",
-          Key: { userId }
-        };
-        const userResult = await docClient.send(new GetCommand(userParams));
-
-        if (userResult.Item && userResult.Item.email) {
-          await sendMilestoneCompletionEmail(
-            userResult.Item.email,
-            userResult.Item.name || userResult.Item.username || "Project Manager",
-            project.projectName,
-            result.Attributes.milestoneName + " (Phase)",
-            result.Attributes.updatedAt
-          );
-          console.log("✅ Phase completion email sent to:", userResult.Item.email);
-        } else {
-          console.log('⚠️ User found but no email address');
-        }
-      } catch (userErr) {
-        console.log('⚠️ User not found in database:', userId);
-        // Don't crash, just log
-      }
-    }
-  }
-} catch (emailErr) {
-  console.error("⚠️ Failed to send phase completion email:", emailErr.message);
-  // Don't crash the request
-}
-
+    // Send email notification
+    sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase");
 
     res.status(200).json({
       message: 'Phase completed successfully!',
@@ -377,7 +404,7 @@ export const updateMilestone = async (req, res) => {
 
   try {
     const getParams = {
-      TableName: 'BuildWiseMilestones',
+      TableName: tableName,
       Key: { projectId, milestoneId }
     };
 
@@ -387,7 +414,6 @@ export const updateMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Milestone not found' });
     }
 
-    // ✅ NEW: Check if milestone was just completed
     const oldMilestone = result.Item;
     const wasCompleted = oldMilestone.status === "completed";
     const isNowCompleted = updates.status === "completed" || (updates.completionPercentage && updates.completionPercentage >= 100);
@@ -407,7 +433,7 @@ export const updateMilestone = async (req, res) => {
     expressionAttributeValues[':updatedAt'] = new Date().toISOString();
 
     const updateParams = {
-      TableName: 'BuildWiseMilestones',
+      TableName: tableName,
       Key: { projectId, milestoneId },
       UpdateExpression: `SET ${updateExpressions.join(', ')}`,
       ExpressionAttributeNames: expressionAttributeNames,
@@ -419,57 +445,10 @@ export const updateMilestone = async (req, res) => {
 
     await autoUpdateProjectStatus(projectId);
 
-    // ✅ NEW: Send email if milestone just completed
-    // ✅ Send email if newly completed
+    // Send email if milestone just completed
     if (!wasCompleted && isNowCompleted) {
-      try {
-        const projectParams = {
-          TableName: "BuildWiseProjects",
-          Key: { projectId }
-        };
-        const projectResult = await docClient.send(new GetCommand(projectParams));
-
-        if (projectResult.Item) {
-          const project = projectResult.Item;
-          
-          // ✅ FIXED: Check if user exists before trying to get them
-          const userId = project.projectManagerId || project.createdBy;
-          
-          if (!userId) {
-            console.log('⚠️ No project manager ID found, skipping email');
-            return;  // Skip email if no manager assigned
-          }
-
-          try {
-            const userParams = {
-              TableName: "BuildWiseUsers",
-              Key: { userId }
-            };
-            const userResult = await docClient.send(new GetCommand(userParams));
-
-            if (userResult.Item && userResult.Item.email) {
-              await sendMilestoneCompletionEmail(
-                userResult.Item.email,
-                userResult.Item.name || userResult.Item.username || "Project Manager",
-                project.projectName,
-                updateResult.Attributes.milestoneName,
-                updateResult.Attributes.updatedAt
-              );
-              console.log("✅ Milestone completion email sent to:", userResult.Item.email);
-            } else {
-              console.log('⚠️ User found but no email address');
-            }
-          } catch (userErr) {
-            console.log('⚠️ User not found in database:', userId);
-            // Don't throw error, just log it
-          }
-        }
-      } catch (emailErr) {
-        console.error("⚠️ Failed to send milestone completion email:", emailErr.message);
-        // Don't crash the request, just log the error
-      }
+      sendCompletionEmail(projectId, updateResult.Attributes.milestoneName, "milestone");
     }
-
 
     res.status(200).json({
       message: 'Milestone updated successfully',
@@ -490,7 +469,7 @@ export const deleteMilestone = async (req, res) => {
   }
 
   const params = {
-    TableName: 'BuildWiseMilestones',
+    TableName: tableName,
     Key: { projectId, milestoneId }
   };
 

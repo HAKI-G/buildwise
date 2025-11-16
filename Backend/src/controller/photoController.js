@@ -13,8 +13,8 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
+const AI_API_URL = 'http://54.255.249.21:5000';
 
-const AI_API_URL = 'http://18.139.229.180:5000'; //  EC2 IP ADDRESSSS
 
 
 // --- Multer S3 Upload Middleware ---
