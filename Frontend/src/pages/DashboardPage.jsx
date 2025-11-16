@@ -9,6 +9,7 @@ const getToken = () => localStorage.getItem('token');
 // ✅ NEW: Format large numbers intelligently
 const formatBudget = (value) => {
   if (!value || value === 0) return '₱0';
+<<<<<<< HEAD
   // Convert to number if it's a string
   const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
   if (isNaN(numValue) || numValue === 0) return '₱0';
@@ -24,11 +25,27 @@ const formatBudget = (value) => {
     return `${sign}₱${(num / 1000000).toFixed(1)}M`;
   } else if (num >= 1000) {
     return `${sign}₱${(num / 1000).toFixed(1)}K`;
+=======
+  const isNegative = value < 0;
+  const num = Math.abs(value);
+  const sign = isNegative ? '-' : '';
+  
+  // Handle extremely large numbers (trillions and beyond)
+  if (num >= 1000000000000) {
+    return `${sign}₱${(num / 1000000000000).toFixed(2)}T`;
+  } else if (num >= 1000000000) {
+    return `${sign}₱${(num / 1000000000).toFixed(2)}B`;
+  } else if (num >= 1000000) {
+    return `${sign}₱${(num / 1000000).toFixed(2)}M`;
+  } else if (num >= 1000) {
+    return `${sign}₱${(num / 1000).toFixed(2)}K`;
+>>>>>>> 2ceefe4a33590064ee808f4940199ee3c9506e25
   } else {
     return `${sign}₱${num.toFixed(2)}`;
   }
 };
 
+<<<<<<< HEAD
 const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
   const contractCost = typeof project.contractCost === 'string' 
     ? parseFloat(project.contractCost.replace(/[^0-9.-]/g, '')) 
@@ -41,6 +58,9 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
   const overageAmount = isOverBudget ? spent - contractCost : 0;
 
   return (
+=======
+const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
+>>>>>>> 2ceefe4a33590064ee808f4940199ee3c9506e25
   <div className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300">
     <div className={`flex items-center p-4 rounded-xl border shadow-sm mb-4 transition-all ${
       isOverBudget
@@ -448,7 +468,10 @@ function DashboardPage() {
                     project={project}
                     taskProgress={project.taskProgress}
                     budgetProgress={project.budgetProgress}
+<<<<<<< HEAD
                     totalSpent={project.totalSpent}
+=======
+>>>>>>> 2ceefe4a33590064ee808f4940199ee3c9506e25
                   />
                 ))
               ) : (

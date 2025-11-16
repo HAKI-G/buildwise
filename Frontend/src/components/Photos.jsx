@@ -361,6 +361,7 @@ const Photos = ({ projectId, readonly = false }) => {
               {photos.length} AI-verified and confirmed photos
             </p>
           </div>
+<<<<<<< HEAD
           <div className="flex items-center gap-3">
             {/* Sort Filter Buttons */}
             {photos.length > 0 && (
@@ -402,6 +403,22 @@ const Photos = ({ projectId, readonly = false }) => {
               </button>
             )}
           </div>
+=======
+          {readonly && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
+              🔒 View Only
+            </div>
+          )}
+          {!readonly && (
+            <button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Photo
+            </button>
+          )}
+>>>>>>> 2ceefe4a33590064ee808f4940199ee3c9506e25
         </div>
 
         {loading ? (
@@ -434,6 +451,7 @@ const Photos = ({ projectId, readonly = false }) => {
                   </h3>
                 </button>
 
+<<<<<<< HEAD
                 {/* Phase Tasks - Expanded State */}
                 {expandedPhases[phaseName] && (
                   <div className="p-4 space-y-6 bg-gray-50 dark:bg-slate-900/50">
@@ -507,6 +525,28 @@ const Photos = ({ projectId, readonly = false }) => {
                         </div>
                       </div>
                     ))}
+=======
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => openViewModal(photo)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleDelete(photo)}
+                      disabled={readonly}
+                      className={`flex-1 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1 transition-colors ${
+                        readonly
+                          ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
+                    </button>
+>>>>>>> 2ceefe4a33590064ee808f4940199ee3c9506e25
                   </div>
                 )}
               </div>
