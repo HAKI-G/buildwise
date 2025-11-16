@@ -62,7 +62,7 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
           <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
           {isOverBudget && (
             <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-md whitespace-nowrap">
-              ⚠️ OVER BUDGET
+             ⚠️ OVER BUDGET
             </span>
           )}
         </div>
