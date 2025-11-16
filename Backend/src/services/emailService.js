@@ -36,7 +36,7 @@ export const generateVerificationCode = () => {
 
 // ✅ 1. FORGOT PASSWORD - Send verification email
 export const sendVerificationEmail = async (email, code) => {
-    const trans = getTransporter(); // Get transporter at runtime
+    const trans = getTransporter();
     
     const mailOptions = {
         from: `"BuildWise Support" <${process.env.EMAIL_USER}>`,
@@ -573,6 +573,114 @@ export const send2FADisabledEmail = async (email, name) => {
     }
 };
 
+// ✅ 7. NEW - MILESTONE COMPLETION - Send notification email
+export const sendMilestoneCompletionEmail = async (projectManagerEmail, projectManagerName, projectName, milestoneName, completionDate) => {
+  const trans = getTransporter();
+  
+  const formattedDate = new Date(completionDate).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const mailOptions = {
+    from: `"BuildWise Notifications" <${process.env.EMAIL_USER}>`,
+    to: projectManagerEmail,
+    subject: `✅ Milestone Completed: ${milestoneName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; padding: 40px 30px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+          .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
+          .content { padding: 40px 30px; }
+          .milestone-box { background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; border-radius: 8px; margin: 25px 0; }
+          .milestone-box h2 { margin: 0 0 10px 0; color: #065f46; font-size: 22px; }
+          .info-row { display: flex; justify-content: space-between; margin: 15px 0; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+          .info-label { font-weight: 600; color: #6b7280; }
+          .info-value { color: #111827; font-weight: 500; }
+          .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+          .cta-button { display: inline-block; background-color: #10b981; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 25px 0; transition: background-color 0.3s; }
+          .cta-button:hover { background-color: #059669; }
+          .footer { background-color: #f9fafb; padding: 25px 30px; text-align: center; color: #6b7280; font-size: 14px; }
+          .footer p { margin: 5px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Milestone Completed!</h1>
+            <p>Great progress on your project</p>
+          </div>
+          
+          <div class="content">
+            <p style="font-size: 16px; color: #374151; margin-bottom: 10px;">
+              Hi <strong>${projectManagerName}</strong>,
+            </p>
+            
+            <div class="success-icon">✅</div>
+            
+            <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+              Congratulations! A milestone has been successfully completed in your project.
+            </p>
+            
+            <div class="milestone-box">
+              <h2>${milestoneName}</h2>
+              
+              <div class="info-row">
+                <span class="info-label">📋 Project:</span>
+                <span class="info-value">${projectName}</span>
+              </div>
+              
+              <div class="info-row">
+                <span class="info-label">✅ Status:</span>
+                <span class="info-value" style="color: #10b981;">Completed</span>
+              </div>
+              
+              <div class="info-row" style="border-bottom: none;">
+                <span class="info-label">🕐 Completed On:</span>
+                <span class="info-value">${formattedDate}</span>
+              </div>
+            </div>
+            
+            <p style="font-size: 15px; color: #6b7280; line-height: 1.6; margin: 25px 0;">
+              Keep up the excellent work! Your project is moving forward successfully. 
+              Check your dashboard for updated project statistics and next milestones.
+            </p>
+            
+            <center>
+              <a href="http://localhost:3000/dashboard" class="cta-button">
+                View Dashboard
+              </a>
+            </center>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 BuildWise. All rights reserved.</p>
+            <p style="margin-top: 10px;">Building the future, one milestone at a time.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  try {
+    const info = await trans.sendMail(mailOptions);
+    console.log('✅ Milestone completion email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('❌ Error sending milestone completion email:', error);
+    throw error;
+  }
+};
+
 // Export all functions
 export default {
     generateVerificationCode,
@@ -581,5 +689,6 @@ export default {
     sendRegistrationVerificationEmail,
     sendWelcomeEmail,
     send2FAEnabledEmail,
-    send2FADisabledEmail
+    send2FADisabledEmail,
+    sendMilestoneCompletionEmail  // ✅ ADDED THIS LINE
 };
