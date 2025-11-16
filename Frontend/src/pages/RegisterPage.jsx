@@ -53,7 +53,7 @@ function RegisterPage() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: 'User'
+        role: 'Project Manager'
       });
 
       setSuccess(response.data.message);
@@ -90,7 +90,7 @@ function RegisterPage() {
       setSuccess('Account created successfully! Redirecting...');
       
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/login');
       }, 1500);
 
     } catch (err) {
