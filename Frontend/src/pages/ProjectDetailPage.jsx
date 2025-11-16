@@ -142,13 +142,16 @@ function ProjectDetailPage() {
     const renderTabContent = () => {
         console.log('🎯 Rendering tab:', activeTab, 'with projectId:', projectId);
         
+        // ✅ Determine if project is read-only (Completed and user is not Admin)
+        const isReadonly = project && project.status === 'Completed' && localStorage.getItem('userRole') !== 'Admin';
+        
         switch(activeTab) {
             case 'milestones':
                 return <Milestones projectId={projectId} />;
             case 'updates':
                 return <Updates projectId={projectId} />;
             case 'photos':
-                return <Photos projectId={projectId} />;
+                return <Photos projectId={projectId} readonly={isReadonly} />;
             case 'reports':
                 return <Reports projectId={projectId} />;
             case 'comments':

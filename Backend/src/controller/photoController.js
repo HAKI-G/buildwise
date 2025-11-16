@@ -95,20 +95,39 @@ export const uploadPhotoForUpdate = async (req, res) => {
         contentType: req.file.mimetype
       });
 
-      const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
-        headers: formData.getHeaders(),
-        timeout: 30000
-      });
+      try {
+        const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
+          headers: formData.getHeaders(),
+          timeout: 15000  // Reduced to 15 seconds for faster feedback
+        });
 
-      aiAnalysis = aiResponse.data;
-      aiProcessed = aiAnalysis && aiAnalysis.success;
-      console.log('✅ AI Analysis successful:', aiProcessed);
-    } catch (aiError) {
-      console.error('❌ AI Analysis failed:', aiError.message);
+        aiAnalysis = aiResponse.data;
+        aiProcessed = aiAnalysis && aiAnalysis.success;
+        console.log('✅ AI Analysis successful:', aiProcessed);
+      } catch (aiTimeoutError) {
+        // If AI service is unavailable or timing out, create a default suggestion
+        console.warn('⚠️ AI Analysis unavailable (timeout/connection error):', aiTimeoutError.code || aiTimeoutError.message);
+        
+        aiAnalysis = {
+          success: false,
+          error: true,
+          message: 'AI service temporarily unavailable',
+          code: aiTimeoutError.code,
+          timestamp: new Date().toISOString(),
+          ai_suggestion: {
+            milestone: taskName || 'Task',
+            confidence: 'low',
+            reason: 'AI service unavailable - manual review required'
+          }
+        };
+        aiProcessed = false;
+      }
+    } catch (imageError) {
+      console.error('❌ Image download failed:', imageError.message);
       aiAnalysis = { 
         error: true, 
-        message: aiError.message,
-        code: aiError.code,
+        message: 'Failed to download image for analysis',
+        code: imageError.code,
         timestamp: new Date().toISOString() 
       };
       aiProcessed = false;
@@ -177,13 +196,32 @@ export const confirmAISuggestion = async (req, res) => {
     console.log('📋 Task ID:', taskId);
     console.log('🏗️ Project ID:', projectId);
 
-    const confirmResponse = await axios.post(`${AI_API_URL}/confirm`, {
-      milestone,
-      user_percentage: parseFloat(userPercentage),
-      confirmed
-    });
+    let calculation;
+    
+    // Try to call the AI service with a 10-second timeout
+    try {
+      const confirmResponse = await axios.post(`${AI_API_URL}/confirm`, {
+        milestone,
+        user_percentage: parseFloat(userPercentage),
+        confirmed
+      }, {
+        timeout: 10000  // 10 second timeout
+      });
 
-    const calculation = confirmResponse.data;
+      calculation = confirmResponse.data;
+      console.log('✅ AI service responded successfully');
+    } catch (aiError) {
+      // If AI service is unavailable, use fallback calculation
+      console.warn('⚠️ AI service unavailable, using fallback calculation:', aiError.code);
+      
+      calculation = {
+        overall_progress_percent: parseFloat(userPercentage),
+        calculation: `Fallback calculation (AI service unavailable): ${milestone} - ${userPercentage}% completion confirmed by user`,
+        milestone: milestone,
+        user_percentage: parseFloat(userPercentage),
+        confirmed: confirmed
+      };
+    }
 
     // Update photo confirmation status
     const photoParams = {
@@ -260,12 +298,17 @@ export const confirmAISuggestion = async (req, res) => {
       message: 'Confirmation saved successfully',
       photo: photoResult.Attributes,
       calculation,
-      taskUpdated: confirmed && taskId && projectId
+      taskUpdated: confirmed && taskId && projectId,
+      aiServiceAvailable: !calculation.calculation.includes('Fallback')
     });
 
   } catch (error) {
     console.error('❌ Error saving confirmation:', error);
-    res.status(500).json({ message: 'Failed to save confirmation', error: error.message });
+    res.status(500).json({ 
+      message: 'Failed to save confirmation', 
+      error: error.message,
+      code: error.code
+    });
   }
 };
 

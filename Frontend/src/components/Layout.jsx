@@ -20,7 +20,7 @@ import {
     MessageSquare,
     FolderOpen,
     Map,
-    Sparkles  // ✅ ADD THIS
+    Sparkles
 } from 'lucide-react';
 
 const DashboardIcon = () => (
@@ -256,53 +256,67 @@ const getCurrentProjectId = () => {
                             </button>
                             
                             {/* ✅ Projects Submenu - Dedicated view pages */}
-                           {/* ✅ Projects Submenu - Dedicated view pages */}
-                        {openMenus.projects && (
-                            <div className="space-y-1 mt-1">
-                                <div onClick={() => handleProjectSubmenuClick('milestones')} 
-                                    className={isProjectSubmenuActive('milestones') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <Target className="w-4 h-4" />
-                                    <span>Milestones</span>
+                            {openMenus.projects && (
+                                <div className="space-y-1 mt-1">
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('milestones')} 
+                                        className={isProjectSubmenuActive('milestones') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <Target className="w-4 h-4" />
+                                        <span>Milestones</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('updates')} 
+                                        className={isProjectSubmenuActive('updates') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>Updates</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('photos')} 
+                                        className={isProjectSubmenuActive('photos') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <Camera className="w-4 h-4" />
+                                        <span>Photos</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('reports')} 
+                                        className={isProjectSubmenuActive('reports') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <BarChart3 className="w-4 h-4" />
+                                        <span>Reports</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('comments')} 
+                                        className={isProjectSubmenuActive('comments') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <MessageSquare className="w-4 h-4" />
+                                        <span>Comments</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('documents')} 
+                                        className={isProjectSubmenuActive('documents') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <FolderOpen className="w-4 h-4" />
+                                        <span>Documents</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('maps')} 
+                                        className={isProjectSubmenuActive('maps') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <Map className="w-4 h-4" />
+                                        <span>Maps</span>
+                                    </div>
+                                    {/* ✅ Generate Report */}
+                                    <div 
+                                        onClick={() => handleProjectSubmenuClick('generate-report')} 
+                                        className={isProjectSubmenuActive('generate-report') ? activeSubMenuLinkClasses : subMenuLinkClasses}
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        <span>Generate Report</span>
+                                    </div>
                                 </div>
-                                <div onClick={() => handleProjectSubmenuClick('updates')} 
-                                    className={isProjectSubmenuActive('updates') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <FileText className="w-4 h-4" />
-                                    <span>Updates</span>
-                                </div>
-                                <div onClick={() => handleProjectSubmenuClick('photos')} 
-                                    className={isProjectSubmenuActive('photos') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <Camera className="w-4 h-4" />
-                                    <span>Photos</span>
-                                </div>
-                                <div onClick={() => handleProjectSubmenuClick('reports')} 
-                                    className={isProjectSubmenuActive('reports') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <BarChart3 className="w-4 h-4" />
-                                    <span>Reports</span>
-                                </div>
-                                <div onClick={() => handleProjectSubmenuClick('comments')} 
-                                    className={isProjectSubmenuActive('comments') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <MessageSquare className="w-4 h-4" />
-                                    <span>Comments</span>
-                                </div>
-                                <div onClick={() => handleProjectSubmenuClick('documents')} 
-                                    className={isProjectSubmenuActive('documents') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <FolderOpen className="w-4 h-4" />
-                                    <span>Documents</span>
-                                </div>
-                                <div onClick={() => handleProjectSubmenuClick('maps')} 
-                                    className={isProjectSubmenuActive('maps') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <Map className="w-4 h-4" />
-                                    <span>Maps</span>
-                                </div>
-                                {/* ✅ ADD THIS NEW ITEM */}
-                                <div onClick={() => handleProjectSubmenuClick('generate-report')} 
-                                    className={isProjectSubmenuActive('generate-report') ? activeSubMenuLinkClasses : subMenuLinkClasses}>
-                                    <Sparkles className="w-4 h-4" />
-                                    <span>Generate Report</span>
-                                </div>
-                            </div>
-                        )}
-
+                            )}
                         </div>
                     </nav>
                 </div>

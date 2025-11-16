@@ -35,7 +35,7 @@ router.get('/project/:projectId/pending', protect, requireAdmin, getPendingPhoto
 
 // --- Upload Route ---
 // Upload photo for a specific update (with AI analysis)
-// This route connects to your EC2 AI server at 54.179.236.172:5000
+// This route connects to your EC2 AI server at 18.141.56.204:5000
 router.post(
   '/:updateId',
   protect,                      // ✅ Authentication required

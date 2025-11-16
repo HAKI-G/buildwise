@@ -29,7 +29,7 @@ import ProjectSelectionPage from './pages/ProjectSelectionPage.jsx';
 import MilestonesViewPage from './pages/MilestonesViewPage.jsx';
 import UpdatesViewPage from './pages/UpdatesViewPage.jsx';
 import PhotosViewPage from './pages/PhotosViewPage.jsx';
-import ReportsViewPage from './pages/Reportsviewpage.jsx';
+import ReportsViewPage from './pages/ReportsViewPage.jsx';
 import CommentsViewPage from './pages/CommentsViewPage.jsx';
 import DocumentsViewPage from './pages/DocumentsViewPage.jsx';
 import MapsViewPage from './pages/MapsViewPage.jsx';
