@@ -147,21 +147,21 @@ function ProjectDetailPage() {
         
         switch(activeTab) {
             case 'milestones':
-                return <Milestones projectId={projectId} />;
+                return <Milestones projectId={projectId} readonly={isReadonly} />;
             case 'updates':
-                return <Updates projectId={projectId} />;
+                return <Updates projectId={projectId} readonly={isReadonly} />;
             case 'photos':
                 return <Photos projectId={projectId} readonly={isReadonly} />;
             case 'reports':
                 return <Reports projectId={projectId} />;
             case 'comments':
-                return <Comments projectId={projectId} />;
+                return <Comments projectId={projectId} readonly={isReadonly} />;
             case 'documents':
-                return <Documents projectId={projectId} />;
+                return <Documents projectId={projectId} readonly={isReadonly} />;
             case 'maps': 
                 return <Maps projectId={projectId} />;
             default:
-                return <Milestones projectId={projectId} />;
+                return <Milestones projectId={projectId} readonly={isReadonly} />;
         }
     };
     

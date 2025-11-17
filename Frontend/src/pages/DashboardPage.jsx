@@ -9,27 +9,48 @@ const getToken = () => localStorage.getItem('token');
 // ✅ NEW: Format large numbers intelligently
 const formatBudget = (value) => {
   if (!value || value === 0) return '₱0';
-  const isNegative = value < 0;
-  const num = Math.abs(value);
+  // Convert to number if it's a string
+  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(numValue) || numValue === 0) return '₱0';
+  
+  const isNegative = numValue < 0;
+  const num = Math.abs(numValue);
   const sign = isNegative ? '-' : '';
   
-  // Handle extremely large numbers (trillions and beyond)
-  if (num >= 1000000000000) {
-    return `${sign}₱${(num / 1000000000000).toFixed(2)}T`;
-  } else if (num >= 1000000000) {
-    return `${sign}₱${(num / 1000000000).toFixed(2)}B`;
+  // Format with appropriate scale
+  if (num >= 1000000000) {
+    return `${sign}₱${(num / 1000000000).toFixed(1)}B`;
   } else if (num >= 1000000) {
-    return `${sign}₱${(num / 1000000).toFixed(2)}M`;
+    return `${sign}₱${(num / 1000000).toFixed(1)}M`;
   } else if (num >= 1000) {
-    return `${sign}₱${(num / 1000).toFixed(2)}K`;
+    return `${sign}₱${(num / 1000).toFixed(1)}K`;
   } else {
     return `${sign}₱${num.toFixed(2)}`;
   }
 };
 
+<<<<<<< HEAD
 const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
+=======
+const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
+  const contractCost = typeof project.contractCost === 'string' 
+    ? parseFloat(project.contractCost.replace(/[^0-9.-]/g, '')) 
+    : (project.contractCost || 0);
+  const spent = typeof totalSpent === 'string'
+    ? parseFloat(totalSpent.replace(/[^0-9.-]/g, ''))
+    : (totalSpent || 0);
+  
+  const isOverBudget = spent > contractCost;
+  const overageAmount = isOverBudget ? spent - contractCost : 0;
+
+  return (
+>>>>>>> 168825ba3f001797d7c5d3036f95666f07300102
   <div className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300">
-    <div className="flex items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm mb-4">
+    <div className={`flex items-center p-4 rounded-xl border shadow-sm mb-4 transition-all ${
+      isOverBudget
+        ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+    }`}>
       {project.projectImage ? (
         <img
           src={project.projectImage}
@@ -41,8 +62,20 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
       )}
 
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+          {isOverBudget && (
+            <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-md whitespace-nowrap">
+             ⚠️ OVER BUDGET
+            </span>
+          )}
+        </div>
         <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
+        {isOverBudget && (
+          <p className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+            Overage: ₱{overageAmount.toLocaleString('en-US', {maximumFractionDigits: 0})}
+          </p>
+        )}
       </div>
 
       <div className="w-1/4 mx-4 hidden md:block">
@@ -66,13 +99,15 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
         <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
           <div
             className={`h-2 rounded-full transition-all duration-500 ${
-              budgetProgress > 90
+              isOverBudget
+                ? 'bg-red-600'
+                : budgetProgress > 90
                 ? 'bg-red-500'
                 : budgetProgress > 70
                 ? 'bg-yellow-500'
                 : 'bg-green-500'
             }`}
-            style={{ width: `${budgetProgress}%` }}
+            style={{ width: `${Math.min(budgetProgress, 100)}%` }}
           ></div>
         </div>
       </div>
@@ -98,7 +133,7 @@ const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
       </div>
     </div>
   </div>
-);
+);};
 
 function DashboardPage() {
   const [projects, setProjects] = useState([]);
@@ -108,6 +143,9 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState('name'); // 'name' or 'date'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [showOverBudgetOnly, setShowOverBudgetOnly] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -193,25 +231,64 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProjects(projectsWithProgress);
-      return;
+    let results = projectsWithProgress;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      results = results.filter(
+        (project) =>
+          project.name?.toLowerCase().includes(searchLower) ||
+          project.location?.toLowerCase().includes(searchLower) ||
+          project.status?.toLowerCase().includes(searchLower)
+      );
     }
 
-    const searchLower = searchQuery.toLowerCase();
-    const filtered = projectsWithProgress.filter(
-      (project) =>
-        project.name?.toLowerCase().includes(searchLower) ||
-        project.location?.toLowerCase().includes(searchLower) ||
-        project.status?.toLowerCase().includes(searchLower)
-    );
-    setFilteredProjects(filtered);
-  }, [searchQuery, projectsWithProgress]);
+    // Over budget filter
+    if (showOverBudgetOnly) {
+      results = results.filter((p) => {
+        const contractCost = typeof p.contractCost === 'string' 
+          ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) 
+          : (p.contractCost || 0);
+        const spent = typeof p.totalSpent === 'string'
+          ? parseFloat(p.totalSpent.replace(/[^0-9.-]/g, ''))
+          : (p.totalSpent || 0);
+        return spent > contractCost;
+      });
+    }
+
+    // Sorting
+    results.sort((a, b) => {
+      let compareValue = 0;
+      
+      if (sortBy === 'name') {
+        compareValue = a.name.localeCompare(b.name);
+      } else if (sortBy === 'date') {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        compareValue = dateA - dateB;
+      }
+
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+
+    setFilteredProjects(results);
+  }, [searchQuery, projectsWithProgress, sortBy, sortOrder, showOverBudgetOnly]);
 
   const stats = {
     totalProjects: projects.length,
-    totalBudget: projects.reduce((sum, p) => sum + (p.contractCost || 0), 0),
-    totalSpent: projectsWithProgress.reduce((sum, p) => sum + (p.totalSpent || 0), 0),
+    totalBudget: projects.reduce((sum, p) => {
+      const cost = typeof p.contractCost === 'string' 
+        ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) 
+        : (p.contractCost || 0);
+      return sum + (isNaN(cost) ? 0 : cost);
+    }, 0),
+    totalSpent: projectsWithProgress.reduce((sum, p) => {
+      const spent = typeof p.totalSpent === 'string'
+        ? parseFloat(p.totalSpent.replace(/[^0-9.-]/g, ''))
+        : (p.totalSpent || 0);
+      return sum + (isNaN(spent) ? 0 : spent);
+    }, 0),
     avgCompletion:
       projectsWithProgress.length > 0
         ? Math.round(
@@ -310,6 +387,43 @@ function DashboardPage() {
           Updating project data...
         </div>
       )}
+
+      {/* Sorting & Filtering Controls */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-slate-900/30 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+        <span className="text-sm font-semibold text-gray-700 dark:text-slate-300">Sort by:</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
+        >
+          <option value="name">Project Name</option>
+          <option value="date">Date Created</option>
+        </select>
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          className="px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
+        >
+          <option value="asc">Ascending (A→Z / Oldest)</option>
+          <option value="desc">Descending (Z→A / Newest)</option>
+        </select>
+
+        <button
+          onClick={() => setShowOverBudgetOnly(!showOverBudgetOnly)}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            showOverBudgetOnly
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600'
+          }`}
+        >
+          🚨 Over Budget Only
+        </button>
+
+        <div className="ml-auto text-sm text-gray-600 dark:text-slate-400">
+          {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} shown
+        </div>
+      </div>
 
       <div>
         {/* Active Projects Section */}

@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const getToken = () => localStorage.getItem('token');
 
-function Documents() {
+function Documents({ readonly }) {
     const { projectId } = useParams();
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -232,10 +232,17 @@ function Documents() {
                 </div>
                 <button
                     onClick={() => setShowUploadModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={readonly}
+                    title={readonly ? "Project is completed - cannot upload documents" : "Upload new document"}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >
                     Upload Document
                 </button>
+                {readonly && (
+                    <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
+                        ⛔ Project completed - uploads disabled
+                    </span>
+                )}
             </div>
 
             {/* Filter */}
@@ -258,7 +265,7 @@ function Documents() {
             </div>
 
             {/* Upload Modal */}
-            {showUploadModal && (
+            {showUploadModal && !readonly && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
                         <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Upload Document</h3>
@@ -270,7 +277,8 @@ function Documents() {
                                 <select
                                     value={uploadData.documentType}
                                     onChange={(e) => setUploadData(prev => ({ ...prev, documentType: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                    disabled={uploading}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                                     required
                                 >
                                     <option>Contract</option>
@@ -291,7 +299,8 @@ function Documents() {
                                     type="text"
                                     value={uploadData.description}
                                     onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                    disabled={uploading}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                                     placeholder="Brief description of the document"
                                     required
                                 />
@@ -304,7 +313,8 @@ function Documents() {
                                 <input
                                     type="file"
                                     onChange={handleFileChange}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                    disabled={uploading}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
                                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt"
                                     required
                                 />

@@ -23,7 +23,7 @@ const extractPhaseNumber = (phaseName) => {
     return match ? parseInt(match[1]) : null;
 };
 
-const Milestones = () => {
+const Milestones = ({ readonly }) => {
     const { projectId } = useParams();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ const Milestones = () => {
         parentPhaseId: '',
         status: 'not started',
         priority: 'Medium',
-        plannedCost: '',
+        estimatedCost: '',  // ✅ Changed from plannedCost
         resources: '',
         isPhase: false,
         isMilestone: false
@@ -108,27 +108,44 @@ const Milestones = () => {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
             
-            const mappedTasks = (response.data || []).map(task => ({
-                ...task,
-                milestoneId: task.milestoneId,
-                milestoneName: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
-                name: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
-                startDate: task.startDate,
-                endDate: task.endDate || task.targetDate,
-                targetDate: task.targetDate || task.endDate,
-                parentPhase: task.parentPhase,
-                parentPhaseId: task.parentPhase,
-                phaseColor: task.phaseColor || '#3B82F6',
-                resources: task.resourceRequirements || task.resources || '',
-                resourceRequirements: task.resourceRequirements || task.resources || '',
-                isMilestone: task.isKeyMilestone || task.isMilestone || false,
-                isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
-                status: task.status || 'not started',
-                priority: task.priority || 'Medium',
-                plannedCost: task.plannedCost || 0,
-                isPhase: task.isPhase || false,
-                completedAt: task.completedAt || null
-            }));
+            // ✅ FIX: Map estimatedCost to internal state
+            const mappedTasks = (response.data || []).map(task => {
+                // Parse estimatedCost - handle both string and number formats
+                let parsedCost = 0;
+                if (task.estimatedCost !== undefined && task.estimatedCost !== null) {
+                    const costStr = task.estimatedCost.toString().replace(/,/g, '');
+                    parsedCost = parseFloat(costStr) || 0;
+                }
+                
+                return {
+                    ...task,
+                    milestoneId: task.milestoneId,
+                    milestoneName: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
+                    name: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
+                    startDate: task.startDate,
+                    endDate: task.endDate || task.targetDate,
+                    targetDate: task.targetDate || task.endDate,
+                    parentPhase: task.parentPhase,
+                    parentPhaseId: task.parentPhase,
+                    phaseColor: task.phaseColor || '#3B82F6',
+                    resources: task.resourceRequirements || task.resources || '',
+                    resourceRequirements: task.resourceRequirements || task.resources || '',
+                    isMilestone: task.isKeyMilestone || task.isMilestone || false,
+                    isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
+                    status: task.status || 'not started',
+                    priority: task.priority || 'Medium',
+                    estimatedCost: parsedCost,  // ✅ Use estimatedCost
+                    isPhase: task.isPhase || false,
+                    completedAt: task.completedAt || null
+                };
+            });
+            
+            // ✅ Debug log to verify the data
+            console.log('Mapped tasks with costs:', mappedTasks.map(t => ({
+                name: t.milestoneName,
+                cost: t.estimatedCost,
+                type: typeof t.estimatedCost
+            })));
             
             setTasks(mappedTasks);
             await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
@@ -165,7 +182,6 @@ const Milestones = () => {
         setPhaseCompletionStatus(statusMap);
     };
 
-    // ✅ FIX: Added projectId check in useEffect
     useEffect(() => {
         if (projectId) {
             fetchProjectTasks();
@@ -176,20 +192,25 @@ const Milestones = () => {
     const handleQuickCompleteTask = async (task) => {
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        
+
         try {
-            const newStatus = task.status === 'completed' ? 'in progress' : 'completed';
+            const newStatus = task.status === "completed" ? "in progress" : "completed";
+            const newCompletion = newStatus === "completed" ? 100 : (task.completionPercentage || 0);
             
             await axios.put(
                 `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
-                { status: newStatus },
+                { 
+                    status: newStatus,
+                    completionPercentage: newCompletion
+                },
                 config
             );
-            
+
+            console.log('✅ Task updated - Email should be sent');
             await fetchProjectTasks();
         } catch (err) {
-            console.error('Error updating task:', err);
-            alert('Failed to update task status');
+            console.error("Error updating task:", err);
+            alert("Failed to update task status");
         }
     };
 
@@ -227,7 +248,7 @@ const Milestones = () => {
             parentPhaseId: '',
             status: 'not started',
             priority: 'Medium',
-            plannedCost: '',
+            estimatedCost: '',  // ✅ Changed
             resources: '',
             isPhase: false,
             isMilestone: false
@@ -246,7 +267,7 @@ const Milestones = () => {
             parentPhaseId: task.parentPhase || task.parentPhaseId || '',
             status: task.status || 'not started',
             priority: task.priority || 'Medium',
-            plannedCost: task.plannedCost || '',
+            estimatedCost: task.estimatedCost || '',  // ✅ Changed
             resources: task.resourceRequirements || task.resources || '',
             isPhase: task.isPhase || false,
             isMilestone: task.isKeyMilestone || task.isMilestone || false
@@ -257,7 +278,7 @@ const Milestones = () => {
 
     const handleCostChange = (value) => {
         const numericValue = parseCurrency(value);
-        setTaskForm({...taskForm, plannedCost: numericValue});
+        setTaskForm({...taskForm, estimatedCost: numericValue});  // ✅ Changed
     };
 
     const handleSaveTask = async () => {
@@ -286,7 +307,7 @@ const Milestones = () => {
                 parentPhase: taskForm.parentPhaseId || null,
                 status: taskForm.status,
                 priority: taskForm.priority,
-                plannedCost: parseFloat(parseCurrency(taskForm.plannedCost)) || 0,
+                estimatedCost: parseFloat(parseCurrency(taskForm.estimatedCost)) || 0,  // ✅ Changed
                 resourceRequirements: taskForm.resources,
                 isPhase: taskForm.isPhase,
                 isKeyMilestone: taskForm.isMilestone,
@@ -498,8 +519,8 @@ const Milestones = () => {
                                                     {task.endDate && (
                                                         <span>Due: {new Date(task.endDate).toLocaleDateString()}</span>
                                                     )}
-                                                    {task.plannedCost > 0 && (
-                                                        <span>Cost: ₱{formatCurrency(task.plannedCost)}</span>
+                                                    {task.estimatedCost > 0 && (
+                                                        <span>Cost: ₱{formatCurrency(task.estimatedCost)}</span>
                                                     )}
                                                     {task.completedAt && (
                                                         <span className="text-green-600 dark:text-green-400">
@@ -698,11 +719,15 @@ const Milestones = () => {
         );
     };
 
+    // ✅ FIXED: Use estimatedCost for total budget calculation
     const totalTasks = tasks.filter(t => t.isPhase !== true).length;
     const totalPhases = phases.length;
     const completedTasks = tasks.filter(t => t.isPhase !== true && t.status === 'completed').length;
     const inProgressTasks = tasks.filter(t => t.isPhase !== true && t.status === 'in progress').length;
-    const totalBudget = phases.reduce((sum, phase) => sum + (parseFloat(phase.plannedCost) || 0), 0);
+    const totalBudget = tasks.reduce((sum, task) => {
+        const cost = parseFloat(task.estimatedCost) || 0;
+        return sum + cost;
+    }, 0);
 
     if (loading) {
         return (
@@ -744,10 +769,17 @@ const Milestones = () => {
                 </div>
                 <button 
                     onClick={openAddTaskModal}
-                    className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700"
+                    disabled={readonly}
+                    className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                    title={readonly ? "Project is completed - cannot add tasks" : "Add new task"}
                 >
                     Add Task
                 </button>
+                {readonly && (
+                    <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
+                        ⛔ Project completed - editing disabled
+                    </span>
+                )}
             </div>
 
             {/* Summary Stats */}
@@ -828,10 +860,10 @@ const Milestones = () => {
                                 </div>
                                 
                                 <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Planned Cost (PHP)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Estimated Cost (PHP)</label>
                                     <input
                                         type="text"
-                                        value={taskForm.plannedCost ? formatCurrency(taskForm.plannedCost) : ''}
+                                        value={taskForm.estimatedCost ? formatCurrency(taskForm.estimatedCost) : ''}
                                         onChange={(e) => handleCostChange(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0"
@@ -922,10 +954,10 @@ const Milestones = () => {
                                 </div>
 
                                 <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Planned Cost (PHP)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Estimated Cost (PHP)</label>
                                     <input
                                         type="text"
-                                        value={taskForm.plannedCost ? formatCurrency(taskForm.plannedCost) : ''}
+                                        value={taskForm.estimatedCost ? formatCurrency(taskForm.estimatedCost) : ''}
                                         onChange={(e) => handleCostChange(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0"

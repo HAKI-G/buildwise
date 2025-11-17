@@ -21,6 +21,8 @@ const Photos = ({ projectId, readonly = false }) => {
   const [tasks, setTasks] = useState([]);
   const [viewModal, setViewModal] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [photoSortOrder, setPhotoSortOrder] = useState("newest"); // 'newest' or 'oldest'
+  const [expandedPhases, setExpandedPhases] = useState({}); // Track which phases are expanded
 
   useEffect(() => {
     if (projectId && showUploadForm) {
@@ -195,6 +197,46 @@ const Photos = ({ projectId, readonly = false }) => {
   const openViewModal = (photo) => setViewModal(photo);
   const closeViewModal = () => setViewModal(null);
 
+  // ✅ Group photos by phase/task with sorting
+  const getGroupedPhotos = () => {
+    // First, group by phase, then by task within each phase
+    const grouped = photos.reduce((acc, photo) => {
+      const phaseName = photo.phaseName || "Ungrouped";
+      const taskName = photo.taskName || "No Task";
+      
+      if (!acc[phaseName]) {
+        acc[phaseName] = {};
+      }
+      if (!acc[phaseName][taskName]) {
+        acc[phaseName][taskName] = [];
+      }
+      
+      acc[phaseName][taskName].push(photo);
+      return acc;
+    }, {});
+
+    // Sort photos within each task by upload date
+    Object.keys(grouped).forEach(phaseName => {
+      Object.keys(grouped[phaseName]).forEach(taskName => {
+        grouped[phaseName][taskName].sort((a, b) => {
+          const dateA = new Date(a.uploadedAt).getTime();
+          const dateB = new Date(b.uploadedAt).getTime();
+          return photoSortOrder === "newest" ? dateB - dateA : dateA - dateB;
+        });
+      });
+    });
+
+    return grouped;
+  };
+
+  // Toggle phase expansion
+  const togglePhase = (phaseName) => {
+    setExpandedPhases(prev => ({
+      ...prev,
+      [phaseName]: !prev[phaseName]
+    }));
+  };
+
   if (!projectId) {
     return (
       <div className="bg-white dark:bg-slate-800 p-6 rounded-lg">
@@ -319,6 +361,7 @@ const Photos = ({ projectId, readonly = false }) => {
               {photos.length} AI-verified and confirmed photos
             </p>
           </div>
+<<<<<<< HEAD
           {readonly && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
               🔒 View Only
@@ -333,6 +376,49 @@ const Photos = ({ projectId, readonly = false }) => {
               Upload Photo
             </button>
           )}
+=======
+          <div className="flex items-center gap-3">
+            {/* Sort Filter Buttons */}
+            {photos.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPhotoSortOrder("newest")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                    photoSortOrder === "newest"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+                  }`}
+                >
+                  ↓ Newest First
+                </button>
+                <button
+                  onClick={() => setPhotoSortOrder("oldest")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                    photoSortOrder === "oldest"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+                  }`}
+                >
+                  ↑ Oldest First
+                </button>
+              </div>
+            )}
+            {readonly && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
+                🔒 View Only
+              </div>
+            )}
+            {!readonly && (
+              <button
+                onClick={() => setShowUploadForm(!showUploadForm)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Photo
+              </button>
+            )}
+          </div>
+>>>>>>> 168825ba3f001797d7c5d3036f95666f07300102
         </div>
 
         {loading ? (
@@ -347,40 +433,25 @@ const Photos = ({ projectId, readonly = false }) => {
             <p className="text-sm">Upload photos and approve them in the Reports tab</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {photos.map((photo) => (
-              <div
-                key={photo.photoId}
-                className="bg-slate-700 dark:bg-slate-900 rounded-lg overflow-hidden border-2 border-green-500"
-              >
-                <div className="relative">
-                  <img
-                    src={photo.fileURL}
-                    alt={photo.caption}
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    AI Verified
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-white mb-1 truncate">
-                    {photo.caption || "No caption"}
+          <div className="space-y-6">
+            {/* Grouped Photos by Phase */}
+            {Object.keys(getGroupedPhotos()).map((phaseName) => (
+              <div key={phaseName} className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                {/* Phase Header */}
+                <button
+                  onClick={() => togglePhase(phaseName)}
+                  className="w-full bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/40 transition-colors"
+                >
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <span>{expandedPhases[phaseName] ? "▼" : "▶"}</span>
+                    🏗️ {phaseName}
+                    <span className="text-xs bg-blue-200 dark:bg-blue-700 text-blue-900 dark:text-blue-200 px-2 py-1 rounded-full">
+                      {Object.values(getGroupedPhotos()[phaseName]).reduce((sum, tasks) => sum + tasks.length, 0)} photos
+                    </span>
                   </h3>
-                  {photo.taskName && (
-                    <p className="text-xs text-blue-400 mb-1">
-                      📋 {photo.taskName}
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-400 mb-1">
-                    Update: {photo.updateId}
-                  </p>
-                  <p className="text-xs text-slate-400 mb-1">
-                    Uploaded: {new Date(photo.uploadedAt).toLocaleDateString()}
-                  </p>
+                </button>
 
+<<<<<<< HEAD
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => openViewModal(photo)}
@@ -401,8 +472,83 @@ const Photos = ({ projectId, readonly = false }) => {
                       <Trash2 className="w-3 h-3" />
                       Delete
                     </button>
+=======
+                {/* Phase Tasks - Expanded State */}
+                {expandedPhases[phaseName] && (
+                  <div className="p-4 space-y-6 bg-gray-50 dark:bg-slate-900/50">
+                    {Object.keys(getGroupedPhotos()[phaseName]).map((taskName) => (
+                      <div key={`${phaseName}-${taskName}`}>
+                        {/* Task Header */}
+                        <div className="mb-4">
+                          <h4 className="font-semibold text-gray-800 dark:text-slate-300 flex items-center gap-2">
+                            <span>📋</span>
+                            {taskName}
+                            <span className="text-xs bg-gray-300 dark:bg-slate-700 text-gray-900 dark:text-slate-300 px-2 py-1 rounded-full">
+                              {getGroupedPhotos()[phaseName][taskName].length}
+                            </span>
+                          </h4>
+                        </div>
+
+                        {/* Photos Grid for Task */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {getGroupedPhotos()[phaseName][taskName].map((photo) => (
+                            <div
+                              key={photo.photoId}
+                              className="bg-slate-700 dark:bg-slate-900 rounded-lg overflow-hidden border-2 border-green-500"
+                            >
+                              <div className="relative">
+                                <img
+                                  src={photo.fileURL}
+                                  alt={photo.caption}
+                                  className="w-full h-48 object-cover"
+                                />
+                                <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  AI Verified
+                                </div>
+                              </div>
+
+                              <div className="p-4">
+                                <h3 className="font-semibold text-white mb-1 truncate">
+                                  {photo.caption || "No caption"}
+                                </h3>
+                                <p className="text-xs text-slate-400 mb-1">
+                                  Update: {photo.updateId}
+                                </p>
+                                <p className="text-xs text-slate-400 mb-1">
+                                  Uploaded: {new Date(photo.uploadedAt).toLocaleDateString()}
+                                </p>
+
+                                <div className="flex gap-2 mt-3">
+                                  <button
+                                    onClick={() => openViewModal(photo)}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    View
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(photo)}
+                                    disabled={readonly}
+                                    className={`flex-1 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1 transition-colors ${
+                                      readonly
+                                        ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
+                                        : 'bg-red-600 hover:bg-red-700'
+                                    }`}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+>>>>>>> 168825ba3f001797d7c5d3036f95666f07300102
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
