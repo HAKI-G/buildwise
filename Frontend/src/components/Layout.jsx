@@ -178,7 +178,7 @@ const getCurrentProjectId = () => {
                             alt="BuildWise Logo"
                             className="h-12 w-auto object-contain"
                         />
-                        <h1 className="text-2xl font-semibold text-gray-800">BuildWise</h1>
+                        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white">BuildWise</h1>
                         </div>
 
                     <nav className="space-y-2">
