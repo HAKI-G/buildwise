@@ -708,12 +708,12 @@ const projectProgress = useMemo(() => {
                                 )}
                         <div className="mt-4 space-y-2">
                             {projectProgress.phaseDetails.map(phase => (
-                                <div key={phase.phaseId} className="bg-white/10 rounded-lg p-3">
+                                <div key={phase.phaseId} className="bg-gray-100 dark:bg-white/10 rounded-lg p-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm text-blue-100">{phase.phaseName}</span>
-                                        <span className="text-lg font-bold text-white">{phase.completion}%</span>
+                                        <span className="text-sm text-gray-700 dark:text-blue-100">{phase.phaseName}</span>
+                                        <span className="text-lg font-bold text-gray-900 dark:text-white">{phase.completion}%</span>
                                     </div>
-                                    <div className="text-xs text-blue-200 mt-1">
+                                    <div className="text-xs text-gray-600 dark:text-blue-200 mt-1">
                                         {phase.taskCount} {phase.taskCount === 1 ? 'task' : 'tasks'}
                                     </div>
                                 </div>
