@@ -29,9 +29,6 @@ const formatBudget = (value) => {
   }
 };
 
-<<<<<<< HEAD
-const ProjectRow = ({ project, taskProgress, budgetProgress }) => (
-=======
 const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
   const contractCost = typeof project.contractCost === 'string' 
     ? parseFloat(project.contractCost.replace(/[^0-9.-]/g, '')) 
@@ -44,7 +41,6 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
   const overageAmount = isOverBudget ? spent - contractCost : 0;
 
   return (
->>>>>>> 168825ba3f001797d7c5d3036f95666f07300102
   <div className="block hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-300">
     <div className={`flex items-center p-4 rounded-xl border shadow-sm mb-4 transition-all ${
       isOverBudget

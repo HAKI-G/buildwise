@@ -264,9 +264,9 @@ function GenerateReportPage() {
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                                 AI-Powered Report Generation
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">
+                            {/* <p className="text-sm text-gray-600 dark:text-slate-400">
                                 Generate comprehensive construction reports using Claude AI with ALL project data
-                            </p>
+                            </p> */}
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

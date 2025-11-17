@@ -29,7 +29,13 @@ function PendingTasksPage() {
                 setProject(projectRes.data);
 
                 const photosRes = await axios.get(`http://localhost:5001/api/photos/project/${projectId}`, config);
-                setPhotos(photosRes.data || []);
+                // Map fileURL to photoUrl for consistency
+                const photosData = (photosRes.data || []).map(photo => ({
+                    ...photo,
+                    photoUrl: photo.fileURL || photo.photoUrl,
+                    uploadDate: photo.uploadedAt || photo.uploadDate
+                }));
+                setPhotos(photosData);
                 
                 localStorage.setItem('lastSelectedProjectId', projectId);
             } catch (err) {
@@ -66,64 +72,71 @@ function PendingTasksPage() {
             </button>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-250px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left: Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Approval Status</h2>
-                    <div className="flex-1 flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                <XAxis dataKey="name" stroke="#9ca3af" />
-                                <YAxis stroke="#9ca3af" />
-                                <Tooltip 
-                                    contentStyle={{ 
-                                        backgroundColor: '#1e293b', 
-                                        border: '1px solid #475569',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Approval Status</h2>
+                    
+                    {chartData.some(d => d.value > 0) ? (
+                        <div className="h-80 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                    <XAxis dataKey="name" stroke="#9ca3af" />
+                                    <YAxis stroke="#9ca3af" />
+                                    <Tooltip 
+                                        contentStyle={{ 
+                                            backgroundColor: '#1e293b', 
+                                            border: '1px solid #475569',
+                                            borderRadius: '8px'
+                                        }}
+                                    />
+                                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="h-80 flex items-center justify-center">
+                            <p className="text-gray-500 dark:text-slate-400">No approval data available</p>
+                        </div>
+                    )}
                     
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200 dark:border-slate-700">
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                            <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                                 {pendingApprovals.length}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Pending</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Pending</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                                 {approvedPhotos.length}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Approved</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Approved</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                                 {rejectedPhotos.length}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Rejected</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Rejected</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Right: Scrollable Pending Approvals */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                         <Clock className="w-5 h-5 text-yellow-600" />
                         Pending Approvals ({pendingApprovals.length})
                     </h3>
                     
                     {/* Scrollable Photo Grid */}
-                    <div className="flex-1 overflow-y-auto pr-2">
+                    <div className="max-h-[600px] overflow-y-auto pr-2">
                         {pendingApprovals.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-slate-400">
                                 <ImageIcon className="w-16 h-16 mb-4 opacity-50" />
@@ -136,11 +149,21 @@ function PendingTasksPage() {
                                         key={photo.photoId}
                                         className="bg-gray-50 dark:bg-slate-700 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
                                     >
-                                        <img
-                                            src={photo.photoUrl}
-                                            alt="Pending approval"
-                                            className="w-full h-48 object-cover"
-                                        />
+                                        {photo.photoUrl ? (
+                                            <img
+                                                src={photo.photoUrl}
+                                                alt="Pending approval"
+                                                className="w-full h-48 object-cover"
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-48 bg-gray-200 dark:bg-slate-600 flex items-center justify-center">
+                                                <ImageIcon className="w-12 h-12 text-gray-400 dark:text-slate-500" />
+                                            </div>
+                                        )}
                                         <div className="p-3">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 text-xs rounded font-medium">

@@ -75,63 +75,70 @@ function TaskPriorityPage() {
             </button>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-250px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left: Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Priority Distribution</h2>
-                    <div className="flex-1 flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={chartData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius="70%"
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                >
-                                    {chartData.map((entry) => (
-                                        <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Priority Distribution</h2>
+                    
+                    {chartData.length > 0 ? (
+                        <div className="h-80 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={chartData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={100}
+                                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {chartData.map((entry) => (
+                                            <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="h-80 flex items-center justify-center">
+                            <p className="text-gray-500 dark:text-slate-400">No priority data available</p>
+                        </div>
+                    )}
                     
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200 dark:border-slate-700">
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                                 {priorityData['High'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">High Priority</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">High Priority</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                            <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                                 {priorityData['Medium'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Medium Priority</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Medium Priority</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                                 {priorityData['Low'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Low Priority</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Low Priority</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Right: Scrollable List with Tabs */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
                         Active Tasks ({tasks.length})
                     </h3>
                     
                     {/* Scrollable Content - Grouped by Priority */}
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                    <div className="max-h-[600px] overflow-y-auto pr-2 space-y-6">
                         {tasks.length === 0 ? (
                             <p className="text-gray-600 dark:text-slate-400 text-center py-8">
                                 No active tasks found.

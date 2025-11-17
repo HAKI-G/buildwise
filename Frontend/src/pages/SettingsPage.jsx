@@ -402,9 +402,9 @@ function SettingsPage() {
                         <form onSubmit={handleSaveProfile}>
                             {/* Avatar */}
                             <div className="mb-6 flex items-center">
-                                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 mr-4">
+                                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 mr-4 flex items-center justify-center">
                                     {previewAvatar ? (
-                                        <img src={previewAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        <img src={previewAvatar} alt="Avatar" className="w-full h-full object-contain" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-3xl text-gray-400">
                                             {profileForm.name.charAt(0).toUpperCase() || '?'}

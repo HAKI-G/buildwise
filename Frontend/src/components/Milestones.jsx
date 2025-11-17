@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import { Download } from 'lucide-react';
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -161,6 +162,66 @@ const Milestones = ({ readonly }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Export milestones as JSON
+    const exportMilestonesToJSON = () => {
+        const exportData = {
+            projectId: projectId,
+            exportDate: new Date().toISOString(),
+            phases: [],
+            tasks: []
+        };
+
+        // Group by phases
+        const grouped = getTasksByPhase();
+        
+        Object.entries(grouped).forEach(([phaseId, data]) => {
+            if (phaseId !== 'unassigned') {
+                exportData.phases.push({
+                    phaseId: data.phase.milestoneId,
+                    phaseName: data.phase.milestoneName,
+                    phaseColor: data.phase.phaseColor,
+                    startDate: data.phase.startDate,
+                    endDate: data.phase.endDate,
+                    status: data.phase.status,
+                    tasks: data.tasks.map(task => ({
+                        taskId: task.milestoneId,
+                        taskName: task.milestoneName,
+                        startDate: task.startDate,
+                        endDate: task.endDate || task.targetDate,
+                        status: task.status,
+                        priority: task.priority,
+                        estimatedCost: task.estimatedCost,
+                        resources: task.resources,
+                        isMilestone: task.isMilestone
+                    }))
+                });
+            } else {
+                exportData.tasks = data.tasks.map(task => ({
+                    taskId: task.milestoneId,
+                    taskName: task.milestoneName,
+                    startDate: task.startDate,
+                    endDate: task.endDate || task.targetDate,
+                    status: task.status,
+                    priority: task.priority,
+                    estimatedCost: task.estimatedCost,
+                    resources: task.resources,
+                    isMilestone: task.isMilestone
+                }));
+            }
+        });
+
+        // Create blob and download
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `milestones_project_${projectId}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const checkAllPhasesCompletionStatus = async (phasesList, config) => {
@@ -767,14 +828,24 @@ const Milestones = ({ readonly }) => {
                         </button>
                     </div>
                 </div>
-                <button 
-                    onClick={openAddTaskModal}
-                    disabled={readonly}
-                    className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-                    title={readonly ? "Project is completed - cannot add tasks" : "Add new task"}
-                >
-                    Add Task
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={exportMilestonesToJSON}
+                        className="bg-green-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-green-700 transition flex items-center gap-2"
+                        title="Export milestones to JSON"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export JSON
+                    </button>
+                    <button 
+                        onClick={openAddTaskModal}
+                        disabled={readonly}
+                        className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                        title={readonly ? "Project is completed - cannot add tasks" : "Add new task"}
+                    >
+                        Add Task
+                    </button>
+                </div>
                 {readonly && (
                     <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
                         ⛔ Project completed - editing disabled
