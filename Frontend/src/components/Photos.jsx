@@ -361,6 +361,23 @@ const Photos = ({ projectId, readonly = false }) => {
               {photos.length} AI-verified and confirmed photos
             </p>
           </div>
+<<<<<<< HEAD
+=======
+          {readonly && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
+              🔒 View Only
+            </div>
+          )}
+          {!readonly && (
+            <button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Photo
+            </button>
+          )}
+>>>>>>> 37bd3a98b357c3b0b5f9cfddc1b890670f3b1173
           <div className="flex items-center gap-3">
             {/* Sort Filter Buttons */}
             {photos.length > 0 && (
