@@ -258,11 +258,7 @@ function SettingsPage() {
             );
 
             // Navigate to 2FA setup page with QR code data
-<<<<<<< HEAD
-            navigate('/2fa-setup', {
-=======
             navigate('/setup-2fa', {
->>>>>>> 37bd3a98b357c3b0b5f9cfddc1b890670f3b1173
                 state: {
                     qrCode: response.data.qrCode,
                     secret: response.data.secret,

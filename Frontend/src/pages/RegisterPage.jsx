@@ -53,11 +53,7 @@ function RegisterPage() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-<<<<<<< HEAD
-        role: 'User'
-=======
         role: 'Project Manager'
->>>>>>> 37bd3a98b357c3b0b5f9cfddc1b890670f3b1173
       });
 
       setSuccess(response.data.message);
@@ -94,11 +90,7 @@ function RegisterPage() {
       setSuccess('Account created successfully! Redirecting...');
       
       setTimeout(() => {
-<<<<<<< HEAD
-        navigate('/dashboard');
-=======
         navigate('/login');
->>>>>>> 37bd3a98b357c3b0b5f9cfddc1b890670f3b1173
       }, 1500);
 
     } catch (err) {
