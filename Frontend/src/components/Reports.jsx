@@ -10,8 +10,8 @@ const Reports = ({ projectId }) => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [userPercentage, setUserPercentage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [taskCompletions, setTaskCompletions] = useState({}); // ✅ Store task averages
-    const [phaseCompletions, setPhaseCompletions] = useState({}); // ✅ FIX: Add missing state
+    const [taskCompletions, setTaskCompletions] = useState({});
+    const [phaseCompletions, setPhaseCompletions] = useState({}); 
     
     const API_URL = 'http://localhost:5001/api';
 

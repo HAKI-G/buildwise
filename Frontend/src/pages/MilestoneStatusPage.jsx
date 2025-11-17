@@ -79,63 +79,70 @@ function MilestoneStatusPage() {
             </button>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-250px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left: Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Status Distribution</h2>
-                    <div className="flex-1 flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={chartData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius="70%"
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                >
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[entry.name] || COLORS['Unknown']} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Status Distribution</h2>
+                    
+                    {chartData.length > 0 ? (
+                        <div className="h-80 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={chartData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={100}
+                                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[entry.name] || COLORS['Unknown']} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="h-80 flex items-center justify-center">
+                            <p className="text-gray-500 dark:text-slate-400">No milestone data available</p>
+                        </div>
+                    )}
                     
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200 dark:border-slate-700">
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                                 {milestoneStatusData['completed'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Completed</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Completed</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                                 {milestoneStatusData['in progress'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">In Progress</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">In Progress</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                                 {milestoneStatusData['not started'] || 0}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-slate-400">Not Started</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Not Started</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Right: Scrollable List */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
                         All Milestones ({milestones.filter(m => !m.isPhase).length})
                     </h3>
                     
                     {/* Scrollable Content */}
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                    <div className="max-h-[600px] overflow-y-auto pr-2 space-y-3">
                         {milestones.filter(m => !m.isPhase).length === 0 ? (
                             <p className="text-gray-600 dark:text-slate-400 text-center py-8">
                                 No milestones found for this project.
