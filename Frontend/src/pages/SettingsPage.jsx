@@ -101,9 +101,21 @@ function SettingsPage() {
     const handleAvatarChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Validate file size (max 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                setMessage({ type: 'error', text: 'Image size must be less than 2MB' });
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onloadend = () => {
-                setPreviewAvatar(reader.result);
+                const base64String = reader.result;
+                setPreviewAvatar(base64String);
+                // Update profileForm with the new avatar
+                setProfileForm(prev => ({
+                    ...prev,
+                    avatar: base64String
+                }));
             };
             reader.readAsDataURL(file);
         }
@@ -151,7 +163,7 @@ function SettingsPage() {
             const updateData = {
                 name: profileForm.name,
                 email: profileForm.email,
-                avatar: previewAvatar || '' // Send the base64 image or empty string
+                avatar: previewAvatar || profileForm.avatar || '' // Use preview or existing avatar
             };
 
             // Call the backend API
@@ -162,6 +174,15 @@ function SettingsPage() {
                 localStorage.setItem('userName', response.user.name);
                 localStorage.setItem('userEmail', response.user.email);
                 localStorage.setItem('userAvatar', response.user.avatar || '');
+                
+                // Update local state to reflect saved changes
+                setProfileForm({
+                    name: response.user.name,
+                    email: response.user.email,
+                    role: response.user.role,
+                    avatar: response.user.avatar || ''
+                });
+                setPreviewAvatar(response.user.avatar || '');
             }
 
             setMessage({ type: 'success', text: 'Profile updated successfully!' });

@@ -369,8 +369,12 @@ const getCurrentProjectId = () => {
                                     <div className="font-bold text-gray-800 dark:text-white">{userInfo.name}</div>
                                     <div className="text-sm text-gray-500 dark:text-slate-400">{userInfo.role}</div>
                                 </div>
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
-                                    {getInitials(userInfo.name)}
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                                    {userInfo.avatar ? (
+                                        <img src={userInfo.avatar} alt={userInfo.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        getInitials(userInfo.name)
+                                    )}
                                 </div>
                             </div>
                         </div>

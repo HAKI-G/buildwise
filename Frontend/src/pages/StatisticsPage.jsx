@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
+import { Search } from 'lucide-react';
 import { 
     PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, 
     BarChart, Bar, XAxis, YAxis, CartesianGrid 
@@ -21,6 +22,7 @@ function StatisticsPage() {
     const [photos, setPhotos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Auto-set task status filter based on project status
     const taskStatusFilter = useMemo(() => {
@@ -276,7 +278,19 @@ const projectProgress = useMemo(() => {
             <Layout title="Statistics">
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-slate-700 transition-colors">
                     <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Select a Project</h2>
-                    <p className="text-gray-600 dark:text-slate-400 mb-8">Choose a project to view its statistics and insights.</p>
+                    <p className="text-gray-600 dark:text-slate-400 mb-4">Choose a project to view its statistics and insights.</p>
+                    
+                    {/* Search Bar */}
+                    <div className="relative mb-6 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search projects by name or location..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                    </div>
                     
                     {loading ? (
                         <p className="text-center py-8 text-gray-500 dark:text-slate-400">Loading projects...</p>
@@ -294,35 +308,54 @@ const projectProgress = useMemo(() => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {projects.map((proj) => (
-                                <button
-                                    key={proj.projectId}
-                                    onClick={() => handleProjectSelect(proj.projectId)}
-                                    className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-lg transition-all duration-200 overflow-hidden text-left"
-                                >
-                                    <div className="p-6">
-                                        <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-4">{proj.name}</h3>
-                                        <div className="text-sm text-gray-600 dark:text-slate-400 space-y-2">
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Location:</span>
-                                                <span className="text-right">{proj.location}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Budget:</span>
-                                                <span className="text-right">₱{proj.contractCost ? parseInt(proj.contractCost).toLocaleString() : 'N/A'}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center pt-2">
-                                                <span className="font-medium">Status:</span>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                    proj.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                                    proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                                }`}>{proj.status || 'Not Started'}</span>
+                            {projects
+                                .filter((proj) => {
+                                    const searchLower = searchQuery.toLowerCase();
+                                    return (
+                                        proj.name?.toLowerCase().includes(searchLower) ||
+                                        proj.location?.toLowerCase().includes(searchLower)
+                                    );
+                                })
+                                .map((proj) => (
+                                    <button
+                                        key={proj.projectId}
+                                        onClick={() => handleProjectSelect(proj.projectId)}
+                                        className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden text-left transform"
+                                    >
+                                        <div className="p-6">
+                                            <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-4">{proj.name}</h3>
+                                            <div className="text-sm text-gray-600 dark:text-slate-400 space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="font-medium">Location:</span>
+                                                    <span className="text-right">{proj.location}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="font-medium">Budget:</span>
+                                                    <span className="text-right">₱{proj.contractCost ? parseInt(proj.contractCost).toLocaleString() : 'N/A'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center pt-2">
+                                                    <span className="font-medium">Status:</span>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                        proj.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                        proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                        'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                                    }`}>{proj.status || 'Not Started'}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </button>
-                            ))}
+                                    </button>
+                                ))}
+                            {projects.filter((proj) => {
+                                const searchLower = searchQuery.toLowerCase();
+                                return (
+                                    proj.name?.toLowerCase().includes(searchLower) ||
+                                    proj.location?.toLowerCase().includes(searchLower)
+                                );
+                            }).length === 0 && (
+                                <div className="col-span-full text-center py-8 text-gray-500 dark:text-slate-400">
+                                    No projects match your search.
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
