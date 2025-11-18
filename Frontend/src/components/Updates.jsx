@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
+import Liquidation from './Liquidation';
 
 const getToken = () => localStorage.getItem('token');
 
-const Updates = ({ readonly }) => {
+const Updates = ({ readonly, projectData }) => {
     const { projectId } = useParams();
     const [expenses, setExpenses] = useState([]);
-    const [expenseDescription, setExpenseDescription] = useState('');
-    const [expenseAmount, setExpenseAmount] = useState('');
+    const [expenseItems, setExpenseItems] = useState([]);  // ✅ Array for material + quantity items
+    const [selectedMaterial, setSelectedMaterial] = useState('');  // ✅ For dropdown selection
+    const [selectedQuantity, setSelectedQuantity] = useState('1');  // ✅ For quantity
     const [expenseCategory, setExpenseCategory] = useState('Materials');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [showLiquidation, setShowLiquidation] = useState(false);
+
+    const materialPrices = {
+        'Wood': 500,
+        'Stone': 800,
+        'Sand and Gravel': 300,
+        'Clay': 200,
+        'Concrete': 5000,
+        'Steel': 3000,
+        'Cement': 250,
+        'Brick': 8,
+        'Glass': 1500,
+        'Plastics': 100,
+        'Ceramics': 600
+    };
+
+    const materials = Object.keys(materialPrices);
 
     const categories = [
         'Materials',
@@ -24,7 +42,6 @@ const Updates = ({ readonly }) => {
         'Miscellaneous'
     ];
 
-    // ✅ FIX: Move fetchExpenses inside useEffect to avoid dependency issues
     useEffect(() => {
         const fetchExpenses = async () => {
             const token = getToken();
@@ -33,7 +50,10 @@ const Updates = ({ readonly }) => {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             
             try {
-                const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
+                const expensesRes = await axios.get(
+                    `http://localhost:5001/api/expenses/project/${projectId}`, 
+                    config
+                );
                 setExpenses(expensesRes.data || []);
                 setError('');
             } catch (expenseError) {
@@ -47,12 +67,12 @@ const Updates = ({ readonly }) => {
         };
 
         fetchExpenses();
-    }, [projectId]); // ✅ Only depends on projectId
+    }, [projectId]);
 
     const handleAddExpense = async (e) => {
         e.preventDefault();
-        if (!expenseDescription || !expenseAmount) {
-            alert('Please fill out both description and amount.');
+        if (expenseItems.length === 0) {
+            alert('Please add at least one material with quantity.');
             return;
         }
 
@@ -62,22 +82,40 @@ const Updates = ({ readonly }) => {
         
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
+        
+        // Calculate total amount from all items
+        const totalAmount = expenseItems.reduce((sum, item) => {
+            return sum + (materialPrices[item.material] * item.quantity);
+        }, 0);
+
+        // Create description with materials and quantities
+        const description = expenseItems.map(item => 
+            `${item.material} x${item.quantity} @ ₱${materialPrices[item.material]}/unit`
+        ).join('\n');
+
         const newExpense = {
-            description: expenseDescription,
-            amount: parseFloat(expenseAmount),
+            description: description,
+            amount: totalAmount,
             category: expenseCategory,
             date: new Date().toISOString()
         };
 
         try {
-            await axios.post(`http://localhost:5001/api/expenses/${projectId}`, newExpense, config);
-            setExpenseDescription('');
-            setExpenseAmount('');
+            await axios.post(
+                `http://localhost:5001/api/expenses/${projectId}`, 
+                newExpense, 
+                config
+            );
+            setExpenseItems([]);  // ✅ Reset items
+            setSelectedMaterial('');  // ✅ Reset dropdown
+            setSelectedQuantity('1');  // ✅ Reset quantity
             setExpenseCategory('Materials');
             setSuccessMessage('Expense added successfully!');
             
-            // ✅ FIX: Refetch expenses inline
-            const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${projectId}`, config);
+            const expensesRes = await axios.get(
+                `http://localhost:5001/api/expenses/project/${projectId}`, 
+                config
+            );
             setExpenses(expensesRes.data || []);
             
             setTimeout(() => setSuccessMessage(''), 3000);
@@ -93,25 +131,16 @@ const Updates = ({ readonly }) => {
         }
     };
 
-    const totalExpenses = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
-
-    // Group expenses by category for liquidation
-    const groupedExpenses = expenses.reduce((acc, expense) => {
-        const category = expense.category || 'Others';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(expense);
-        return acc;
-    }, {});
-
-    const getCategoryTotal = (category) => {
-        return (groupedExpenses[category] || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+    // Calculate total amount for display
+    const calculateTotal = () => {
+        return expenseItems.reduce((sum, item) => {
+            return sum + (materialPrices[item.material] * item.quantity);
+        }, 0);
     };
 
-    const printLiquidation = () => {
-        window.print();
-    };
+    const totalExpenses = expenses.reduce((sum, expense) => 
+        sum + parseFloat(expense.amount || 0), 0
+    );
 
     return (
         <div className="space-y-6">
@@ -125,7 +154,7 @@ const Updates = ({ readonly }) => {
                             : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
                     }`}
                 >
-                    📝 Add Expenses
+                     Add Expenses
                 </button>
                 <button
                     onClick={() => setShowLiquidation(true)}
@@ -135,14 +164,17 @@ const Updates = ({ readonly }) => {
                             : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
                     }`}
                 >
-                    📊 View Liquidation
+                     View Liquidation
                 </button>
             </div>
 
             {!showLiquidation ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Add Expense Form */}
                     <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
-                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add New Expense</h2>
+                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                            Add New Expense
+                        </h2>
                         
                         {readonly && (
                             <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300 rounded-lg text-sm">
@@ -180,37 +212,104 @@ const Updates = ({ readonly }) => {
                                 </select>
                             </div>
                             <div className="mb-4">
-                                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Description
+                                <label htmlFor="materials" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                                    Materials
                                 </label>
-                                <input
-                                    type="text" 
-                                    id="description" 
-                                    value={expenseDescription} 
-                                    onChange={(e) => setExpenseDescription(e.target.value)}
-                                    disabled={isSubmitting || readonly}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
-                                    placeholder="e.g., Cement - 50 bags @ ₱250/bag" 
-                                />
+                                <div className="space-y-2">
+                                    {expenseItems.map((item, index) => (
+                                        <div key={index} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-900 dark:text-white">{item.material}</div>
+                                                <div className="text-sm text-gray-600 dark:text-slate-400">
+                                                    Qty: {item.quantity} × ₱{materialPrices[item.material].toLocaleString()} = ₱{(item.quantity * materialPrices[item.material]).toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const updated = expenseItems.filter((_, i) => i !== index);
+                                                    setExpenseItems(updated);
+                                                }}
+                                                disabled={isSubmitting || readonly}
+                                                className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md disabled:cursor-not-allowed"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                    
+                                    <div className="flex items-end gap-2 pt-2 border-t border-gray-300 dark:border-slate-600">
+                                        <div className="flex-1">
+                                            <label htmlFor="material-select" className="block text-xs font-medium text-gray-700 dark:text-slate-400 mb-1">
+                                                Select Material
+                                            </label>
+                                            <select
+                                                id="material-select"
+                                                value={selectedMaterial}
+                                                onChange={(e) => setSelectedMaterial(e.target.value)}
+                                                disabled={isSubmitting || readonly}
+                                                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                                            >
+                                                <option value="">Choose material...</option>
+                                                {materials.map(material => (
+                                                    <option key={material} value={material}>
+                                                        {material} (₱{materialPrices[material].toLocaleString()})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="w-24">
+                                            <label htmlFor="qty-input" className="block text-xs font-medium text-gray-700 dark:text-slate-400 mb-1">
+                                                Quantity
+                                            </label>
+                                            <input
+                                                id="qty-input"
+                                                type="number"
+                                                min="1"
+                                                value={selectedQuantity}
+                                                onChange={(e) => setSelectedQuantity(e.target.value || '1')}
+                                                disabled={isSubmitting || readonly}
+                                                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (selectedMaterial) {
+                                                    setExpenseItems([...expenseItems, {
+                                                        material: selectedMaterial,
+                                                        quantity: parseInt(selectedQuantity) || 1
+                                                    }]);
+                                                    setSelectedMaterial('');
+                                                    setSelectedQuantity('1');
+                                                }
+                                            }}
+                                            disabled={isSubmitting || readonly || !selectedMaterial}
+                                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="mb-4">
-                                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    Amount (PHP)
-                                </label>
-                                <input
-                                    type="number" 
-                                    id="amount" 
-                                    value={expenseAmount} 
-                                    onChange={(e) => setExpenseAmount(e.target.value)}
-                                    disabled={isSubmitting || readonly}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
-                                    placeholder="e.g., 12500"
-                                    step="0.01"
-                                />
-                            </div>
+
+                            {/* Display Total Amount */}
+                            {expenseItems.length > 0 && (
+                                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Total Amount:</span>
+                                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                            ₱{calculateTotal().toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
                             <button 
                                 type="submit" 
-                                disabled={isSubmitting || readonly} 
+                                disabled={isSubmitting || readonly || expenseItems.length === 0} 
                                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
                             >
                                 {isSubmitting ? 'Adding...' : 'Add Expense'}
@@ -218,12 +317,15 @@ const Updates = ({ readonly }) => {
                         </form>
                     </div>
 
+                    {/* Expense Log */}
                     <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Expense Log</h2>
                             <div className="text-right">
                                 <p className="text-sm text-gray-500 dark:text-slate-400">Total Expenses</p>
-                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">₱{totalExpenses.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                    ₱{totalExpenses.toLocaleString()}
+                                </p>
                             </div>
                         </div>
                         
@@ -283,112 +385,13 @@ const Updates = ({ readonly }) => {
                     </div>
                 </div>
             ) : (
-                // Liquidation Report View
-                <div className="bg-white dark:bg-slate-800 p-8 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
-                    {/* Header */}
-                    <div className="text-center mb-6 border-b-2 border-gray-800 dark:border-slate-300 pb-4">
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">BUDGET LIQUIDATION</h1>
-                        <p className="text-sm text-gray-600 dark:text-slate-400">Date of Submission: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                        <p className="text-sm text-gray-600 dark:text-slate-400">Amount requested: ₱{totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    </div>
-
-                    <div className="flex justify-end mb-4 no-print">
-                        <button
-                            onClick={printLiquidation}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2"
-                        >
-                            🖨️ Print Report
-                        </button>
-                    </div>
-
-                    <div className="space-y-6">
-                        {categories.map((category, catIndex) => {
-                            const categoryExpenses = groupedExpenses[category];
-                            if (!categoryExpenses || categoryExpenses.length === 0) return null;
-
-                            return (
-                                <div key={category} className="mb-6">
-                                    {/* Category Header */}
-                                    <div className="bg-gray-200 dark:bg-slate-700 px-4 py-2 mb-2">
-                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">{String.fromCharCode(65 + catIndex)}. {category}</h3>
-                                    </div>
-                                    
-                                    {/* Category Table */}
-                                    <table className="w-full border-collapse border border-gray-400 dark:border-slate-600">
-                                        <thead>
-                                            <tr className="bg-gray-100 dark:bg-slate-800">
-                                                <th className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-300">Company</th>
-                                                <th className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-300">Particulars</th>
-                                                <th className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-slate-300">Total Amount</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {categoryExpenses.map((expense, idx) => (
-                                                <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                                    <td className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-sm text-gray-900 dark:text-white">
-                                                        {expense.date ? new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
-                                                    </td>
-                                                    <td className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-sm text-gray-900 dark:text-white">
-                                                        {expense.description}
-                                                    </td>
-                                                    <td className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">
-                                                        ₱ {parseFloat(expense.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {/* Subtotal Row */}
-                                            <tr className="bg-gray-100 dark:bg-slate-800 font-bold">
-                                                <td colSpan="2" className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-sm text-right text-gray-900 dark:text-white">
-                                                    Sub Total:
-                                                </td>
-                                                <td className="border border-gray-400 dark:border-slate-600 px-3 py-2 text-sm text-right text-blue-600 dark:text-blue-400">
-                                                    ₱ {getCategoryTotal(category).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            );
-                        })}
-
-                        {/* Grand Total */}
-                        <div className="mt-8 border-t-4 border-gray-900 dark:border-slate-300 pt-4">
-                            <table className="w-full">
-                                <tbody>
-                                    <tr className="bg-yellow-100 dark:bg-yellow-900/30">
-                                        <td className="px-4 py-3 text-right text-lg font-bold text-gray-900 dark:text-white">
-                                            GRAND TOTAL:
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-2xl font-bold text-blue-600 dark:text-blue-400" style={{ width: '200px' }}>
-                                            ₱ {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {expenses.length === 0 && (
-                            <div className="text-center py-12 text-gray-500 dark:text-slate-400">
-                                <p className="text-lg mb-2">No expenses to liquidate yet.</p>
-                                <p className="text-sm">Add expenses to generate the liquidation report.</p>
-                            </div>
-                        )}
-
-                        {/* Signature Section */}
-                        <div className="mt-12 grid grid-cols-2 gap-8">
-                            <div className="text-center">
-                                <div className="border-t-2 border-gray-800 dark:border-slate-300 pt-2 mt-16">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Prepared by</p>
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div className="border-t-2 border-gray-800 dark:border-slate-300 pt-2 mt-16">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Approved by</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                // Liquidation Component
+                <Liquidation 
+                    expenses={expenses}
+                    categories={categories}
+                    projectName={projectData?.name || "Construction Project"}
+                    projectLocation={projectData?.location || ""}
+                />
             )}
         </div>
     );

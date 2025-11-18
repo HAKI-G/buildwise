@@ -417,7 +417,10 @@ const projectProgress = useMemo(() => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {/* Milestone Status Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                <div 
+                    onClick={() => navigate(`/projects/${selectedProjectId}/view/milestones`)}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
+                >
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">MILESTONE STATUS</h2>
                     <div className="w-full h-64">
                         {milestoneStatusData.length === 0 ? (
@@ -442,7 +445,10 @@ const projectProgress = useMemo(() => {
                 </div>
 
                 {/* Task Priority Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                <div 
+                    onClick={() => navigate(`/projects/${selectedProjectId}/view/milestones`)}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
+                >
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK PRIORITY</h2>
                     <div className="w-full h-64">
                         {taskPriorityData.length === 0 ? (
@@ -467,7 +473,10 @@ const projectProgress = useMemo(() => {
                 </div>
 
                 {/* Pending Items Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors">
+                <div 
+                    onClick={() => navigate(`/projects/${selectedProjectId}/view/reports`)}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm transition-colors hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
+                >
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">PENDING TASK</h2>
                     <div className="w-full h-64">
                         <ResponsiveContainer>
@@ -483,7 +492,10 @@ const projectProgress = useMemo(() => {
                 </div>
 
                 {/* Budget Overview */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors">
+                <div 
+                    onClick={() => navigate(`/projects/${selectedProjectId}/view/updates`)}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
+                >
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">BUDGET OVERVIEW</h2>
                     
                     <div className="grid grid-cols-3 gap-4 mb-6">
@@ -570,7 +582,10 @@ const projectProgress = useMemo(() => {
                 </div>
 
                 {/* Task Timeline - Gantt Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors">
+                <div 
+                    onClick={() => navigate(`/projects/${selectedProjectId}/view/milestones?view=gantt`)}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm md:col-span-2 xl:col-span-3 transition-colors hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
+                >
                     <h2 className="text-lg font-bold text-center mb-4 text-gray-800 dark:text-white">TASK TIMELINE - GANTT CHART</h2>
                     {(() => {
                         let tasksWithDates = milestones.filter(m => 
@@ -580,19 +595,12 @@ const projectProgress = useMemo(() => {
                             (m.milestoneName || m.title)
                         );
 
-                        // Apply task status filter
-                        if (taskStatusFilter === 'completed') {
-                            tasksWithDates = tasksWithDates.filter(t => t.status === 'completed');
-                        } else if (taskStatusFilter === 'in-progress') {
-                            tasksWithDates = tasksWithDates.filter(t => t.status === 'in-progress');
-                        } else if (taskStatusFilter === 'not-started') {
-                            tasksWithDates = tasksWithDates.filter(t => t.status === 'not-started');
-                        }
+                        // Don't filter by status for Gantt chart - show all tasks with dates
 
                         if (tasksWithDates.length === 0) {
                             return (
                                 <div className="text-center py-12 text-gray-400 dark:text-slate-500">
-                                    <p>No tasks to display{taskStatusFilter !== 'all' ? ` with status "${taskStatusFilter}"` : ''} in Gantt chart.</p>
+                                    <p>No tasks to display in Gantt chart.</p>
                                     <p className="text-sm mt-2">Add tasks with start and end dates in the project detail view.</p>
                                 </div>
                             );
@@ -719,8 +727,8 @@ const projectProgress = useMemo(() => {
                                 </div>
                             ))}
                         </div>
-                            </div>
-                        );
+                        </div>
+                    );
                     })()}
                 </div>
             </div>

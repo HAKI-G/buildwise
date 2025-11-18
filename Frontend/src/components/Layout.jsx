@@ -194,9 +194,12 @@ const getCurrentProjectId = () => {
                         {/* Statistics with Submenu */}
                         <div>
                             <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.preventDefault();
                                     toggleMenu('statistics');
-                                    navigate('/statistics');
+                                    if (!openMenus.statistics) {
+                                        navigate('/statistics');
+                                    }
                                 }}
                                 className={location.pathname.includes('/statistics') ? activeNavLinkClasses : navLinkClasses}
                             >
@@ -240,9 +243,12 @@ const getCurrentProjectId = () => {
                         {/* Projects with Submenu */}
                         <div>
                             <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.preventDefault();
                                     toggleMenu('projects');
-                                    navigate('/projects');
+                                    if (!openMenus.projects) {
+                                        navigate('/projects');
+                                    }
                                 }}
                                 className={location.pathname.includes('/projects') ? activeNavLinkClasses : navLinkClasses}
                             >

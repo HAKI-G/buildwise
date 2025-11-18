@@ -23,17 +23,16 @@ const extractPhaseNumber = (phaseName) => {
     return match ? parseInt(match[1]) : null;
 };
 
-const Milestones = ({ readonly }) => {
+const Milestones = ({ readonly, initialViewMode = 'table' }) => {
     const { projectId } = useParams();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
+    const [viewMode, setViewMode] = useState(initialViewMode);
     const [editingTask, setEditingTask] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [taskToDelete, setTaskToDelete] = useState(null);
-    const [viewMode, setViewMode] = useState('table');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const [completingPhase, setCompletingPhase] = useState(null);
@@ -49,7 +48,8 @@ const Milestones = ({ readonly }) => {
         status: 'not started',
         priority: 'Medium',
         estimatedCost: '',  // ✅ Changed from plannedCost
-        resources: '',
+        resources: [],  // ✅ Changed to array for list items
+        resourceInput: '', // ✅ New field for input
         isPhase: false,
         isMilestone: false
     });
@@ -128,7 +128,9 @@ const Milestones = ({ readonly }) => {
                     parentPhase: task.parentPhase,
                     parentPhaseId: task.parentPhase,
                     phaseColor: task.phaseColor || '#3B82F6',
-                    resources: task.resourceRequirements || task.resources || '',
+                    resources: Array.isArray(task.resourceRequirements) 
+                        ? task.resourceRequirements 
+                        : (task.resourceRequirements || task.resources || '').split('\n').filter(r => r.trim()),
                     resourceRequirements: task.resourceRequirements || task.resources || '',
                     isMilestone: task.isKeyMilestone || task.isMilestone || false,
                     isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
@@ -249,7 +251,8 @@ const Milestones = ({ readonly }) => {
             status: 'not started',
             priority: 'Medium',
             estimatedCost: '',  // ✅ Changed
-            resources: '',
+            resources: [],  // ✅ Changed to empty array
+            resourceInput: '',  // ✅ Added
             isPhase: false,
             isMilestone: false
         });
@@ -258,6 +261,13 @@ const Milestones = ({ readonly }) => {
     };
 
     const openEditTaskModal = (task) => {
+        // Convert resources to array if it's a string
+        const resourcesArray = Array.isArray(task.resources)
+            ? task.resources
+            : Array.isArray(task.resourceRequirements)
+                ? task.resourceRequirements
+                : (task.resourceRequirements || task.resources || '').split('\n').filter(r => r.trim());
+        
         setTaskForm({
             name: task.milestoneName || task.name || '',
             startDate: task.startDate || '',
@@ -268,7 +278,8 @@ const Milestones = ({ readonly }) => {
             status: task.status || 'not started',
             priority: task.priority || 'Medium',
             estimatedCost: task.estimatedCost || '',  // ✅ Changed
-            resources: task.resourceRequirements || task.resources || '',
+            resources: resourcesArray,  // ✅ Now an array
+            resourceInput: '',  // ✅ Reset input
             isPhase: task.isPhase || false,
             isMilestone: task.isKeyMilestone || task.isMilestone || false
         });
@@ -308,11 +319,11 @@ const Milestones = ({ readonly }) => {
                 status: taskForm.status,
                 priority: taskForm.priority,
                 estimatedCost: parseFloat(parseCurrency(taskForm.estimatedCost)) || 0,  // ✅ Changed
-                resourceRequirements: taskForm.resources,
+                resourceRequirements: Array.isArray(taskForm.resources) ? taskForm.resources.join('\n') : taskForm.resources,  // ✅ Convert array to string
                 isPhase: taskForm.isPhase,
                 isKeyMilestone: taskForm.isMilestone,
                 phaseColor: taskForm.phaseColor || '#3B82F6',
-                description: taskForm.resources,
+                description: Array.isArray(taskForm.resources) ? taskForm.resources.join('\n') : taskForm.resources,
                 createdAt: editingTask ? undefined : new Date().toISOString()
             };
 
@@ -872,13 +883,64 @@ const Milestones = ({ readonly }) => {
                                 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Resource Requirements</label>
-                                    <textarea
-                                        value={taskForm.resources}
-                                        onChange={(e) => setTaskForm({...taskForm, resources: e.target.value})}
-                                        rows="3"
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="List required resources for this phase..."
-                                    />
+                                    <div className="space-y-2">
+                                        {taskForm.resources.map((resource, index) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={resource}
+                                                    onChange={(e) => {
+                                                        const updated = [...taskForm.resources];
+                                                        updated[index] = e.target.value;
+                                                        setTaskForm({...taskForm, resources: updated});
+                                                    }}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="e.g., Cement, Round Metal, etc."
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = taskForm.resources.filter((_, i) => i !== index);
+                                                        setTaskForm({...taskForm, resources: updated});
+                                                    }}
+                                                    className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={taskForm.resourceInput}
+                                                onChange={(e) => setTaskForm({...taskForm, resourceInput: e.target.value})}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter' && taskForm.resourceInput.trim()) {
+                                                        setTaskForm({
+                                                            ...taskForm,
+                                                            resources: [...taskForm.resources, taskForm.resourceInput.trim()],
+                                                            resourceInput: ''
+                                                        });
+                                                    }
+                                                }}
+                                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                placeholder="Add a resource and press Enter..."
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (taskForm.resourceInput.trim()) {
+                                                        setTaskForm({
+                                                            ...taskForm,
+                                                            resources: [...taskForm.resources, taskForm.resourceInput.trim()],
+                                                            resourceInput: ''
+                                                        });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </>
                         ) : (
@@ -966,13 +1028,64 @@ const Milestones = ({ readonly }) => {
 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Resource Requirements</label>
-                                    <textarea
-                                        value={taskForm.resources}
-                                        onChange={(e) => setTaskForm({...taskForm, resources: e.target.value})}
-                                        rows="3"
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="List required personnel, materials, equipment..."
-                                    />
+                                    <div className="space-y-2">
+                                        {taskForm.resources.map((resource, index) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={resource}
+                                                    onChange={(e) => {
+                                                        const updated = [...taskForm.resources];
+                                                        updated[index] = e.target.value;
+                                                        setTaskForm({...taskForm, resources: updated});
+                                                    }}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="e.g., Cement, Round Metal, etc."
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = taskForm.resources.filter((_, i) => i !== index);
+                                                        setTaskForm({...taskForm, resources: updated});
+                                                    }}
+                                                    className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={taskForm.resourceInput}
+                                                onChange={(e) => setTaskForm({...taskForm, resourceInput: e.target.value})}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter' && taskForm.resourceInput.trim()) {
+                                                        setTaskForm({
+                                                            ...taskForm,
+                                                            resources: [...taskForm.resources, taskForm.resourceInput.trim()],
+                                                            resourceInput: ''
+                                                        });
+                                                    }
+                                                }}
+                                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                placeholder="Add a resource and press Enter..."
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (taskForm.resourceInput.trim()) {
+                                                        setTaskForm({
+                                                            ...taskForm,
+                                                            resources: [...taskForm.resources, taskForm.resourceInput.trim()],
+                                                            resourceInput: ''
+                                                        });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </>
                         )}

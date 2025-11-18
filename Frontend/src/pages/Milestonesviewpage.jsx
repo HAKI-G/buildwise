@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout.jsx';
 import Milestones from '../components/Milestones.jsx';
@@ -10,10 +10,12 @@ const getToken = () => localStorage.getItem('token');
 function MilestonesViewPage() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [project, setProject] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [initialViewMode] = useState(searchParams.get('view') || 'table');
 
     // ✅ Get status badge color
     const getStatusColor = (status) => {
@@ -179,7 +181,7 @@ function MilestonesViewPage() {
 
                 {/* Milestones Content */}
                 <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-                    <Milestones projectId={projectId} />
+                    <Milestones projectId={projectId} initialViewMode={initialViewMode} />
                 </div>
             </div>
         </Layout>
