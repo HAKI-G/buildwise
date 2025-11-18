@@ -67,11 +67,6 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
           )}
         </div>
         <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
-        {isOverBudget && (
-          <p className="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
-            Overage: ₱{overageAmount.toLocaleString('en-US', {maximumFractionDigits: 0})}
-          </p>
-        )}
       </div>
 
       <div className="w-1/4 mx-4 hidden md:block">
@@ -88,9 +83,16 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
       </div>
 
       <div className="w-1/4 mx-4 hidden md:block">
-        <div className="flex justify-between text-sm text-gray-500 dark:text-slate-400 mb-1">
-          <span>Budget</span>
-          <span>{budgetProgress}%</span>
+        <div className="flex justify-between items-center text-sm mb-1">
+          <span className="text-gray-500 dark:text-slate-400">Budget</span>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 dark:text-slate-400">{budgetProgress}%</span>
+            {isOverBudget && (
+              <span className="text-xs text-red-600 dark:text-red-400 font-bold">
+                +₱{overageAmount.toLocaleString('en-US', {maximumFractionDigits: 0})}
+              </span>
+            )}
+          </div>
         </div>
         <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
           <div
@@ -143,6 +145,7 @@ function DashboardPage() {
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
   const [showOverBudgetOnly, setShowOverBudgetOnly] = useState(false);
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState(false); // When true, show only active projects
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -267,8 +270,9 @@ function DashboardPage() {
       );
     }
 
-    // Over budget filter
+    // Apply exclusive filters (only one can be active)
     if (showOverBudgetOnly) {
+      // Show all over-budget projects (active + completed)
       results = results.filter((p) => {
         const contractCost = typeof p.contractCost === 'string' 
           ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) 
@@ -278,12 +282,14 @@ function DashboardPage() {
           : (p.totalSpent || 0);
         return spent > contractCost;
       });
-    }
-
-    // Completed projects filter
-    if (showCompletedOnly) {
+    } else if (showCompletedOnly) {
+      // Show only completed projects
       results = results.filter((p) => p.status === 'Completed');
+    } else if (showActiveOnly) {
+      // Show only active projects (not completed)
+      results = results.filter((p) => p.status !== 'Completed');
     }
+    // If no filter is active (default), show all projects
 
     // Sorting
     results.sort((a, b) => {
@@ -301,7 +307,7 @@ function DashboardPage() {
     });
 
     setFilteredProjects(results);
-  }, [searchQuery, projectsWithProgress, sortBy, sortOrder, showOverBudgetOnly, showCompletedOnly]);
+  }, [searchQuery, projectsWithProgress, sortBy, sortOrder, showOverBudgetOnly, showCompletedOnly, showActiveOnly]);
 
   const stats = {
     totalProjects: projects.length,
@@ -438,25 +444,48 @@ function DashboardPage() {
         </select>
 
         <button
-          onClick={() => setShowOverBudgetOnly(!showOverBudgetOnly)}
+          onClick={() => {
+            setShowActiveOnly(!showActiveOnly);
+            setShowOverBudgetOnly(false);
+            setShowCompletedOnly(false);
+          }}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            showActiveOnly
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600'
+          }`}
+        >
+          📋 Active Projects
+        </button>
+
+        <button
+          onClick={() => {
+            setShowOverBudgetOnly(!showOverBudgetOnly);
+            setShowActiveOnly(false);
+            setShowCompletedOnly(false);
+          }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
             showOverBudgetOnly
               ? 'bg-red-600 text-white'
               : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600'
           }`}
         >
-          🚨 Over Budget Only
+          🚨 Over Budget Projects
         </button>
 
         <button
-          onClick={() => setShowCompletedOnly(!showCompletedOnly)}
+          onClick={() => {
+            setShowCompletedOnly(!showCompletedOnly);
+            setShowActiveOnly(false);
+            setShowOverBudgetOnly(false);
+          }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
             showCompletedOnly
               ? 'bg-green-600 text-white'
               : 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600'
           }`}
         >
-          ✓ Completed Only
+          ✓ Completed Projects
         </button>
 
         <div className="ml-auto text-sm text-gray-600 dark:text-slate-400">
@@ -468,11 +497,13 @@ function DashboardPage() {
         {/* Active Projects Section */}
         <div>
           <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
-            {showCompletedOnly
+            {showOverBudgetOnly
+              ? `OVER BUDGET PROJECTS (${filteredProjects.length})`
+              : showCompletedOnly
               ? `COMPLETED PROJECTS (${filteredProjects.length})`
-              : searchQuery
-              ? `SEARCH RESULTS (${filteredProjects.filter(p => p.status !== 'Completed').length})`
-              : `ACTIVE PROJECTS (${projects.filter(p => p.status !== 'Completed').length})`}
+              : showActiveOnly
+              ? `ACTIVE PROJECTS (${filteredProjects.length})`
+              : `ALL PROJECTS (${filteredProjects.length})`}
           </p>
 
           {loading && (
@@ -486,57 +517,43 @@ function DashboardPage() {
 
           {!loading && !error && (
             <div>
-              {showCompletedOnly ? (
-                filteredProjects.length > 0 ? (
-                  filteredProjects.map((project) => (
-                    <ProjectRow
-                      key={project.projectId}
-                      project={project}
-                      taskProgress={project.taskProgress}
-                      budgetProgress={project.budgetProgress}
-                      totalSpent={project.totalSpent}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
-                    <p className="text-gray-500 dark:text-slate-400 mb-4">No completed projects found.</p>
-                  </div>
-                )
+              {filteredProjects.length > 0 ? (
+                filteredProjects.map((project) => (
+                  <ProjectRow
+                    key={project.projectId}
+                    project={project}
+                    taskProgress={project.taskProgress}
+                    budgetProgress={project.budgetProgress}
+                    totalSpent={project.totalSpent}
+                  />
+                ))
               ) : (
-                filteredProjects.filter(p => p.status !== 'Completed').length > 0 ? (
-                  filteredProjects.filter(p => p.status !== 'Completed').map((project) => (
-                    <ProjectRow
-                      key={project.projectId}
-                      project={project}
-                      taskProgress={project.taskProgress}
-                      budgetProgress={project.budgetProgress}
-                      totalSpent={project.totalSpent}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
-                    <p className="text-gray-500 dark:text-slate-400 mb-4">
-                      {searchQuery
-                        ? 'No active projects match your search.'
-                        : 'No active projects found. Create one on the Projects page!'}
-                    </p>
-                    {!searchQuery && (
-                      <button
-                        onClick={() => navigate('/projects')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Create Your First Project
-                      </button>
-                    )}
-                  </div>
-                )
+                <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
+                  <p className="text-gray-500 dark:text-slate-400 mb-4">
+                    {showOverBudgetOnly
+                      ? 'No over-budget projects found.'
+                      : showCompletedOnly
+                      ? 'No completed projects found.'
+                      : showActiveOnly
+                      ? 'No active projects found.'
+                      : 'No projects found.'}
+                  </p>
+                  {showActiveOnly && (
+                    <button
+                      onClick={() => navigate('/projects')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Create Your First Project
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
         </div>
 
         {/* Completed Projects Section */}
-        {!showCompletedOnly && !searchQuery && !loading && !error && projectsWithProgress.filter(p => p.status === 'Completed').length > 0 && (
+        {!showCompletedOnly && !showOverBudgetOnly && !showActiveOnly && !loading && !error && projectsWithProgress.filter(p => p.status === 'Completed').length > 0 && (
           <div className="mt-8">
             <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
               COMPLETED PROJECTS ({projectsWithProgress.filter(p => p.status === 'Completed').length})
