@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
@@ -37,6 +37,8 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
     
     const [completingPhase, setCompletingPhase] = useState(null);
     const [phaseCompletionStatus, setPhaseCompletionStatus] = useState({});
+    
+    const [budgetWarning, setBudgetWarning] = useState(null); // For budget warning modal
     
     const [taskForm, setTaskForm] = useState({
         name: '',
@@ -143,13 +145,89 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             });
             
             // ✅ Debug log to verify the data
-            console.log('Mapped tasks with costs:', mappedTasks.map(t => ({
+            console.log('🔍 RAW API Response:', response.data);
+            console.log('📦 Mapped tasks:', mappedTasks.map(t => ({
+                id: t.milestoneId,
                 name: t.milestoneName,
+                isPhase: t.isPhase,
+                parentPhase: t.parentPhase,
                 cost: t.estimatedCost,
-                type: typeof t.estimatedCost
+                status: t.status
             })));
             
-            setTasks(mappedTasks);
+            // ✅ Check for orphaned tasks (tasks with deleted parent phases)
+            const phases = mappedTasks.filter(t => t.isPhase === true);
+            const phaseIds = new Set(phases.map(p => p.milestoneId));
+            const orphanedTasks = mappedTasks.filter(t => 
+                !t.isPhase && 
+                t.parentPhase && 
+                !phaseIds.has(t.parentPhase)
+            );
+            
+            if (orphanedTasks.length > 0) {
+                console.warn('⚠️ Found orphaned tasks (parent phase deleted):', orphanedTasks.map(t => ({
+                    name: t.milestoneName,
+                    parentPhase: t.parentPhase
+                })));
+                
+                // Auto-delete orphaned tasks
+                const token = getToken();
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                for (const orphan of orphanedTasks) {
+                    try {
+                        await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${orphan.milestoneId}`, config);
+                        console.log(`  ✅ Auto-deleted orphaned task: ${orphan.milestoneName}`);
+                    } catch (err) {
+                        console.error(`  ❌ Failed to delete orphaned task: ${orphan.milestoneName}`, err);
+                    }
+                }
+                
+                // Re-fetch after cleanup
+                if (orphanedTasks.length > 0) {
+                    const cleanResponse = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
+                    const cleanMappedTasks = (cleanResponse.data || []).map(task => {
+                        let parsedCost = 0;
+                        if (task.estimatedCost !== undefined && task.estimatedCost !== null) {
+                            const costStr = task.estimatedCost.toString().replace(/,/g, '');
+                            parsedCost = parseFloat(costStr) || 0;
+                        }
+                        
+                        return {
+                            ...task,
+                            milestoneId: task.milestoneId,
+                            milestoneName: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
+                            name: task.milestoneName || task.taskName || task.name || 'Unnamed Task',
+                            startDate: task.startDate,
+                            endDate: task.endDate || task.targetDate,
+                            targetDate: task.targetDate || task.endDate,
+                            parentPhase: task.parentPhase,
+                            parentPhaseId: task.parentPhase,
+                            phaseColor: task.phaseColor || '#3B82F6',
+                            resources: task.resourceRequirements || task.resources || '',
+                            resourceRequirements: task.resourceRequirements || task.resources || '',
+                            isMilestone: task.isKeyMilestone || task.isMilestone || false,
+                            isKeyMilestone: task.isKeyMilestone || task.isMilestone || false,
+                            status: task.status || 'not started',
+                            priority: task.priority || 'Medium',
+                            estimatedCost: parsedCost,
+                            isPhase: task.isPhase || false,
+                            completedAt: task.completedAt || null
+                        };
+                    });
+                    setTasks(cleanMappedTasks);
+                    await checkAllPhasesCompletionStatus(cleanMappedTasks.filter(t => t.isPhase), config);
+                    setError('');
+                    setLoading(false);
+                    return;
+                }
+            }
+            
+            // Clear tasks first, then set new data
+            setTasks([]);
+            setTimeout(() => {
+                setTasks(mappedTasks);
+            }, 0);
+            
             await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
             setError('');
         } catch (err) {
@@ -303,13 +381,46 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             return;
         }
 
+        // ✅ Budget validation for tasks against parent phase
+        if (!taskForm.isPhase && taskForm.parentPhaseId && taskForm.estimatedCost) {
+            const parentPhase = phases.find(p => p.milestoneId === taskForm.parentPhaseId);
+            if (parentPhase && parentPhase.estimatedCost) {
+                const phaseBudget = parseFloat(parentPhase.estimatedCost) || 0;
+                const siblingTasks = tasks.filter(t => 
+                    !t.isPhase && 
+                    t.parentPhase === taskForm.parentPhaseId &&
+                    t.milestoneId !== editingTask // Exclude current task if editing
+                );
+                const totalSiblingCosts = siblingTasks.reduce((sum, t) => sum + (parseFloat(t.estimatedCost) || 0), 0);
+                const newTaskCost = parseFloat(parseCurrency(taskForm.estimatedCost)) || 0;
+                const totalPhaseCost = totalSiblingCosts + newTaskCost;
+                
+                if (totalPhaseCost > phaseBudget) {
+                    const overbudget = totalPhaseCost - phaseBudget;
+                    // Show custom modal instead of window.confirm
+                    setBudgetWarning({
+                        phaseBudget,
+                        totalSiblingCosts,
+                        newTaskCost,
+                        totalPhaseCost,
+                        overbudget
+                    });
+                    return;
+                }
+            }
+        }
+
+        await saveTaskData();
+    };
+
+    const saveTaskData = async () => {
         setIsSubmitting(true);
         const token = getToken();
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         try {
+            // ✅ Don't include projectId in the update body (it's a key attribute)
             const taskData = {
-                projectId,
                 milestoneName: taskForm.name.trim(),
                 taskName: taskForm.name.trim(),
                 startDate: taskForm.startDate,
@@ -327,20 +438,41 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 createdAt: editingTask ? undefined : new Date().toISOString()
             };
 
+            // Only add projectId and createdAt for new tasks
+            const createData = {
+                projectId,
+                ...taskData,
+                createdAt: new Date().toISOString()
+            };
+
+            console.log('💾 Saving task:', { editingTask, data: editingTask ? taskData : createData });
+
             if (editingTask) {
                 await axios.put(`http://localhost:5001/api/milestones/${projectId}/${editingTask}`, taskData, config);
+                console.log('✅ Task updated successfully');
             } else {
-                await axios.post(`http://localhost:5001/api/milestones/${projectId}`, taskData, config);
+                await axios.post(`http://localhost:5001/api/milestones/${projectId}`, createData, config);
+                console.log('✅ Task created successfully');
             }
 
             setShowModal(false);
             await fetchProjectTasks();
         } catch (err) {
-            console.error('Error saving task:', err);
-            alert('Failed to save task. Please try again.');
+            console.error('❌ Error saving task:', err);
+            console.error('Error details:', err.response?.data);
+            alert(`Failed to save task: ${err.response?.data?.message || err.message}`);
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleBudgetWarningConfirm = async () => {
+        setBudgetWarning(null);
+        await saveTaskData();
+    };
+
+    const handleBudgetWarningCancel = () => {
+        setBudgetWarning(null);
     };
 
     const confirmDelete = (milestoneId) => {
@@ -355,12 +487,46 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         try {
+            const itemToDelete = tasks.find(t => t.milestoneId === taskToDelete);
+            const isPhase = itemToDelete?.isPhase;
+            
+            console.log('🗑️ Deleting:', {
+                id: taskToDelete,
+                name: itemToDelete?.milestoneName,
+                isPhase,
+                hasChildren: isPhase ? tasks.filter(t => t.parentPhase === taskToDelete && !t.isPhase).length : 0
+            });
+            
+            // If deleting a phase, also delete all child tasks
+            if (isPhase) {
+                const childTasks = tasks.filter(t => t.parentPhase === taskToDelete && !t.isPhase);
+                
+                console.log(`  → Deleting ${childTasks.length} child tasks first`);
+                
+                // Delete all child tasks first
+                for (const childTask of childTasks) {
+                    await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${childTask.milestoneId}`, config);
+                    console.log(`    ✅ Deleted child task: ${childTask.milestoneName}`);
+                }
+            }
+            
+            // Delete the phase/task itself
             await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${taskToDelete}`, config);
+            console.log(`  ✅ Deleted ${isPhase ? 'phase' : 'task'}: ${itemToDelete?.milestoneName}`);
+            
+            // Close modal and clear selection
             setShowDeleteConfirm(false);
             setTaskToDelete(null);
+            
+            // Force clear local state before refresh
+            setTasks([]);
+            
+            // Refresh the tasks list from server
             await fetchProjectTasks();
+            
+            console.log('✅ Deletion complete and data refreshed');
         } catch (err) {
-            console.error('Error deleting task:', err);
+            console.error('❌ Error deleting task:', err);
             alert('Failed to delete task. Please try again.');
         }
     };
@@ -408,11 +574,13 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                         <div key={phase.milestoneId} className={`border rounded-lg overflow-hidden ${
                             isPhaseCompleted 
                                 ? 'border-green-500 dark:border-green-600' 
+                                : phaseBudgetStatus[phase.milestoneId]?.isOverbudget
+                                ? 'border-red-500 dark:border-red-600'
                                 : 'border-gray-200 dark:border-slate-700'
                         }`}>
                             <div className="flex items-center p-3 border-l-4 bg-white dark:bg-slate-800" 
-                                 style={{ borderLeftColor: phase.phaseColor }}>
-                                <div className="w-6 h-3 mr-3 rounded" style={{ backgroundColor: phase.phaseColor }}></div>
+                                 style={{ borderLeftColor: phaseBudgetStatus[phase.milestoneId]?.isOverbudget ? '#EF4444' : phase.phaseColor }}>
+                                <div className="w-6 h-3 mr-3 rounded" style={{ backgroundColor: phaseBudgetStatus[phase.milestoneId]?.isOverbudget ? '#EF4444' : phase.phaseColor }}></div>
                                 
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
@@ -434,7 +602,26 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                                 ({phaseStatus.completedTasks}/{phaseStatus.totalTasks} tasks)
                                             </span>
                                         )}
+                                        
+                                        {/* ✅ Overbudget indicator */}
+                                        {phaseBudgetStatus[phase.milestoneId]?.isOverbudget && (
+                                            <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-2 py-1 rounded-full font-semibold">
+                                                ⚠️ Over Budget: ₱{formatCurrency(phaseBudgetStatus[phase.milestoneId].overbudgetAmount)}
+                                            </span>
+                                        )}
                                     </div>
+                                    
+                                    {/* Phase budget info */}
+                                    {phase.estimatedCost && (
+                                        <div className="text-xs text-gray-600 dark:text-slate-400 mt-1">
+                                            Phase Budget: ₱{formatCurrency(phase.estimatedCost)}
+                                            {phaseBudgetStatus[phase.milestoneId] && (
+                                                <span className={phaseBudgetStatus[phase.milestoneId].isOverbudget ? 'text-red-600 dark:text-red-400 ml-2' : 'ml-2'}>
+                                                    | Tasks Total: ₱{formatCurrency(phaseBudgetStatus[phase.milestoneId].totalTasksCost)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <div className="ml-auto flex items-center space-x-2">
@@ -479,6 +666,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                             <div className="bg-gray-50 dark:bg-slate-900/50">
                                 {phaseTasks.map((task) => {
                                     const isTaskCompleted = task.status === 'completed';
+                                    const completionPct = task.completionPercentage || 0;
                                     
                                     return (
                                         <div key={task.milestoneId} className={`flex items-center p-2 pl-12 border-b border-gray-200 dark:border-slate-700 last:border-b-0 ${
@@ -520,6 +708,17 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                                     }`}>
                                                         {task.status}
                                                     </span>
+                                                    
+                                                    {/* ✅ SHOW COMPLETION PERCENTAGE */}
+                                                    {completionPct > 0 && (
+                                                        <span className={`ml-1 inline-flex px-2 py-1 text-xs font-semibold rounded ${
+                                                            completionPct >= 100 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                                                            completionPct >= 50 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                                                            'bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300'
+                                                        }`}>
+                                                            {completionPct}%
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex space-x-4 text-xs text-gray-500 dark:text-slate-400 mt-1">
                                                     {task.priority && (
@@ -539,6 +738,20 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                                         </span>
                                                     )}
                                                 </div>
+                                                
+                                                {/* ✅ PROGRESS BAR for non-completed tasks */}
+                                                {!isTaskCompleted && completionPct > 0 && (
+                                                    <div className="mt-2 w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
+                                                        <div 
+                                                            className={`h-1.5 rounded-full transition-all ${
+                                                                completionPct >= 75 ? 'bg-green-500' :
+                                                                completionPct >= 50 ? 'bg-blue-500' :
+                                                                'bg-yellow-500'
+                                                            }`}
+                                                            style={{ width: `${completionPct}%` }}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex space-x-2 ml-2">
                                                 <button 
@@ -558,8 +771,8 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                     );
                                 })}
                                 {phaseTasks.length === 0 && (
-                                    <div className="p-3 pl-12 text-gray-500 dark:text-slate-400 text-xs">
-                                        No tasks in this phase yet.
+                                    <div className="p-3 pl-12 text-gray-500 dark:text-slate-400 text-xs italic">
+                                        No tasks in this phase yet. Click "Add Task" and assign it to this phase.
                                     </div>
                                 )}
                             </div>
@@ -569,7 +782,8 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 
                 {Object.keys(groupedTasks).length === 0 && (
                     <div className="text-center py-8 text-gray-500 dark:text-slate-400">
-                        No tasks or phases created yet. Click "Add Task" to get started.
+                        <p className="text-lg mb-2">No tasks or phases created yet.</p>
+                        <p className="text-sm">Click "Add Task" to get started, or check "This is a Phase" to create a phase first.</p>
                     </div>
                 )}
             </div>
@@ -730,15 +944,75 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         );
     };
 
-    // ✅ FIXED: Use estimatedCost for total budget calculation
-    const totalTasks = tasks.filter(t => t.isPhase !== true).length;
-    const totalPhases = phases.length;
-    const completedTasks = tasks.filter(t => t.isPhase !== true && t.status === 'completed').length;
-    const inProgressTasks = tasks.filter(t => t.isPhase !== true && t.status === 'in progress').length;
-    const totalBudget = tasks.reduce((sum, task) => {
-        const cost = parseFloat(task.estimatedCost) || 0;
-        return sum + cost;
-    }, 0);
+    // ✅ Calculate phase budget status (overbudget detection)
+    const phaseBudgetStatus = useMemo(() => {
+        const statusMap = {};
+        phases.forEach(phase => {
+            const phaseBudget = parseFloat(phase.estimatedCost) || 0;
+            const phaseTasks = tasks.filter(t => !t.isPhase && t.parentPhase === phase.milestoneId);
+            const totalTasksCost = phaseTasks.reduce((sum, t) => sum + (parseFloat(t.estimatedCost) || 0), 0);
+            const isOverbudget = totalTasksCost > phaseBudget && phaseBudget > 0;
+            const overbudgetAmount = isOverbudget ? totalTasksCost - phaseBudget : 0;
+            
+            statusMap[phase.milestoneId] = {
+                phaseBudget,
+                totalTasksCost,
+                isOverbudget,
+                overbudgetAmount
+            };
+        });
+        return statusMap;
+    }, [tasks, phases]);
+
+    // ✅ FIXED: Total budget now sums ONLY phase costs, not individual tasks
+    const stats = useMemo(() => {
+        // Ensure we're working with fresh data
+        const actualTasks = tasks.filter(t => t.isPhase !== true);
+        const totalTasks = actualTasks.length;
+        const totalPhases = phases.length;
+        const completedTasks = actualTasks.filter(t => t.status === 'completed').length;
+        const inProgressTasks = actualTasks.filter(t => t.status === 'in progress').length;
+        
+        // ✅ Sum only PHASE budgets
+        const totalBudget = phases.reduce((sum, phase) => {
+            const cost = parseFloat(phase.estimatedCost) || 0;
+            return sum + cost;
+        }, 0);
+        
+        // Count overbudget phases
+        const overbudgetPhases = Object.values(phaseBudgetStatus).filter(p => p.isOverbudget).length;
+
+        // Debug logging with more detail
+        console.log('📊 Stats Calculation:', {
+            totalItems: tasks.length,
+            phasesData: phases.map(p => ({ 
+                id: p.milestoneId,
+                name: p.milestoneName, 
+                isPhase: p.isPhase,
+                cost: p.estimatedCost 
+            })),
+            tasksData: actualTasks.map(t => ({ 
+                id: t.milestoneId,
+                name: t.milestoneName, 
+                isPhase: t.isPhase,
+                parentPhase: t.parentPhase,
+                status: t.status
+            })),
+            totalBudget,
+            totalTasks,
+            totalPhases,
+            overbudgetPhases
+        });
+
+        return {
+            totalTasks,
+            totalPhases,
+            completedTasks,
+            inProgressTasks,
+            totalBudget,
+            overbudgetPhases
+        };
+    }, [tasks, phases, phaseBudgetStatus]);
 
     if (loading) {
         return (
@@ -778,6 +1052,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                         </button>
                     </div>
                 </div>
+                
                 <button 
                     onClick={openAddTaskModal}
                     disabled={readonly}
@@ -786,34 +1061,51 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 >
                     Add Task
                 </button>
-                {readonly && (
-                    <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
-                        ⛔ Project completed - editing disabled
-                    </span>
-                )}
             </div>
+            {readonly && (
+                <span className="text-sm text-yellow-600 dark:text-yellow-400 ml-3">
+                    ⛔ Project completed - editing disabled
+                </span>
+            )}
 
             {/* Summary Stats */}
             <div className="grid grid-cols-5 gap-3 mb-4">
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
                     <div className="text-xs font-medium text-blue-600 dark:text-blue-400">Total Phases</div>
-                    <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{totalPhases}</div>
+                    <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.totalPhases}</div>
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
                     <div className="text-xs font-medium text-green-600 dark:text-green-400">Total Tasks</div>
-                    <div className="text-xl font-bold text-green-800 dark:text-green-300">{totalTasks}</div>
+                    <div className="text-xl font-bold text-green-800 dark:text-green-300">{stats.totalTasks}</div>
                 </div>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
                     <div className="text-xs font-medium text-yellow-600 dark:text-yellow-400">Completed</div>
-                    <div className="text-xl font-bold text-yellow-800 dark:text-yellow-300">{completedTasks}</div>
+                    <div className="text-xl font-bold text-yellow-800 dark:text-yellow-300">{stats.completedTasks}</div>
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
                     <div className="text-xs font-medium text-purple-600 dark:text-purple-400">In Progress</div>
-                    <div className="text-xl font-bold text-purple-800 dark:text-purple-300">{inProgressTasks}</div>
+                    <div className="text-xl font-bold text-purple-800 dark:text-purple-300">{stats.inProgressTasks}</div>
                 </div>
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg">
-                    <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400">Total Budget</div>
-                    <div className="text-xl font-bold text-indigo-800 dark:text-indigo-300">₱{formatCurrency(totalBudget)}</div>
+                <div className={`p-3 rounded-lg ${
+                    stats.overbudgetPhases > 0 
+                        ? 'bg-red-50 dark:bg-red-900/20' 
+                        : 'bg-indigo-50 dark:bg-indigo-900/20'
+                }`}>
+                    <div className={`text-xs font-medium ${
+                        stats.overbudgetPhases > 0 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : 'text-indigo-600 dark:text-indigo-400'
+                    }`}>
+                        Total Budget (Phases Only)
+                        {stats.overbudgetPhases > 0 && (
+                            <span className="ml-1">⚠️ {stats.overbudgetPhases} Over</span>
+                        )}
+                    </div>
+                    <div className={`text-xl font-bold ${
+                        stats.overbudgetPhases > 0 
+                            ? 'text-red-800 dark:text-red-300' 
+                            : 'text-indigo-800 dark:text-indigo-300'
+                    }`}>₱{formatCurrency(stats.totalBudget)}</div>
                 </div>
             </div>
 
@@ -871,7 +1163,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                 </div>
                                 
                                 <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Estimated Cost (PHP)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Phase Cost (PHP)</label>
                                     <input
                                         type="text"
                                         value={taskForm.estimatedCost ? formatCurrency(taskForm.estimatedCost) : ''}
@@ -879,6 +1171,9 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0"
                                     />
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                                        This is the total budget allocated for this phase
+                                    </p>
                                 </div>
                                 
                                 <div className="mb-4">
@@ -1024,6 +1319,30 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0"
                                     />
+                                    {taskForm.parentPhaseId && (() => {
+                                        const parentPhase = phases.find(p => p.milestoneId === taskForm.parentPhaseId);
+                                        if (parentPhase?.estimatedCost) {
+                                            const phaseBudget = parseFloat(parentPhase.estimatedCost) || 0;
+                                            const siblingTasks = tasks.filter(t => 
+                                                !t.isPhase && 
+                                                t.parentPhase === taskForm.parentPhaseId &&
+                                                t.milestoneId !== editingTask
+                                            );
+                                            const totalSiblingCosts = siblingTasks.reduce((sum, t) => sum + (parseFloat(t.estimatedCost) || 0), 0);
+                                            const currentTaskCost = parseFloat(parseCurrency(taskForm.estimatedCost)) || 0;
+                                            const totalPhaseCost = totalSiblingCosts + currentTaskCost;
+                                            const remaining = phaseBudget - totalPhaseCost;
+                                            
+                                            return (
+                                                <p className={`mt-1 text-xs ${remaining < 0 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-slate-400'}`}>
+                                                    Phase Budget: ₱{formatCurrency(phaseBudget)} | 
+                                                    Used: ₱{formatCurrency(totalPhaseCost)} | 
+                                                    {remaining >= 0 ? `Remaining: ₱${formatCurrency(remaining)}` : `⚠️ Over: ₱${formatCurrency(Math.abs(remaining))}`}
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
 
                                 <div className="mb-4">
@@ -1126,6 +1445,62 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
                             >
                                 {isSubmitting ? 'Saving...' : 'Save'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Budget Warning Modal */}
+            {budgetWarning && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center mb-4">
+                            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-red-600 dark:text-red-400 text-xl">⚠</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">BUDGET WARNING</h3>
+                        </div>
+                        
+                        <div className="mb-6 space-y-2 text-sm">
+                            <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                <span className="text-gray-600 dark:text-slate-400">Phase Budget:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">₱{formatCurrency(budgetWarning.phaseBudget)}</span>
+                            </div>
+                            <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                <span className="text-gray-600 dark:text-slate-400">Current Tasks Total:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">₱{formatCurrency(budgetWarning.totalSiblingCosts)}</span>
+                            </div>
+                            <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                <span className="text-gray-600 dark:text-slate-400">This Task:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">₱{formatCurrency(budgetWarning.newTaskCost)}</span>
+                            </div>
+                            <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                <span className="text-gray-600 dark:text-slate-400">New Total:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">₱{formatCurrency(budgetWarning.totalPhaseCost)}</span>
+                            </div>
+                            <div className="flex justify-between py-2 bg-red-50 dark:bg-red-900/20 rounded px-3">
+                                <span className="text-red-600 dark:text-red-400 font-semibold">Overbudget:</span>
+                                <span className="font-bold text-red-600 dark:text-red-400">₱{formatCurrency(budgetWarning.overbudget)}</span>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-600 dark:text-slate-400 mb-6 text-sm">
+                            This will exceed the phase budget. Do you want to continue?
+                        </p>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={handleBudgetWarningCancel}
+                                className="px-4 py-2 text-gray-600 dark:text-slate-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleBudgetWarningConfirm}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                            >
+                                OK
                             </button>
                         </div>
                     </div>

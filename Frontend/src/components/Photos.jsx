@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, Trash2, Eye, CheckCircle, Image as ImageIcon } from "lucide-react";
 import axios from "axios";
 
@@ -148,13 +148,17 @@ const Photos = ({ projectId, readonly = false }) => {
       setShowUploadForm(false);
       document.querySelector('input[type="file"]').value = "";
 
-      alert(
-        `✅ Photo uploaded successfully!\n\n` +
-        `Update ID: ${updateId}\n` +
-        `Task: ${taskDetails?.milestoneName}\n` +
-        `AI Status: ${response.data.aiAnalysis?.success ? 'Analyzed ✓' : 'Failed'}\n\n` +
-        `📝 Go to the REPORTS tab to review AI suggestions and approve.`
-      );
+      // ✅ Enhanced success message with AI percentage
+      const aiPercentage = response.data.aiSuggestedPercentage || 
+                          response.data.aiAnalysis?.ai_suggestion?.ai_estimated_completion ||
+                          null;
+      
+      setSuccessModal({
+        task: taskDetails?.milestoneName,
+        updateId: updateId,
+        aiPercentage: aiPercentage,
+        aiStatus: response.data.aiAnalysis?.success ? 'Analyzed ✓' : 'Pending Analysis'
+      });
     } catch (err) {
       console.error("❌ Upload failed:", err);
       if (err.response?.status === 401) {
@@ -167,30 +171,45 @@ const Photos = ({ projectId, readonly = false }) => {
     }
   };
 
+  const [deleteModal, setDeleteModal] = React.useState(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [successModal, setSuccessModal] = React.useState(null);
+  const [deleteSuccessModal, setDeleteSuccessModal] = React.useState(false);
+
   const handleDelete = async (photo) => {
     if (readonly) {
       alert("🔒 Cannot delete photos in view-only mode");
       return;
     }
-    if (!confirm("Are you sure you want to delete this photo?")) return;
+    setDeleteModal(photo);
+  };
 
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    
+    setIsDeleting(true);
     try {
       await axios.delete(
-        `${API_URL}/photos/${photo.photoId}`, 
+        `${API_URL}/photos/${deleteModal.photoId}`, 
         {
           headers: getAuthHeaders(),
           data: {
-            updateId: photo.updateId,
-            s3Key: photo.s3Key,
+            updateId: deleteModal.updateId,
+            s3Key: deleteModal.s3Key,
+            taskId: deleteModal.taskId,
+            projectId: projectId
           },
         }
       );
 
       await fetchConfirmedPhotosForProject();
-      alert("✅ Photo deleted successfully!");
+      setDeleteModal(null);
+      setDeleteSuccessModal(true);
     } catch (err) {
       console.error("❌ Error deleting photo:", err);
       alert("❌ Failed to delete photo");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -361,20 +380,6 @@ const Photos = ({ projectId, readonly = false }) => {
               {photos.length} AI-verified and confirmed photos
             </p>
           </div>
-          {readonly && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
-              🔒 View Only
-            </div>
-          )}
-          {!readonly && (
-            <button
-              onClick={() => setShowUploadForm(!showUploadForm)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Photo
-            </button>
-          )}
           <div className="flex items-center gap-3">
             {/* Sort Filter Buttons */}
             {photos.length > 0 && (
@@ -469,49 +474,52 @@ const Photos = ({ projectId, readonly = false }) => {
                           {getGroupedPhotos()[phaseName][taskName].map((photo) => (
                             <div
                               key={photo.photoId}
-                              className="bg-slate-700 dark:bg-slate-900 rounded-lg overflow-hidden border-2 border-green-500"
+                              className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border-2 border-green-200 dark:border-green-600 shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1 group"
                             >
-                              <div className="relative">
+                              <div className="relative overflow-hidden">
                                 <img
                                   src={photo.fileURL}
                                   alt={photo.caption}
-                                  className="w-full h-48 object-cover"
+                                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
-                                <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute top-2 left-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                                  <CheckCircle className="w-4 h-4" />
                                   AI Verified
                                 </div>
                               </div>
 
                               <div className="p-4">
-                                <h3 className="font-semibold text-white mb-1 truncate">
+                                <h3 className="font-bold text-gray-900 dark:text-white mb-2 truncate text-sm">
                                   {photo.caption || "No caption"}
                                 </h3>
-                                <p className="text-xs text-slate-400 mb-1">
-                                  Update: {photo.updateId}
-                                </p>
-                                <p className="text-xs text-slate-400 mb-1">
-                                  Uploaded: {new Date(photo.uploadedAt).toLocaleDateString()}
-                                </p>
+                                <div className="space-y-1 mb-3">
+                                  <p className="text-xs text-gray-600 dark:text-slate-400 truncate">
+                                    📄 {photo.updateId}
+                                  </p>
+                                  <p className="text-xs text-gray-600 dark:text-slate-400">
+                                    📅 {new Date(photo.uploadedAt).toLocaleDateString()}
+                                  </p>
+                                </div>
 
-                                <div className="flex gap-2 mt-3">
+                                <div className="flex gap-2">
                                   <button
                                     onClick={() => openViewModal(photo)}
-                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1"
+                                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all"
                                   >
-                                    <Eye className="w-3 h-3" />
+                                    <Eye className="w-4 h-4" />
                                     View
                                   </button>
                                   <button
                                     onClick={() => handleDelete(photo)}
                                     disabled={readonly}
-                                    className={`flex-1 text-white px-3 py-1.5 rounded text-sm flex items-center justify-center gap-1 transition-colors ${
+                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md ${
                                       readonly
-                                        ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
-                                        : 'bg-red-600 hover:bg-red-700'
+                                        ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:shadow-lg'
                                     }`}
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    <Trash2 className="w-4 h-4" />
                                     Delete
                                   </button>
                                 </div>
@@ -529,64 +537,248 @@ const Photos = ({ projectId, readonly = false }) => {
         )}
       </div>
 
-      {/* View Modal */}
+      {/* View Modal - Enhanced */}
       {viewModal && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={closeViewModal}
         >
           <div
-            className="bg-slate-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-slate-700"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-start mb-4 p-6 border-b border-slate-700 sticky top-0 bg-slate-800 rounded-t-lg">
-              <h3 className="text-xl font-bold text-white flex-1 break-words pr-4">
-                {viewModal.caption || "Photo Details"}
-              </h3>
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 sticky top-0 z-10 rounded-t-2xl">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="bg-blue-600 p-2 rounded-lg">
+                  <Eye className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Photo Details
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-slate-400">{viewModal.caption || "No caption"}</p>
+                </div>
+              </div>
               <button
                 onClick={closeViewModal}
-                className="text-white hover:text-gray-300 text-3xl flex-shrink-0 leading-none w-8 h-8 flex items-center justify-center"
+                className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
                 title="Close"
               >
-                ×
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
-            <div className="px-6 pb-6">
-              <img
-                src={viewModal.fileURL}
-                alt={viewModal.caption}
-                className="w-full max-h-[50vh] object-contain rounded-lg mb-6"
-              />
+            <div className="p-6">
+              <div className="relative group mb-6">
+                <img
+                  src={viewModal.fileURL}
+                  alt={viewModal.caption}
+                  className="w-full max-h-[60vh] object-contain rounded-xl border-2 border-gray-200 dark:border-slate-700 shadow-lg"
+                />
+                <div className="absolute top-3 right-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg">
+                  <CheckCircle className="w-4 h-4" />
+                  AI Verified
+                </div>
+              </div>
 
-              <div className="space-y-2 text-sm text-slate-300">
-                <p><strong>Update ID:</strong> {viewModal.updateId}</p>
-                {viewModal.taskName && (
-                  <p><strong>Task:</strong> {viewModal.taskName}</p>
-                )}
-                <p><strong>Uploaded:</strong> {new Date(viewModal.uploadedAt).toLocaleString()}</p>
-                {viewModal.confirmedAt && (
-                  <p><strong>Approved:</strong> {new Date(viewModal.confirmedAt).toLocaleString()}</p>
-                )}
-                {viewModal.aiAnalysis && (
-                  <div className="mt-4 p-4 bg-blue-900/30 rounded-lg">
-                    <p className="font-bold text-blue-300 mb-2">AI Analysis:</p>
-                    <p><strong>Objects Detected:</strong> {viewModal.totalObjects || 0}</p>
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 dark:bg-slate-900/50 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Information</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-slate-400">Update ID</span>
+                      <span className="font-mono text-xs text-gray-900 dark:text-white truncate ml-2">{viewModal.updateId}</span>
+                    </div>
+                    {viewModal.taskName && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-slate-400">Task</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{viewModal.taskName}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-slate-400">Uploaded</span>
+                      <span className="text-gray-900 dark:text-white">{new Date(viewModal.uploadedAt).toLocaleDateString()}</span>
+                    </div>
+                    {viewModal.confirmedAt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-slate-400">Approved</span>
+                        <span className="text-green-600 dark:text-green-400">{new Date(viewModal.confirmedAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border-2 border-blue-200 dark:border-blue-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                    </svg>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Completion</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {viewModal.aiSuggestedPercentage && (
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">🤖 AI Suggested</p>
+                        <p className="text-2xl font-black text-blue-600 dark:text-blue-400">
+                          {viewModal.aiSuggestedPercentage}%
+                        </p>
+                      </div>
+                    )}
+                    {viewModal.userInputPercentage && (
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">✅ Confirmed</p>
+                        <p className="text-2xl font-black text-green-600 dark:text-green-400">
+                          {viewModal.userInputPercentage}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {viewModal.aiAnalysis && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-5 border-2 border-purple-200 dark:border-purple-700 mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                    </svg>
+                    <h4 className="font-bold text-gray-900 dark:text-white">AI Analysis</h4>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Objects</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{viewModal.totalObjects || 0}</p>
+                    </div>
                     {viewModal.aiSuggestion && (
                       <>
-                        <p><strong>AI Suggested:</strong> {viewModal.aiSuggestion.milestone}</p>
-                        <p><strong>Confidence:</strong> {viewModal.aiSuggestion.confidence}</p>
+                        <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Milestone</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{viewModal.aiSuggestion.milestone}</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Confidence</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white capitalize">{viewModal.aiSuggestion.confidence}</p>
+                        </div>
                       </>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <button
                 onClick={closeViewModal}
-                className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg transition-colors"
+                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mr-3">
+                <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Photo Uploaded Successfully!</h3>
+            </div>
+            
+            <div className="mb-6 space-y-2 text-sm">
+              <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                <span className="text-gray-600 dark:text-slate-400">Task:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{successModal.task}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                <span className="text-gray-600 dark:text-slate-400">Update ID:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{successModal.updateId}</span>
+              </div>
+              {successModal.aiPercentage && (
+                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                  <span className="text-gray-600 dark:text-slate-400">AI Suggested:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{successModal.aiPercentage}%</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 bg-blue-50 dark:bg-blue-900/20 rounded px-3">
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">AI Status:</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{successModal.aiStatus}</span>
+              </div>
+            </div>
+
+            <p className="text-gray-600 dark:text-slate-400 mb-6 text-sm">
+              Go to the REPORTS tab to review AI suggestions and confirm progress.
+            </p>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setSuccessModal(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Success Modal */}
+      {deleteSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mr-3">
+                <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Photo Deleted Successfully!</h3>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setDeleteSuccessModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Confirm Delete</h3>
+            <p className="text-gray-600 dark:text-slate-400 mb-6">
+              Are you sure you want to delete this item? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteModal(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

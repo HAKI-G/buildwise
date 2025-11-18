@@ -11,7 +11,8 @@ const Reports = ({ projectId }) => {
     const [userPercentage, setUserPercentage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [taskCompletions, setTaskCompletions] = useState({});
-    const [phaseCompletions, setPhaseCompletions] = useState({}); 
+    const [phaseCompletions, setPhaseCompletions] = useState({});
+    const [confirmResultModal, setConfirmResultModal] = useState(null); 
     
     const API_URL = 'http://localhost:5001/api';
 
@@ -146,7 +147,8 @@ const Reports = ({ projectId }) => {
             const photos = photosResponse.data || [];
             const milestones = milestonesResponse.data || [];
 
-            const pending = photos.filter(p => p.confirmationStatus === 'pending' && p.aiProcessed);
+            // ✅ Show all pending photos, even if AI didn't process them
+            const pending = photos.filter(p => p.confirmationStatus === 'pending');
             const confirmed = photos.filter(p => p.confirmationStatus === 'confirmed');
 
             setPendingPhotos(pending);
@@ -174,7 +176,12 @@ const Reports = ({ projectId }) => {
 
     const openConfirmModal = (photo) => {
         setSelectedPhoto(photo);
-        setUserPercentage(photo.aiSuggestion?.ai_estimated_completion || '');
+        // Pre-fill with AI suggestion from multiple possible sources
+        const aiSuggested = photo.aiSuggestedPercentage || 
+                          photo.aiSuggestion?.ai_estimated_completion || 
+                          photo.aiSuggestion?.suggested_percentage || 
+                          '';
+        setUserPercentage(aiSuggested);
         setShowConfirmModal(true);
     };
 
@@ -216,14 +223,24 @@ const Reports = ({ projectId }) => {
             );
 
             if (confirmed) {
-                alert(
-                    `✅ Progress confirmed successfully!\n\n` +
-                    `Task: ${selectedPhoto.taskName || 'Unknown'}\n` +
-                    `Completion: ${userPercentage}%\n\n` +
-                    `The task's completion percentage has been updated.`
-                );
+                // ✅ Enhanced success message with comparison
+                const aiPercentage = selectedPhoto.aiSuggestedPercentage || 
+                                   selectedPhoto.aiSuggestion?.ai_estimated_completion || 
+                                   null;
+                
+                const difference = aiPercentage ? parseInt(userPercentage) - aiPercentage : null;
+                
+                setConfirmResultModal({
+                    success: true,
+                    task: selectedPhoto.taskName || 'Unknown',
+                    confirmed: userPercentage,
+                    aiSuggested: aiPercentage,
+                    difference: difference
+                });
             } else {
-                alert('Photo rejected');
+                setConfirmResultModal({
+                    success: false
+                });
             }
 
             setShowConfirmModal(false);
@@ -417,13 +434,46 @@ const Reports = ({ projectId }) => {
                                         </span>
                                     </div>
                                     
-                                    {/* ✅ Show this photo's contribution */}
-                                    <div className="flex justify-between items-center py-2 border-t border-gray-200 dark:border-slate-700">
-                                        <span className="text-gray-600 dark:text-slate-400">This Photo</span>
-                                        <span className="font-bold text-blue-600 dark:text-blue-400">
-                                            {photo.userInputPercentage || 0}%
-                                        </span>
-                                    </div>
+                                    {/* ✅ AI vs USER PERCENTAGE COMPARISON */}
+                                    {photo.aiSuggestedPercentage && (
+                                        <div className="py-2 border-t border-gray-200 dark:border-slate-700">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-gray-600 dark:text-slate-400">🤖 AI Suggested</span>
+                                                <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                    {photo.aiSuggestedPercentage}%
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600 dark:text-slate-400">✅ You Confirmed</span>
+                                                <span className="font-bold text-green-600 dark:text-green-400">
+                                                    {photo.userInputPercentage || 0}%
+                                                </span>
+                                            </div>
+                                            {/* Show difference */}
+                                            {Math.abs((photo.userInputPercentage || 0) - photo.aiSuggestedPercentage) > 0 && (
+                                                <div className="mt-2 text-xs text-center">
+                                                    <span className={`px-2 py-1 rounded ${
+                                                        (photo.userInputPercentage || 0) > photo.aiSuggestedPercentage 
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                                    }`}>
+                                                        {(photo.userInputPercentage || 0) > photo.aiSuggestedPercentage ? '+' : ''}
+                                                        {(photo.userInputPercentage || 0) - photo.aiSuggestedPercentage}% difference
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Fallback if no AI percentage */}
+                                    {!photo.aiSuggestedPercentage && (
+                                        <div className="flex justify-between items-center py-2 border-t border-gray-200 dark:border-slate-700">
+                                            <span className="text-gray-600 dark:text-slate-400">This Photo</span>
+                                            <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                {photo.userInputPercentage || 0}%
+                                            </span>
+                                        </div>
+                                    )}
                                     
                                     {/* ✅ IMPORTANT: Show TASK AVERAGE completion */}
                                     {taskInfo && (
@@ -523,76 +573,123 @@ const Reports = ({ projectId }) => {
                 )}
             </div>
 
-            {/* Confirmation Modal */}
+            {/* Confirmation Modal - Enhanced Design */}
             {showConfirmModal && selectedPhoto && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Confirm Progress</h3>
+                <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-slate-700">
+                        {/* Header */}
+                        <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800">
+                            <div>
+                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <svg className="w-7 h-7 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    Review & Confirm Progress
+                                </h3>
+                                <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">Review AI analysis and confirm completion percentage</p>
+                            </div>
                             <button
                                 onClick={() => setShowConfirmModal(false)}
                                 disabled={isSubmitting}
-                                className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300"
+                                className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
                             >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        <div className="px-6 py-4">
+                        <div className="px-6 py-5">
                             {/* Photo Preview */}
-                            <div className="mb-6">
+                            <div className="mb-6 relative group">
                                 <img 
                                     src={selectedPhoto.fileURL} 
                                     alt={selectedPhoto.caption}
-                                    className="w-full h-64 object-cover rounded-lg"
+                                    className="w-full h-80 object-cover rounded-xl border-2 border-gray-200 dark:border-slate-700 shadow-lg"
                                 />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                                    <p className="text-white font-medium">{selectedPhoto.caption || 'No caption'}</p>
+                                </div>
                             </div>
 
-                            {/* ✅ Show Task Name */}
-                            {selectedPhoto.taskName && (
-                                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6 border-2 border-blue-200 dark:border-blue-700">
-                                    <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
-                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                                            <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                                        </svg>
-                                        Task
-                                    </h4>
-                                    <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                                        {selectedPhoto.taskName}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* AI Suggestion */}
-                            {selectedPhoto.aiSuggestion && (
-                                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-6 border-2 border-green-200 dark:border-green-700">
-                                    <h4 className="font-semibold text-green-900 dark:text-green-300 mb-2">
-                                        🤖 AI Analysis
-                                    </h4>
-                                    <p className="text-lg font-bold text-green-800 dark:text-green-200 mb-2">
-                                        {selectedPhoto.aiSuggestion.milestone || 'Unknown'}
-                                    </p>
-                                    {selectedPhoto.aiSuggestion.reason && (
-                                        <p className="text-sm text-gray-700 dark:text-slate-300 mb-2">
-                                            {selectedPhoto.aiSuggestion.reason}
+                            <div className="grid md:grid-cols-2 gap-4 mb-6">
+                                {/* ✅ Task Info */}
+                                {selectedPhoto.taskName && (
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-5 border-2 border-blue-200 dark:border-blue-700 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                                                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                                            </svg>
+                                            <h4 className="font-semibold text-blue-900 dark:text-blue-300">Task</h4>
+                                        </div>
+                                        <p className="text-lg font-bold text-blue-800 dark:text-blue-200">
+                                            {selectedPhoto.taskName}
                                         </p>
-                                    )}
-                                    <p className="text-sm text-gray-600 dark:text-slate-400">
-                                        AI Estimated: <span className="font-bold text-green-700 dark:text-green-300">{selectedPhoto.aiSuggestion.ai_estimated_completion || 0}%</span>
-                                    </p>
-                                </div>
-                            )}
+                                    </div>
+                                )}
 
-                            {/* User Input */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                                    What percentage is this task complete? (1-100)
+                                {/* ✅ AI Analysis */}
+                                {selectedPhoto.aiSuggestion && (
+                                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-5 border-2 border-purple-200 dark:border-purple-700 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                                            </svg>
+                                            <h4 className="font-semibold text-purple-900 dark:text-purple-300">AI Detected</h4>
+                                        </div>
+                                        <p className="text-lg font-bold text-purple-800 dark:text-purple-200">
+                                            {selectedPhoto.aiSuggestion.milestone || 'Unknown'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* AI Percentage Display */}
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/10 rounded-xl p-6 mb-6 border-2 border-green-200 dark:border-green-700 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-2xl">🤖</span>
+                                            <h4 className="font-bold text-green-900 dark:text-green-300 text-lg">AI Suggestion</h4>
+                                        </div>
+                                        {selectedPhoto.aiSuggestion?.reason && (
+                                            <p className="text-sm text-gray-700 dark:text-slate-300 mb-3">
+                                                {selectedPhoto.aiSuggestion.reason}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-gray-600 dark:text-slate-400">Confidence:</span>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${getConfidenceBadge(selectedPhoto.aiSuggestion?.confidence || 'low')}`}>
+                                                {selectedPhoto.aiSuggestion?.confidence || 'low'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-semibold text-green-700 dark:text-green-300 mb-1">
+                                            Suggested %
+                                        </p>
+                                        <p className="text-6xl font-black text-green-600 dark:text-green-400">
+                                            {selectedPhoto.aiSuggestedPercentage || 
+                                             selectedPhoto.aiSuggestion?.ai_estimated_completion || 
+                                             selectedPhoto.aiSuggestion?.suggested_percentage || 
+                                             <span className="text-3xl text-gray-400 dark:text-slate-500">N/A</span>}
+                                            {(selectedPhoto.aiSuggestedPercentage || selectedPhoto.aiSuggestion?.ai_estimated_completion || selectedPhoto.aiSuggestion?.suggested_percentage) && <span className="text-3xl">%</span>}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* User Input Section */}
+                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 dark:from-slate-900/50 dark:to-slate-800/30 rounded-xl p-6 border-2 border-gray-200 dark:border-slate-700">
+                                <label className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white mb-2">
+                                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    Your Expert Assessment
                                 </label>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
-                                    You can adjust the AI's suggestion based on your expert assessment
+                                <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+                                    Review the AI's suggestion and enter your confirmed completion percentage (1-100%)
                                 </p>
                                 <div className="relative">
                                     <input
@@ -601,40 +698,48 @@ const Reports = ({ projectId }) => {
                                         max="100"
                                         value={userPercentage}
                                         onChange={(e) => setUserPercentage(e.target.value)}
-                                        className="w-full px-4 py-3 text-2xl font-bold text-center border-2 border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="75"
+                                        className="w-full px-6 py-5 text-4xl font-black text-center border-3 border-blue-300 dark:border-blue-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/50 shadow-inner transition-all"
+                                        placeholder="0"
                                     />
-                                    <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-2xl font-bold text-gray-400 dark:text-slate-500">%</span>
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">
+                                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
                                     This will update the task's overall completion percentage
-                                </p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 rounded-b-xl">
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 px-6 py-5 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                             <button
                                 onClick={() => handleConfirm(false)}
                                 disabled={isSubmitting}
-                                className="px-6 py-2 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                className="px-8 py-3 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border-2 border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-2 shadow-sm hover:shadow-md"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-400"></div>
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 dark:border-gray-400"></div>
                                         Rejecting...
                                     </>
                                 ) : (
-                                    'Reject'
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Reject
+                                    </>
                                 )}
                             </button>
                             <button
                                 onClick={() => handleConfirm(true)}
                                 disabled={isSubmitting || !userPercentage || userPercentage <= 0 || userPercentage > 100}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all font-semibold shadow-lg hover:shadow-xl"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                         Saving...
                                     </>
                                 ) : (
@@ -645,6 +750,72 @@ const Reports = ({ projectId }) => {
                                         Confirm Progress
                                     </>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Result Modal */}
+            {confirmResultModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center mb-4">
+                            <div className={`w-10 h-10 ${confirmResultModal.success ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'} rounded-full flex items-center justify-center mr-3`}>
+                                <span className={`${confirmResultModal.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} text-xl`}>
+                                    {confirmResultModal.success ? '✓' : '✕'}
+                                </span>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {confirmResultModal.success ? 'Progress Confirmed Successfully!' : 'Photo Rejected'}
+                            </h3>
+                        </div>
+                        
+                        {confirmResultModal.success ? (
+                            <>
+                                <div className="mb-6 space-y-2 text-sm">
+                                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                        <span className="text-gray-600 dark:text-slate-400">Task:</span>
+                                        <span className="font-semibold text-gray-900 dark:text-white">{confirmResultModal.task}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                        <span className="text-gray-600 dark:text-slate-400">Confirmed:</span>
+                                        <span className="font-semibold text-gray-900 dark:text-white">{confirmResultModal.confirmed}%</span>
+                                    </div>
+                                    {confirmResultModal.aiSuggested && (
+                                        <>
+                                            <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                                                <span className="text-gray-600 dark:text-slate-400">AI Suggested:</span>
+                                                <span className="font-semibold text-gray-900 dark:text-white">{confirmResultModal.aiSuggested}%</span>
+                                            </div>
+                                            {confirmResultModal.difference !== null && (
+                                                <div className="flex justify-between py-2 bg-blue-50 dark:bg-blue-900/20 rounded px-3">
+                                                    <span className="text-blue-600 dark:text-blue-400 font-semibold">Difference:</span>
+                                                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                        {confirmResultModal.difference > 0 ? '+' : ''}{confirmResultModal.difference}%
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+
+                                <p className="text-gray-600 dark:text-slate-400 mb-6 text-sm">
+                                    The task's completion percentage has been updated automatically.
+                                </p>
+                            </>
+                        ) : (
+                            <p className="text-gray-600 dark:text-slate-400 mb-6">
+                                Photo rejected and will not be counted towards completion.
+                            </p>
+                        )}
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setConfirmResultModal(null)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                                OK
                             </button>
                         </div>
                     </div>

@@ -76,7 +76,7 @@ const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
 
       <div className="w-1/4 mx-4 hidden md:block">
         <div className="flex justify-between text-sm text-gray-500 dark:text-slate-400 mb-1">
-          <span>Task</span>
+          <span>Progress</span>
           <span>{taskProgress}%</span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
@@ -172,10 +172,36 @@ function DashboardPage() {
             );
             const milestones = milestonesResponse.data || [];
 
+            // ✅ Calculate project progress based on PHASE averages (not individual tasks)
+            const phases = milestones.filter((m) => m.isPhase === true);
             const tasks = milestones.filter((m) => m.isPhase !== true);
-            const completedTasks = tasks.filter((t) => t.status === 'completed').length;
-            const taskProgress =
-              tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+            
+            let taskProgress = 0;
+            
+            if (phases.length > 0) {
+              // Group tasks by phase and calculate each phase's average
+              const phaseAverages = phases.map(phase => {
+                const phaseTasks = tasks.filter(task => task.parentPhase === phase.milestoneId);
+                
+                if (phaseTasks.length === 0) return 0;
+                
+                const totalCompletion = phaseTasks.reduce((sum, task) => {
+                  return sum + (task.completionPercentage || 0);
+                }, 0);
+                
+                return totalCompletion / phaseTasks.length;
+              });
+              
+              // Calculate project progress as average of all phase averages
+              const totalPhaseCompletion = phaseAverages.reduce((sum, avg) => sum + avg, 0);
+              taskProgress = Math.round(totalPhaseCompletion / phases.length);
+            } else if (tasks.length > 0) {
+              // Fallback: If no phases, calculate from tasks directly
+              const totalCompletion = tasks.reduce((sum, task) => {
+                return sum + (task.completionPercentage || 0);
+              }, 0);
+              taskProgress = Math.round(totalCompletion / tasks.length);
+            }
 
             const expensesResponse = await axios.get(
               `http://localhost:5001/api/expenses/project/${project.projectId}`,

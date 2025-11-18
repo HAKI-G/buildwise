@@ -48,6 +48,9 @@ export const calculateProjectStatus = async (projectId) => {
         
         // Get photos
         let photos = [];
+        let pendingReviewPhotos = [];
+        let confirmedPhotos = [];
+        
         try {
             const photosParams = {
                 TableName: 'BuildWisePhotos',
@@ -58,6 +61,17 @@ export const calculateProjectStatus = async (projectId) => {
             };
             const photosResult = await docClient.send(new ScanCommand(photosParams));
             photos = photosResult.Items || [];
+            
+            // ✅ CHECK FOR PENDING REVIEW PHOTOS
+            pendingReviewPhotos = photos.filter(p => 
+                !p.confirmationStatus || 
+                p.confirmationStatus === 'pending' || 
+                p.confirmationStatus === 'rejected'
+            );
+            confirmedPhotos = photos.filter(p => p.confirmationStatus === 'confirmed');
+            
+            console.log(`📸 Photos: ${photos.length} total, ${confirmedPhotos.length} confirmed, ${pendingReviewPhotos.length} pending review`);
+            
         } catch (error) {
             console.warn('Could not fetch photos:', error.message);
         }
@@ -69,28 +83,40 @@ export const calculateProjectStatus = async (projectId) => {
             return project.status;
         }
         
-        // 1. NOT STARTED: No tasks, no phases, no photos
-        if (tasks.length === 0 && phases.length === 0 && photos.length === 0) {
+        // ✅ PRIORITY 1: PENDING REVIEW - Project has photos awaiting approval
+        if (pendingReviewPhotos.length > 0 && confirmedPhotos.length === 0) {
+            console.log('🔒 Project blocked - pending photo review');
+            calculatedStatus = 'Pending Review';
+        }
+        // ✅ PRIORITY 2: NOT STARTED - No tasks, no phases, no photos
+        else if (tasks.length === 0 && phases.length === 0 && photos.length === 0) {
             calculatedStatus = 'Not Started';
         }
-        // 2. IN PROGRESS: Has tasks/phases/photos
-        else if (tasks.length > 0 || phases.length > 0 || photos.length > 0) {
+        // ✅ PRIORITY 3: IN PROGRESS - Has confirmed photos OR tasks in progress
+        else if (confirmedPhotos.length > 0 || tasks.length > 0 || phases.length > 0) {
             const allTasksComplete = tasks.length > 0 && tasks.every(t => (t.completionPercentage || 0) >= 100);
-            calculatedStatus = allTasksComplete ? 'In Progress' : 'In Progress';
+            const allPhasesComplete = phases.length > 0 && phases.every(p => p.status === 'completed');
+            
+            if (allTasksComplete && allPhasesComplete) {
+                calculatedStatus = 'Completed';
+            } else {
+                calculatedStatus = 'In Progress';
+            }
         }
         
-        // 3. OVERDUE: Past due date
+        // ✅ PRIORITY 4: OVERDUE - Past due date (except if completed)
         if (project.contractCompletionDate || project.targetDate) {
             const dueDate = new Date(project.contractCompletionDate || project.targetDate);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             dueDate.setHours(0, 0, 0, 0);
             
-            if (today > dueDate && calculatedStatus !== 'Completed' && project.status !== 'On Hold') {
+            if (today > dueDate && calculatedStatus !== 'Completed' && calculatedStatus !== 'Pending Review') {
                 calculatedStatus = 'Overdue';
             }
         }
         
+        console.log(`📊 Calculated status: ${calculatedStatus}`);
         return calculatedStatus;
         
     } catch (error) {

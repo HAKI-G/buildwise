@@ -13,7 +13,7 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
-const AI_API_URL = 'http://54.255.249.21:5000';
+const AI_API_URL = 'http://54.251.28.81:5000';
 
 
 
@@ -54,8 +54,29 @@ export const uploadPhotoForUpdate = async (req, res) => {
     const taskResult = await docClient.send(new GetCommand(taskParams));
     const task = taskResult.Item;
     
-    const phaseId = task?.parentPhase || null;
-    const phaseName = task?.parentPhaseName || 'No Phase';
+    let phaseId = task?.parentPhase || null;
+    let phaseName = 'No Phase';
+    
+    // ✅ If task has a parent phase, fetch the phase name
+    if (phaseId) {
+      try {
+        const phaseParams = {
+          TableName: 'BuildWiseMilestones',
+          Key: {
+            projectId: projectId,
+            milestoneId: phaseId
+          }
+        };
+        
+        const phaseResult = await docClient.send(new GetCommand(phaseParams));
+        if (phaseResult.Item) {
+          phaseName = phaseResult.Item.milestoneName || phaseResult.Item.name || 'No Phase';
+          console.log('✅ Found phase name:', phaseName);
+        }
+      } catch (phaseError) {
+        console.warn('⚠️ Could not fetch phase name:', phaseError.message);
+      }
+    }
 
     const existingPhotos = await docClient.send(new QueryCommand({
       TableName: 'BuildWisePhotos',
@@ -87,7 +108,7 @@ export const uploadPhotoForUpdate = async (req, res) => {
     try {
       const imageResponse = await axios.get(publicUrl, { 
         responseType: 'arraybuffer', 
-        timeout: 15000 
+        timeout: 30000  // Increased to 30 seconds
       });
       
       const FormData = (await import('form-data')).default;
@@ -98,14 +119,24 @@ export const uploadPhotoForUpdate = async (req, res) => {
       });
 
       try {
+        console.log('🤖 Calling AI service at:', AI_API_URL);
         const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
           headers: formData.getHeaders(),
-          timeout: 15000  // Reduced to 15 seconds for faster feedback
+          timeout: 30000  // Increased to 30 seconds
         });
 
         aiAnalysis = aiResponse.data;
         aiProcessed = aiAnalysis && aiAnalysis.success;
         console.log('✅ AI Analysis successful:', aiProcessed);
+        console.log('📊 Full AI Response:', JSON.stringify(aiAnalysis, null, 2));
+        
+        // ✅ LOG AI PERCENTAGE for debugging
+        const aiPercentage = aiAnalysis?.ai_suggestion?.ai_estimated_completion || 
+                           aiAnalysis?.ai_suggestion?.suggested_percentage ||
+                           aiAnalysis?.suggested_percentage || 
+                           null;
+        console.log('📊 AI Suggested Percentage:', aiPercentage);
+        
       } catch (aiTimeoutError) {
         // If AI service is unavailable or timing out, create a default suggestion
         console.warn('⚠️ AI Analysis unavailable (timeout/connection error):', aiTimeoutError.code || aiTimeoutError.message);
@@ -154,6 +185,10 @@ export const uploadPhotoForUpdate = async (req, res) => {
         aiAnalysis,
         aiProcessed,
         aiSuggestion: aiAnalysis?.ai_suggestion || null,
+        aiSuggestedPercentage: aiAnalysis?.ai_suggestion?.ai_estimated_completion || 
+                              aiAnalysis?.ai_suggestion?.suggested_percentage || 
+                              aiAnalysis?.suggested_percentage || 
+                              null,  // ✅ PERSIST AI PERCENTAGE from multiple possible fields
         aiDetections: aiAnalysis?.detections || null,
         totalObjects: aiAnalysis?.total_objects || 0,
         confirmationStatus: 'pending',
@@ -182,11 +217,16 @@ export const confirmAISuggestion = async (req, res) => {
   const { photoId } = req.params;
   const { updateId, milestone, userPercentage, confirmed, taskId, projectId } = req.body;
 
-  if (!photoId || !updateId || !milestone || userPercentage === undefined) {
+  if (!photoId || !updateId || !milestone) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  if (!taskId || !projectId) {
+  // Only require userPercentage if confirming (not rejecting)
+  if (confirmed && userPercentage === undefined) {
+    return res.status(400).json({ message: 'User percentage is required for confirmation' });
+  }
+
+  if (confirmed && (!taskId || !projectId)) {
     return res.status(400).json({ message: 'Task ID and Project ID are required to update task completion' });
   }
 
@@ -225,74 +265,88 @@ export const confirmAISuggestion = async (req, res) => {
       };
     }
 
-    // Update photo confirmation status
-    const photoParams = {
+    // Get current photo to preserve AI suggested percentage
+    const getPhotoParams = {
       TableName: 'BuildWisePhotos',
-      Key: { updateId, photoId },
-      UpdateExpression: `SET 
-        confirmationStatus = :status,
-        userConfirmedMilestone = :milestone,
-        userInputPercentage = :percentage,
-        calculatedProgress = :progress,
-        overallProgressPercent = :overallProgress,
-        calculation = :calculation,
-        confirmedAt = :confirmedAt`,
-      ExpressionAttributeValues: {
-        ':status': confirmed ? 'confirmed' : 'rejected',
-        ':milestone': milestone,
-        ':percentage': parseFloat(userPercentage),
-        ':progress': calculation.overall_progress_percent,
-        ':overallProgress': calculation.overall_progress_percent,
-        ':calculation': calculation.calculation,
-        ':confirmedAt': new Date().toISOString()
-      },
-      ReturnValues: 'ALL_NEW'
+      Key: { updateId, photoId }
     };
+    const currentPhoto = await docClient.send(new GetCommand(getPhotoParams));
+    const aiSuggestedPercentage = currentPhoto.Item?.aiSuggestedPercentage || null;
+
+    // Update photo confirmation status
+    let photoParams;
+    
+    if (confirmed) {
+      // For confirmed photos, update with user percentage
+      photoParams = {
+        TableName: 'BuildWisePhotos',
+        Key: { updateId, photoId },
+        UpdateExpression: `SET 
+          confirmationStatus = :status,
+          userConfirmedMilestone = :milestone,
+          userInputPercentage = :percentage,
+          aiSuggestedPercentage = :aiPercentage,
+          calculatedProgress = :progress,
+          overallProgressPercent = :overallProgress,
+          calculation = :calculation,
+          confirmedAt = :confirmedAt`,
+        ExpressionAttributeValues: {
+          ':status': 'confirmed',
+          ':milestone': milestone,
+          ':percentage': parseFloat(userPercentage),
+          ':aiPercentage': aiSuggestedPercentage,
+          ':progress': calculation.overall_progress_percent,
+          ':overallProgress': calculation.overall_progress_percent,
+          ':calculation': calculation.calculation,
+          ':confirmedAt': new Date().toISOString()
+        },
+        ReturnValues: 'ALL_NEW'
+      };
+    } else {
+      // For rejected photos, just update status
+      photoParams = {
+        TableName: 'BuildWisePhotos',
+        Key: { updateId, photoId },
+        UpdateExpression: `SET 
+          confirmationStatus = :status,
+          confirmedAt = :confirmedAt`,
+        ExpressionAttributeValues: {
+          ':status': 'rejected',
+          ':confirmedAt': new Date().toISOString()
+        },
+        ReturnValues: 'ALL_NEW'
+      };
+    }
 
     const photoResult = await docClient.send(new UpdateCommand(photoParams));
 
-    // Update task completion percentage
+    // ✅ AUTO-UPDATE TASK STATUS based on all photos (not just this one)
     if (confirmed && taskId && projectId) {
       try {
-        console.log('📋 Updating task completion percentage...');
+        console.log('🔄 Triggering auto-status update for task...');
         
-        const now = new Date().toISOString();
-        const isCompleted = parseFloat(userPercentage) >= 100;
+        // Call the sync endpoint to recalculate status from ALL photos
+        const token = req.headers.authorization; // Forward the auth token
+        const apiUrl = process.env.API_URL || 'http://localhost:5001';
         
-        const taskUpdateParams = {
-          TableName: 'BuildWiseMilestones',
-          Key: {
-            projectId: projectId,
-            milestoneId: taskId
-          },
-          UpdateExpression: `SET 
-            completionPercentage = :percentage,
-            #status = :status,
-            completedAt = :completedAt,
-            updatedAt = :now`,
-          ExpressionAttributeNames: {
-            '#status': 'status'
-          },
-          ExpressionAttributeValues: {
-            ':percentage': parseFloat(userPercentage),
-            ':status': isCompleted ? 'completed' : (parseFloat(userPercentage) > 0 ? 'in progress' : 'not started'),
-            ':completedAt': isCompleted ? now : null,
-            ':now': now
-          },
-          ReturnValues: 'ALL_NEW'
-        };
+        console.log(`📡 Calling sync endpoint: ${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`);
         
-        const taskResult = await docClient.send(new UpdateCommand(taskUpdateParams));
+        await axios.post(
+          `${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`,
+          {},
+          { headers: { Authorization: token } }
+        );
         
-        console.log('✅ Task completion updated successfully!');
-        console.log(`   Task: ${taskResult.Attributes.milestoneName}`);
-        console.log(`   Completion: ${taskResult.Attributes.completionPercentage}%`);
+        console.log('✅ Task status synced successfully from all photos!');
         
-        // ✅ Auto-update project status
+        // ✅ Also trigger project status update
         await autoUpdateProjectStatus(projectId);
+        console.log('✅ Project status updated!');
         
       } catch (taskError) {
-        console.error('⚠️ Warning: Failed to update task completion:', taskError.message);
+        console.error('⚠️ Warning: Failed to sync task status:', taskError.message);
+        console.error('Error details:', taskError.response?.data || taskError.message);
+        // Continue anyway - this is not critical
       }
     }
 
@@ -442,7 +496,7 @@ export const getPendingPhotosForProject = async (req, res) => {
 
 export const deletePhoto = async (req, res) => {
     const { photoId } = req.params;
-    const { updateId, s3Key } = req.body;
+    const { updateId, s3Key, taskId, projectId } = req.body;
 
     if (!photoId || !updateId) {
         return res.status(400).json({ message: 'photoId and updateId are required' });
@@ -468,6 +522,31 @@ export const deletePhoto = async (req, res) => {
         });
 
         await docClient.send(deleteDbCommand);
+
+        // ✅ AUTO-UPDATE TASK STATUS after deletion
+        if (taskId && projectId) {
+            try {
+                console.log('🔄 Triggering auto-status update after photo deletion...');
+                
+                const token = req.headers.authorization;
+                const apiUrl = process.env.API_URL || 'http://localhost:5001';
+                
+                await axios.post(
+                    `${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`,
+                    {},
+                    { headers: { Authorization: token } }
+                );
+                
+                console.log('✅ Task status synced after deletion!');
+                
+                // Also update project status
+                await autoUpdateProjectStatus(projectId);
+                console.log('✅ Project status updated after deletion!');
+                
+            } catch (syncError) {
+                console.error('⚠️ Warning: Failed to sync after deletion:', syncError.message);
+            }
+        }
 
         res.status(200).json({ message: 'Photo deleted successfully' });
     } catch (error) {

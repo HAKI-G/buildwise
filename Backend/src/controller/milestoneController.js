@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { autoUpdateProjectStatus } from './projectController.js';
 import { sendMilestoneCompletionEmail } from '../services/emailService.js';
 
@@ -15,6 +15,116 @@ import { v4 as uuidv4 } from 'uuid';
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = 'BuildWiseMilestones';
+
+// ✅ AUTO-UPDATE TASK STATUS based on photo confirmations
+const autoUpdateTaskStatus = async (projectId, taskId) => {
+  try {
+    console.log(`📊 Auto-updating task status for task: ${taskId}`);
+    
+    // Get photos for this task - check both taskId and milestoneId fields
+    const photosParams = {
+      TableName: 'BuildWisePhotos',
+      FilterExpression: 'projectId = :projectId AND (taskId = :taskId OR milestoneId = :taskId)',
+      ExpressionAttributeValues: {
+        ':projectId': projectId,
+        ':taskId': taskId
+      }
+    };
+    
+    const photosResult = await docClient.send(new ScanCommand(photosParams));
+    const photos = photosResult.Items || [];
+    
+    console.log(`📷 Found ${photos.length} photos for task ${taskId}`);
+    
+    if (photos.length === 0) {
+      // No photos - task remains "not started"
+      return { status: 'not started', completionPercentage: 0 };
+    }
+    
+    // Filter photos by confirmation status
+    const confirmedPhotos = photos.filter(p => 
+      p.confirmationStatus === 'confirmed' && 
+      p.userInputPercentage !== undefined &&
+      p.userInputPercentage !== null
+    );
+    
+    console.log(`✅ Found ${confirmedPhotos.length} confirmed photos with user input`);
+    
+    // Calculate average completion from user-confirmed percentages
+    let completionPercentage = 0;
+    
+    if (confirmedPhotos.length > 0) {
+      const totalPercentage = confirmedPhotos.reduce((sum, photo) => {
+        return sum + (parseFloat(photo.userInputPercentage) || 0);
+      }, 0);
+      completionPercentage = Math.round(totalPercentage / confirmedPhotos.length);
+    }
+    
+    // Determine status based on completion
+    let status = 'not started';
+    
+    if (confirmedPhotos.length === 0) {
+      // No confirmed photos - task not started
+      status = 'not started';
+      completionPercentage = 0;
+    } else if (completionPercentage > 0 && completionPercentage < 100) {
+      // Some progress - task in progress
+      status = 'in progress';
+    } else if (completionPercentage >= 100) {
+      // Fully completed
+      status = 'completed';
+    }
+    
+    console.log(`📊 Task ${taskId} - Status: ${status}, Completion: ${completionPercentage}%`);
+    
+    return { status, completionPercentage };
+    
+  } catch (error) {
+    console.error('Error auto-updating task status:', error);
+    return null;
+  }
+};
+
+// ✅ AUTO-CHECK PHASE COMPLETION based on task completion
+const autoCheckPhaseCompletion = async (projectId, phaseId) => {
+  try {
+    const params = {
+      TableName: tableName,
+      KeyConditionExpression: 'projectId = :pid',
+      ExpressionAttributeValues: {
+        ':pid': projectId
+      }
+    };
+    
+    const data = await docClient.send(new QueryCommand(params));
+    const milestones = data.Items || [];
+    
+    // Get all tasks in this phase
+    const tasksInPhase = milestones.filter(m => 
+      m.parentPhase === phaseId && m.isPhase !== true
+    );
+    
+    if (tasksInPhase.length === 0) {
+      return { canComplete: false, shouldAutoComplete: false };
+    }
+    
+    // Check if all tasks are 100% complete
+    const allTasksComplete = tasksInPhase.every(task => 
+      (task.completionPercentage || 0) >= 100
+    );
+    
+    return { 
+      canComplete: allTasksComplete, 
+      shouldAutoComplete: allTasksComplete,
+      totalTasks: tasksInPhase.length,
+      completedTasks: tasksInPhase.filter(t => (t.completionPercentage || 0) >= 100).length
+    };
+    
+  } catch (error) {
+    console.error('Error checking phase completion:', error);
+    return { canComplete: false, shouldAutoComplete: false };
+  }
+};
 
 // POST /api/milestones/:projectId
 export const createMilestone = async (req, res) => {
@@ -415,19 +525,44 @@ export const updateMilestone = async (req, res) => {
     }
 
     const oldMilestone = result.Item;
+    const isTask = !oldMilestone.isPhase;
+    
+    // ✅ AUTO-UPDATE TASK STATUS based on photos
+    if (isTask) {
+      const autoStatus = await autoUpdateTaskStatus(projectId, milestoneId);
+      
+      if (autoStatus) {
+        console.log(`📊 Auto-calculated task status:`, autoStatus);
+        
+        // Override any manual status updates with calculated status
+        updates.status = autoStatus.status;
+        updates.completionPercentage = autoStatus.completionPercentage;
+        
+        // Add completedAt timestamp if task just completed
+        if (autoStatus.status === 'completed' && oldMilestone.status !== 'completed') {
+          updates.completedAt = new Date().toISOString();
+        }
+      }
+    }
+
     const wasCompleted = oldMilestone.status === "completed";
     const isNowCompleted = updates.status === "completed" || (updates.completionPercentage && updates.completionPercentage >= 100);
 
+    // Build update expression with proper attribute name handling
     const updateExpressions = [];
     const expressionAttributeNames = {};
     const expressionAttributeValues = {};
 
     Object.keys(updates).forEach((key, index) => {
-      updateExpressions.push(`#attr${index} = :val${index}`);
-      expressionAttributeNames[`#attr${index}`] = key;
-      expressionAttributeValues[`:val${index}`] = updates[key];
+      const attrName = `#attr${index}`;
+      const attrValue = `:val${index}`;
+      
+      updateExpressions.push(`${attrName} = ${attrValue}`);
+      expressionAttributeNames[attrName] = key;
+      expressionAttributeValues[attrValue] = updates[key];
     });
 
+    // Always update the updatedAt timestamp
     updateExpressions.push(`#updatedAt = :updatedAt`);
     expressionAttributeNames['#updatedAt'] = 'updatedAt';
     expressionAttributeValues[':updatedAt'] = new Date().toISOString();
@@ -441,13 +576,47 @@ export const updateMilestone = async (req, res) => {
       ReturnValues: 'ALL_NEW'
     };
 
+    console.log('📝 Updating milestone:', { projectId, milestoneId, updates });
+    
     const updateResult = await docClient.send(new UpdateCommand(updateParams));
+    
+    console.log('✅ Milestone updated successfully');
+
+    // ✅ AUTO-CHECK PHASE COMPLETION if this is a task
+    if (isTask && oldMilestone.parentPhase) {
+      const phaseCheck = await autoCheckPhaseCompletion(projectId, oldMilestone.parentPhase);
+      
+      if (phaseCheck.shouldAutoComplete) {
+        console.log(`✅ All tasks in phase ${oldMilestone.parentPhase} are 100% - Auto-completing phase!`);
+        
+        // Auto-complete the parent phase
+        const phaseUpdateParams = {
+          TableName: tableName,
+          Key: { projectId, milestoneId: oldMilestone.parentPhase },
+          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now, completionPercentage = :hundred',
+          ExpressionAttributeNames: {
+            '#status': 'status'
+          },
+          ExpressionAttributeValues: {
+            ':completed': 'completed',
+            ':now': new Date().toISOString(),
+            ':hundred': 100
+          },
+          ReturnValues: 'ALL_NEW'
+        };
+        
+        const phaseResult = await docClient.send(new UpdateCommand(phaseUpdateParams));
+        
+        // Send phase completion email
+        sendCompletionEmail(projectId, phaseResult.Attributes.milestoneName, "phase");
+      }
+    }
 
     await autoUpdateProjectStatus(projectId);
 
     // Send email if milestone just completed
     if (!wasCompleted && isNowCompleted) {
-      sendCompletionEmail(projectId, updateResult.Attributes.milestoneName, "milestone");
+      sendCompletionEmail(projectId, updateResult.Attributes.milestoneName, isTask ? "milestone" : "phase");
     }
 
     res.status(200).json({
@@ -455,7 +624,8 @@ export const updateMilestone = async (req, res) => {
       milestone: updateResult.Attributes
     });
   } catch (error) {
-    console.error('Error updating milestone:', error);
+    console.error('❌ Error updating milestone:', error);
+    console.error('Error details:', error.message);
     res.status(500).json({ message: 'Failed to update milestone', error: error.message });
   }
 };
@@ -474,11 +644,166 @@ export const deleteMilestone = async (req, res) => {
   };
 
   try {
-    await docClient.send(new DeleteCommand(params));
+    console.log(`🗑️ Attempting to delete milestone: ${milestoneId} from project: ${projectId}`);
+    const result = await docClient.send(new DeleteCommand(params));
+    console.log(`✅ Milestone deleted successfully:`, result);
     await autoUpdateProjectStatus(projectId);
     res.status(200).json({ message: 'Milestone deleted successfully' });
   } catch (error) {
-    console.error('Error deleting milestone:', error);
+    console.error('❌ Error deleting milestone:', error);
     res.status(500).json({ message: 'Failed to delete milestone', error: error.message });
+  }
+};
+
+// DELETE ALL milestones for a project (for cleanup)
+export const deleteAllMilestones = async (req, res) => {
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    return res.status(400).json({ message: 'projectId is required.' });
+  }
+
+  try {
+    // First, get all milestones for this project
+    const queryParams = {
+      TableName: tableName,
+      KeyConditionExpression: 'projectId = :pid',
+      ExpressionAttributeValues: {
+        ':pid': projectId
+      }
+    };
+
+    const data = await docClient.send(new QueryCommand(queryParams));
+    const milestones = data.Items || [];
+
+    console.log(`🗑️ Deleting ${milestones.length} milestones for project ${projectId}`);
+
+    // Delete each milestone
+    for (const milestone of milestones) {
+      const deleteParams = {
+        TableName: tableName,
+        Key: { 
+          projectId: milestone.projectId, 
+          milestoneId: milestone.milestoneId 
+        }
+      };
+      await docClient.send(new DeleteCommand(deleteParams));
+      console.log(`  ✅ Deleted: ${milestone.milestoneName} (${milestone.milestoneId})`);
+    }
+
+    await autoUpdateProjectStatus(projectId);
+    
+    res.status(200).json({ 
+      message: `Successfully deleted ${milestones.length} milestones`,
+      deletedCount: milestones.length
+    });
+  } catch (error) {
+    console.error('❌ Error deleting all milestones:', error);
+    res.status(500).json({ message: 'Failed to delete milestones', error: error.message });
+  }
+};
+
+// ✅ NEW: Trigger task status update when photo is confirmed
+export const syncTaskStatusFromPhotos = async (req, res) => {
+  const { projectId, taskId } = req.params;
+  
+  if (!projectId || !taskId) {
+    return res.status(400).json({ message: 'projectId and taskId are required.' });
+  }
+  
+  try {
+    console.log(`🔄 Syncing task status from photos: ${taskId}`);
+    
+    // Get task details first
+    const getParams = {
+      TableName: tableName,
+      Key: { projectId, milestoneId: taskId }
+    };
+    
+    const result = await docClient.send(new GetCommand(getParams));
+    
+    if (!result.Item) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+    
+    const task = result.Item;
+    
+    // Calculate status from photos
+    const autoStatus = await autoUpdateTaskStatus(projectId, taskId);
+    
+    if (!autoStatus) {
+      return res.status(500).json({ message: 'Failed to calculate task status' });
+    }
+    
+    console.log(`📊 Calculated status:`, autoStatus);
+    
+    // Update task with new status
+    const updateParams = {
+      TableName: tableName,
+      Key: { projectId, milestoneId: taskId },
+      UpdateExpression: 'SET #status = :status, completionPercentage = :percentage, updatedAt = :now',
+      ExpressionAttributeNames: {
+        '#status': 'status'
+      },
+      ExpressionAttributeValues: {
+        ':status': autoStatus.status,
+        ':percentage': autoStatus.completionPercentage,
+        ':now': new Date().toISOString()
+      },
+      ReturnValues: 'ALL_NEW'
+    };
+    
+    // Add completedAt if task just completed
+    if (autoStatus.status === 'completed' && task.status !== 'completed') {
+      updateParams.UpdateExpression += ', completedAt = :completedAt';
+      updateParams.ExpressionAttributeValues[':completedAt'] = new Date().toISOString();
+    }
+    
+    const updateResult = await docClient.send(new UpdateCommand(updateParams));
+    
+    // Check if parent phase should auto-complete
+    if (task.parentPhase) {
+      const phaseCheck = await autoCheckPhaseCompletion(projectId, task.parentPhase);
+      
+      if (phaseCheck.shouldAutoComplete) {
+        console.log(`✅ All tasks in phase ${task.parentPhase} are 100% - Auto-completing phase!`);
+        
+        const phaseUpdateParams = {
+          TableName: tableName,
+          Key: { projectId, milestoneId: task.parentPhase },
+          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now, completionPercentage = :hundred',
+          ExpressionAttributeNames: {
+            '#status': 'status'
+          },
+          ExpressionAttributeValues: {
+            ':completed': 'completed',
+            ':now': new Date().toISOString(),
+            ':hundred': 100
+          },
+          ReturnValues: 'ALL_NEW'
+        };
+        
+        const phaseResult = await docClient.send(new UpdateCommand(phaseUpdateParams));
+        sendCompletionEmail(projectId, phaseResult.Attributes.milestoneName, "phase");
+      }
+    }
+    
+    // Update project status
+    await autoUpdateProjectStatus(projectId);
+    
+    // Send completion email if task just completed
+    if (autoStatus.status === 'completed' && task.status !== 'completed') {
+      sendCompletionEmail(projectId, task.milestoneName, "milestone");
+    }
+    
+    res.status(200).json({
+      message: 'Task status synced successfully',
+      task: updateResult.Attributes,
+      calculatedStatus: autoStatus
+    });
+    
+  } catch (error) {
+    console.error('❌ Error syncing task status:', error);
+    res.status(500).json({ message: 'Failed to sync task status', error: error.message });
   }
 };
