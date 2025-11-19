@@ -32,7 +32,7 @@ export const generateAIReport = async (req, res) => {
         let project;
         try {
             const projectParams = {
-                TableName: 'buildwiseProjects', // Keep lowercase if that's your actual table name
+                TableName: 'buildwiseProjects',
                 Key: { projectId }
             };
             const projectResult = await docClient.send(new GetCommand(projectParams));
@@ -58,7 +58,7 @@ export const generateAIReport = async (req, res) => {
         let milestones = [];
         try {
             const milestonesParams = {
-                TableName: 'BuildWiseMilestones', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWiseMilestones',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -78,7 +78,7 @@ export const generateAIReport = async (req, res) => {
         let updates = [];
         try {
             const updatesParams = {
-                TableName: 'BuildWiseProgressUpdates', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWiseProgressUpdates',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -98,7 +98,7 @@ export const generateAIReport = async (req, res) => {
         let photos = [];
         try {
             const photosParams = {
-                TableName: 'BuildWisePhotos', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWisePhotos',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -118,7 +118,7 @@ export const generateAIReport = async (req, res) => {
         let expenses = [];
         try {
             const expensesParams = {
-                TableName: 'BuildWiseExpenses', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWiseExpenses',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -139,7 +139,7 @@ export const generateAIReport = async (req, res) => {
         let comments = [];
         try {
             const commentsParams = {
-                TableName: 'BuildWiseComments', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWiseComments',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -159,7 +159,7 @@ export const generateAIReport = async (req, res) => {
         let documents = [];
         try {
             const documentsParams = {
-                TableName: 'BuildWiseDocuments', // ✅ FIXED: Changed to PascalCase
+                TableName: 'BuildWiseDocuments',
                 FilterExpression: 'projectId = :projectId',
                 ExpressionAttributeValues: { ':projectId': projectId }
             };
@@ -190,7 +190,14 @@ export const generateAIReport = async (req, res) => {
             model: "claude-3-haiku-20240307",
             max_tokens: 4096,
             temperature: 0.7,
-            system: `You are a professional construction site supervisor writing daily progress reports. Write in natural paragraph format with flowing sentences, NOT in structured markdown format. Do not use headers (##) or bold text (**). Write like you're telling someone about the day's work in complete, professional sentences.`,
+            system: `You are a professional construction site supervisor writing Daily Accomplishment Reports in a structured format with clear sections. Format the report with the following structure:
+
+SECTION 1: Summary of Accomplishments (2-3 sentences highlighting key achievements)
+SECTION 2: Detailed Accomplishments (Create a table with columns: Task/Activity | Details/Description | Impact/Outcome | Time Spent)
+SECTION 3: Pending/Follow-up Tasks (Create a table with columns: Task/Activity | Reason for Pending | Action Plan | Expected Completion)
+SECTION 4: Reflections and Suggestions (Include personal reflections on the day's accomplishments and suggestions for improvement)
+
+Use clear headers with ---SECTION 1---, ---SECTION 2---, etc. Format tables using pipe characters (|) for columns. Keep professional tone throughout.`,
             messages: [{
                 role: "user",
                 content: aiContext
@@ -199,17 +206,18 @@ export const generateAIReport = async (req, res) => {
 
         console.log('✅ Claude AI responded successfully');
 
-        // 10. Clean up AI generated text
+        // 10. Clean up AI generated text - IMPROVED CLEANING
         console.log('🔍 Step 10: Cleaning generated text...');
         let generatedReport = message.content[0].text;
         
-        // Remove gibberish patterns
+        // Remove gibberish patterns more aggressively
         generatedReport = generatedReport
-            .replace(/(&[a-zA-Z];)+/g, ' ')           // Remove single letter & patterns
-            .replace(/(&[a-zA-Z0-9]+)+/g, ' ')        // Remove multi-letter & patterns
-            .replace(/&[a-zA-Z0-9]+&?/g, ' ')         // Remove remaining ampersand words
-            .replace(/[&=#]+/g, ' ')                  // Remove repeated special chars
-            .replace(/\s{2,}/g, ' ')                  // Remove multiple spaces
+            .replace(/&[a-zA-Z0-9#;]+/g, '')           // Remove HTML entities and gibberish
+            .replace(/[&×÷±§¶•‡†]/g, '')               // Remove special symbols
+            .replace(/([a-zA-Z]&)+/g, '')              // Remove patterns like "a&b&c&"
+            .replace(/(&[^&\s]{1,6})+/g, '')           // Remove short ampersand patterns
+            .replace(/\s{2,}/g, ' ')                   // Remove multiple spaces
+            .replace(/^\s+|\s+$/gm, '')                // Trim lines
             .trim();
 
         // 11. Save Report to DynamoDB
@@ -266,7 +274,7 @@ export const generateAIReport = async (req, res) => {
 };
 
 /**
- * Prepare AI context with project data
+ * Prepare AI context with project data - FIXED TO PREVENT UNDEFINED TEXT
  */
 const prepareAIContext = (project, milestones, updates, photos, expenses, comments, documents, reportType) => {
     const completedTasks = milestones.filter(m => m.status === 'completed').length;
@@ -274,66 +282,105 @@ const prepareAIContext = (project, milestones, updates, photos, expenses, commen
     const totalBudget = project.contractCost || 0;
     const totalSpent = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     
-    // Get recent updates
-    const recentUpdates = updates
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 5)
-        .map(u => `- ${u.title || 'Update'}: ${u.description || 'No details'}`)
-        .join('\n');
+    // Get actual milestone data - FIXED: Filter out items without names
+    const completedList = milestones
+        .filter(m => m.status === 'completed' && m.name && m.name.trim())
+        .map(m => ({
+            name: m.name.trim(),
+            description: (m.description || '').trim() || 'Task completed successfully'
+        }));
+    
+    const inProgressList = milestones
+        .filter(m => m.status === 'in progress' && m.name && m.name.trim())
+        .map(m => ({
+            name: m.name.trim(),
+            description: (m.description || '').trim() || 'Work in progress',
+            progress: m.progress || 0
+        }));
+    
+    // Format completed accomplishments - FIXED: Better formatting
+    const completedItems = completedList.length > 0 
+        ? completedList.map(m => `${m.name}: ${m.description}`).join('\n')
+        : 'No completed tasks recorded for this period';
+    
+    // Format performance metrics - FIXED: Better formatting
+    const inProgressItems = inProgressList.length > 0
+        ? inProgressList.map(m => `${m.name} (${m.progress}% complete): ${m.description}`).join('\n')
+        : 'No tasks currently in progress';
+    
+    // Format expenses as impact - FIXED: Filter out invalid expenses
+    const validExpenses = expenses.filter(e => e.description && e.description.trim() && e.amount);
+    const expensesSummary = validExpenses.length > 0 
+        ? validExpenses.map(e => `${e.description.trim()}: ₱${(e.amount || 0).toLocaleString()}`).join('\n')
+        : 'No expenses recorded for this period';
 
-    // Get photo descriptions
-    const photoDescriptions = photos
-        .filter(p => p.aiAnalysis)
-        .slice(0, 5)
-        .map(p => `- ${p.aiAnalysis}`)
-        .join('\n');
+    const totalExpensesFormatted = validExpenses.length > 0 ? `₱${totalSpent.toLocaleString()}` : '₱0';
+    
+    // Calculate progress percentage
+    const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    return `You are a professional construction project manager writing a ${reportType} progress report.
+    return `You are a professional construction company writing an ACCOMPLISHMENT REPORT FOR EMPLOYEE/TEAM for ${project.name}.
 
-Write the report in PARAGRAPH FORMAT with flowing sentences, similar to a professional daily construction report.
+DO NOT add any information that is not in the provided data. Use ONLY the facts provided below. Do not invent metrics, timelines, or outcomes.
 
-PROJECT DETAILS:
-- Project Name: ${project.name}
-- Location: ${project.location || 'Not specified'}
-- Status: ${project.status || 'Active'}
-- Contract Cost: ₱${totalBudget.toLocaleString()}
-- Start Date: ${project.startDate || 'Not specified'}
-- Completion Date: ${project.contractCompletionDate || 'Not specified'}
+Generate the report in this EXACT format:
 
-PROGRESS DATA:
-- Milestones: ${completedTasks} completed out of ${totalTasks} total
-- Budget: ₱${totalSpent.toLocaleString()} spent of ₱${totalBudget.toLocaleString()} (${totalBudget > 0 ? ((totalSpent/totalBudget)*100).toFixed(1) : 0}%)
-- Progress Updates: ${updates.length} updates logged
-- Photos: ${photos.length} uploaded, ${photos.filter(p => p.aiProcessed).length} AI-analyzed
-- Comments: ${comments.length} team comments
-- Documents: ${documents.length} files uploaded
+---HEADER---
+Accomplishment Report For Construction Team
+${project.name} – ${project.location || 'Project Location'} Construction Project
 
-RECENT PROGRESS UPDATES:
-${recentUpdates || 'No recent updates available'}
+---EMPLOYEE_INFO---
+Project Name: ${project.name}
+Location: ${project.location || 'Not specified'}
+Department: Construction Management
+Reporting Period: [Report Period] | Generated: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 
-PHOTO ANALYSIS INSIGHTS:
-${photoDescriptions || 'No AI-analyzed photos available'}
+---INTRODUCTION---
+This report documents the significant accomplishments and contributions of the construction team to ${project.name} during the specified reporting period. It aims to recognize the efforts and achievements that have positively impacted the project's progress and financial performance.
 
-MILESTONE STATUS:
-${milestones.length > 0 ? milestones.map(m => `- ${m.name}: ${m.status} (${m.progress || 0}% complete)`).join('\n') : 'No milestones defined'}
+---KEY_ACCOMPLISHMENTS---
+Project Successes:
+${completedItems}
 
-BUDGET BREAKDOWN:
-${expenses.length > 0 ? expenses.map(e => `- ${e.description || 'Expense'}: ₱${(e.amount || 0).toLocaleString()}`).slice(0, 10).join('\n') : 'No expenses recorded'}
+Performance Metrics:
+- Overall Project Progress: ${overallProgress}% complete
+- Total Milestones Completed: ${completedTasks} out of ${totalTasks}
+- Construction Tasks In Progress: ${inProgressList.length}
+- Active Updates/Documentation: ${updates.length} records
+- Photo Documentation: ${photos.length} images recorded
 
-WRITING STYLE REQUIREMENTS:
-- Write in narrative paragraph format like a professional daily report
-- Use complete sentences flowing naturally
-- Start with today's date (${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}) and weather conditions
-- Describe work progress with specific percentages and tasks from the data above
-- Include workforce numbers (make realistic estimates based on project scope)
-- Mention equipment used (make realistic estimates based on project type)
-- Include any delays or challenges (infer from progress data)
-- Break down budget allocation by category
-- Reference the recent updates and photo analysis provided above
-- Conclude with safety status and next steps
-- NO bullet points, NO headers (## or **), just natural flowing paragraphs
+---FINANCIAL_IMPACT---
+Cost Management and Budget Performance:
+- Total Project Budget: ₱${totalBudget.toLocaleString()}
+- Total Expenses Recorded: ${totalExpensesFormatted}
+- Expense Breakdown:
+${expensesSummary}
 
-Generate a professional, detailed ${reportType} report that reads like a natural narrative using ALL the data provided above.`;
+---IN_PROGRESS_TASKS---
+Current Construction Activities:
+${inProgressItems}
+
+---SKILLS_AND_LEARNING---
+Team Development and Project Knowledge:
+- Documentation provided through ${documents.length} construction documents
+- Team collaboration tracked through ${comments.length} project discussions
+- Site documentation through ${photos.length} photos for quality assurance
+
+---FOOTER---
+Copyright © ${new Date().getFullYear()} BuildWise Construction Management | All Rights Reserved
+
+FORMAT INSTRUCTIONS:
+- Use the exact section headers with --- delimiters
+- Fill in all bracketed information with actual data
+- Do NOT add information beyond what is provided
+- Keep accomplishments factual and data-driven
+- Use actual project names, locations, and metrics from the data
+- Present numbers and figures exactly as they are in the data
+- Do not estimate or assume any values
+- Do NOT use ampersands (&) or special characters in your output
+- Write in plain text without encoding
+
+Generate the complete report now using ONLY the provided data.`;
 };
 
 /**

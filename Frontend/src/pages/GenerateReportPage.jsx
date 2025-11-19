@@ -19,16 +19,15 @@ import {
 
 const getToken = () => localStorage.getItem('token');
 
-// Utility to clean gibberish from AI text results
+// Utility to clean gibberish from AI text results - IMPROVED
 const cleanText = text =>
   (text || '')
-    .replace(/&[a-z]{1,20}&/gi, ' ')
-    .replace(/&[a-z0-9]+/gi, ' ')
-    .replace(/[&]{2,}/g, ' ')
-    .replace(/[#=]+/g, ' ')
-    .replace(/(\s?[a-zA-Z0-9]\s?&)+/g, ' ')
-    .replace(/&/g, ' ')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/&[a-zA-Z0-9#;]+/g, '')           // Remove HTML entities and gibberish
+    .replace(/[&×÷±§¶•‡†]/g, '')               // Remove special symbols
+    .replace(/([a-zA-Z]&)+/g, '')              // Remove patterns like "a&b&c&"
+    .replace(/(&[^&\s]{1,6})+/g, '')           // Remove short ampersand patterns
+    .replace(/\s{2,}/g, ' ')                   // Remove multiple spaces
+    .replace(/^\s+|\s+$/gm, '')                // Trim lines
     .trim();
 
 function GenerateReportPage() {
@@ -43,6 +42,174 @@ function GenerateReportPage() {
     const [loadingReports, setLoadingReports] = useState(false);
     const [selectedReport, setSelectedReport] = useState(null);
     const [showModal, setShowModal] = useState(false);
+
+    // Parse accomplishment report sections
+    const parseAccomplishmentReport = (text) => {
+        const sections = {};
+        const sectionRegex = /---([A-Z_]+)---([\s\S]*?)(?=---[A-Z_]+---|$)/g;
+        let match;
+
+        while ((match = sectionRegex.exec(text)) !== null) {
+            const sectionName = match[1];
+            const content = cleanText(match[2].trim()); // Clean the content
+            sections[sectionName] = content;
+        }
+
+        return sections;
+    };
+
+    // Format header section with golden line
+    const renderReportHeader = (headerText) => {
+        const lines = headerText.split('\n').filter(l => l.trim());
+        return (
+            <div className="mb-8 text-center border-t-4 border-b-4 border-yellow-600 py-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20">
+                <h1 className="text-3xl font-bold text-yellow-900 dark:text-yellow-400 mb-2">
+                    {lines[0] || 'Accomplishment Report'}
+                </h1>
+                {lines.slice(1).map((line, idx) => (
+                    <p key={idx} className="text-base text-yellow-800 dark:text-yellow-300 font-semibold">
+                        {line}
+                    </p>
+                ))}
+            </div>
+        );
+    };
+
+    // Format info section with project details
+    const renderInfoSection = (infoText) => {
+        const lines = infoText.split('\n').filter(l => l.trim());
+        const details = lines.map(line => {
+            const [label, ...rest] = line.split(':');
+            return { label: label.trim(), value: rest.join(':').trim() };
+        });
+
+        return (
+            <div className="mb-8 bg-white dark:bg-slate-800 border-l-4 border-yellow-600 p-6 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {details.map((item, idx) => (
+                        <div key={idx}>
+                            <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">{item.label}</p>
+                            <p className="text-gray-800 dark:text-slate-300">{item.value}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    // Format section with proper styling
+    const renderAccomplishmentSection = (title, body) => {
+        const isTable = body.includes('|');
+        const isList = body.split('\n').some(l => l.trim().startsWith('-'));
+
+        return (
+            <div className="mb-8">
+                <h2 className="text-2xl font-bold text-yellow-900 dark:text-yellow-500 mb-4 pb-3 border-b-2 border-yellow-400 dark:border-yellow-700">
+                    {title}
+                </h2>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg">
+                    {isTable ? (
+                        renderTable(body)
+                    ) : isList ? (
+                        <ul className="space-y-3">
+                            {body.split('\n').filter(l => l.trim()).map((line, idx) => {
+                                const cleanLine = line.trim().replace(/^[-•]\s*/, '');
+                                return (
+                                    <li key={idx} className="flex gap-3 text-gray-700 dark:text-slate-300">
+                                        <span className="text-yellow-600 dark:text-yellow-500 font-bold">•</span>
+                                        <span>{cleanLine}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    ) : (
+                        <p className="text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{body}</p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // Format footer
+    const renderFooter = (footerText) => {
+        return (
+            <div className="mt-12 pt-6 border-t-2 border-yellow-300 dark:border-yellow-700 text-center text-sm text-gray-600 dark:text-slate-400">
+                <p>{footerText}</p>
+            </div>
+        );
+    };
+
+    // Render table from pipe format
+    const renderTable = (tableText) => {
+        const lines = tableText.split('\n').filter(line => line.trim());
+        if (lines.length < 2) {
+            return <p className="text-gray-700 dark:text-slate-300">{tableText}</p>;
+        }
+
+        // Find header line - should be first line with pipes and actual content
+        let headerLine = null;
+        let headerIndex = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const cells = lines[i].split('|').map(c => c.trim()).filter(c => c);
+            if (cells.length > 0 && !lines[i].includes('---')) {
+                headerLine = cells;
+                headerIndex = i;
+                break;
+            }
+        }
+
+        if (!headerLine) {
+            return <p className="text-gray-700 dark:text-slate-300">{tableText}</p>;
+        }
+
+        // Get body rows - everything after header, skip separator lines
+        const bodyLines = lines.slice(headerIndex + 1).filter(line => {
+            const cleaned = line.replace(/[|\s-]/g, '');
+            return cleaned.length > 0 && !line.includes('---');
+        });
+
+        const bodyRows = bodyLines.map(line => {
+            return line.split('|').map(c => c.trim()).filter(c => c);
+        }).filter(row => row.length > 0);
+
+        if (bodyRows.length === 0) {
+            return <p className="text-gray-700 dark:text-slate-300">{tableText}</p>;
+        }
+
+        return (
+            <div className="overflow-x-auto mb-6 border border-gray-300 dark:border-slate-600 rounded-lg">
+                <table className="w-full border-collapse bg-white dark:bg-slate-800">
+                    <thead>
+                        <tr className="bg-yellow-100 dark:bg-yellow-900/30 border-b-2 border-yellow-400 dark:border-yellow-700">
+                            {headerLine.map((header, idx) => (
+                                <th 
+                                    key={idx} 
+                                    className="border-r border-gray-300 dark:border-slate-600 px-4 py-3 text-left text-sm font-bold text-yellow-900 dark:text-yellow-400"
+                                >
+                                    {header}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {bodyRows.map((row, rowIdx) => (
+                            <tr key={rowIdx} className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                                {row.map((cell, cellIdx) => (
+                                    <td 
+                                        key={cellIdx} 
+                                        className="border-r border-gray-200 dark:border-slate-700 px-4 py-3 text-sm text-gray-800 dark:text-slate-300 last:border-r-0"
+                                    >
+                                        {cell}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
 
     useEffect(() => {
         if (projectId) {
@@ -120,7 +287,7 @@ function GenerateReportPage() {
         setShowModal(true);
     };
 
-    // PDF Download (uses cleaned text)
+    // PDF Download - BLACK AND WHITE ONLY
     const handleDownloadPDF = (report) => {
         try {
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -131,7 +298,7 @@ function GenerateReportPage() {
             let yPosition = margin;
 
             const checkAndAddPage = (requiredSpace) => {
-                if (yPosition + requiredSpace > pageHeight - margin) {
+                if (yPosition + requiredSpace > pageHeight - margin - 10) {
                     doc.addPage();
                     yPosition = margin;
                     return true;
@@ -139,64 +306,226 @@ function GenerateReportPage() {
                 return false;
             };
 
-            // Header
-            doc.setFillColor(37, 99, 235);
-            doc.rect(0, 0, pageWidth, 40, 'F');
-            doc.setTextColor(255, 255, 255);
+            // Parse sections and clean text
+            const sections = parseAccomplishmentReport(report.generatedText);
+
+            // 1. HEADER with BLACK borders only
+            checkAndAddPage(15);
+            doc.setLineWidth(2);
+            doc.setDrawColor(0, 0, 0); // BLACK
+            doc.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 4;
+
             doc.setFontSize(20);
             doc.setFont('helvetica', 'bold');
-            doc.text('BuildWise Construction Report', margin, 18);
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${report.projectName}`, margin, 28);
-            doc.text(`${report.reportType.toUpperCase()}`, margin, 35);
-            yPosition = 50;
-
-            // Report Info
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Generated: ${new Date(report.createdAt).toLocaleString()}`, margin, yPosition);
-            yPosition += 10;
-
-            // Report Content
-            checkAndAddPage(15);
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Report Content', margin, yPosition);
+            doc.setTextColor(0, 0, 0); // BLACK
+            doc.text('Accomplishment Report For Construction Team', pageWidth / 2, yPosition, { align: 'center' });
             yPosition += 8;
 
-            const reportText = cleanText(report.generatedText || 'No content available');
-            const lines = reportText.split('\n');
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
+            if (sections.HEADER) {
+                const lines = sections.HEADER.split('\n').filter(l => l.trim());
+                lines.slice(1).forEach(line => {
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(60, 60, 60); // DARK GRAY
+                    doc.text(cleanText(line), pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 5;
+                });
+            }
 
-            lines.forEach(line => {
-                if (!line.trim()) {
-                    yPosition += 3;
-                    return;
-                }
-                checkAndAddPage(6);
-                const splitText = doc.splitTextToSize(line, contentWidth);
-                doc.text(splitText, margin, yPosition);
-                yPosition += splitText.length * 5;
-            });
+            yPosition += 2;
+            doc.setDrawColor(0, 0, 0); // BLACK
+            doc.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 6;
 
-            // Footer
+            // 2. EMPLOYEE INFO - BLACK AND WHITE
+            if (sections.EMPLOYEE_INFO) {
+                checkAndAddPage(18);
+                const infoLines = sections.EMPLOYEE_INFO.split('\n').filter(l => l.trim());
+                const itemsPerRow = 2;
+                let infoOnCurrentRow = 0;
+
+                infoLines.forEach((line) => {
+                    if (infoOnCurrentRow === 0) {
+                        checkAndAddPage(6);
+                    }
+
+                    const [label, ...rest] = line.split(':');
+                    const value = rest.join(':').trim();
+
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 0, 0); // BLACK
+                    doc.text(cleanText(label.trim()) + ':', margin + (infoOnCurrentRow * contentWidth / itemsPerRow), yPosition);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(50, 50, 50); // DARK GRAY
+                    doc.text(cleanText(value), margin + (infoOnCurrentRow * contentWidth / itemsPerRow) + 40, yPosition);
+
+                    infoOnCurrentRow++;
+                    if (infoOnCurrentRow >= itemsPerRow) {
+                        infoOnCurrentRow = 0;
+                        yPosition += 6;
+                    }
+                });
+                if (infoOnCurrentRow > 0) yPosition += 6;
+                yPosition += 3;
+            }
+
+            // 3. INTRODUCTION - BLACK AND WHITE
+            if (sections.INTRODUCTION) {
+                checkAndAddPage(12);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0); // BLACK
+                doc.text('Introduction', margin, yPosition);
+                yPosition += 6;
+
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(50, 50, 50); // DARK GRAY
+                const introLines = doc.splitTextToSize(cleanText(sections.INTRODUCTION.trim()), contentWidth);
+                doc.text(introLines, margin, yPosition);
+                yPosition += (introLines.length * 4) + 4;
+            }
+
+            // 4. KEY ACCOMPLISHMENTS - BLACK AND WHITE
+            if (sections.KEY_ACCOMPLISHMENTS) {
+                checkAndAddPage(12);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0); // BLACK
+                doc.text('Key Accomplishments', margin, yPosition);
+                yPosition += 6;
+
+                const accomplishLines = sections.KEY_ACCOMPLISHMENTS.trim().split('\n');
+                accomplishLines.forEach(line => {
+                    if (!line.trim()) return;
+                    checkAndAddPage(5);
+                    
+                    doc.setFontSize(10);
+                    if (line.trim().endsWith(':')) {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(0, 0, 0); // BLACK
+                        doc.text(cleanText(line.trim()), margin + 3, yPosition);
+                        yPosition += 5;
+                    } else {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(50, 50, 50); // DARK GRAY
+                        const cleanLine = cleanText(line.trim().replace(/^[-•]\s*/, ''));
+                        const wrappedLines = doc.splitTextToSize(`• ${cleanLine}`, contentWidth - 6);
+                        doc.text(wrappedLines, margin + 3, yPosition);
+                        yPosition += (wrappedLines.length * 4) + 1;
+                    }
+                });
+                yPosition += 2;
+            }
+
+            // 5. FINANCIAL IMPACT - BLACK AND WHITE
+            if (sections.FINANCIAL_IMPACT) {
+                checkAndAddPage(12);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0); // BLACK
+                doc.text('Financial Impact', margin, yPosition);
+                yPosition += 6;
+
+                const financeLines = sections.FINANCIAL_IMPACT.trim().split('\n');
+                financeLines.forEach(line => {
+                    if (!line.trim()) return;
+                    checkAndAddPage(5);
+                    
+                    doc.setFontSize(10);
+                    if (line.trim().endsWith(':')) {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(0, 0, 0); // BLACK
+                        doc.text(cleanText(line.trim()), margin + 3, yPosition);
+                        yPosition += 5;
+                    } else {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(50, 50, 50); // DARK GRAY
+                        const cleanLine = cleanText(line.trim().replace(/^[-•]\s*/, ''));
+                        const wrappedLines = doc.splitTextToSize(`• ${cleanLine}`, contentWidth - 6);
+                        doc.text(wrappedLines, margin + 3, yPosition);
+                        yPosition += (wrappedLines.length * 4) + 1;
+                    }
+                });
+                yPosition += 2;
+            }
+
+            // 6. IN-PROGRESS TASKS - BLACK AND WHITE
+            if (sections.IN_PROGRESS_TASKS) {
+                checkAndAddPage(12);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0); // BLACK
+                doc.text('In-Progress Construction Activities', margin, yPosition);
+                yPosition += 6;
+
+                const taskLines = sections.IN_PROGRESS_TASKS.trim().split('\n');
+                taskLines.forEach(line => {
+                    if (!line.trim()) return;
+                    checkAndAddPage(5);
+                    
+                    doc.setFontSize(10);
+                    if (line.trim().endsWith(':')) {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(0, 0, 0); // BLACK
+                        doc.text(cleanText(line.trim()), margin + 3, yPosition);
+                        yPosition += 5;
+                    } else {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(50, 50, 50); // DARK GRAY
+                        const cleanLine = cleanText(line.trim().replace(/^[-•]\s*/, ''));
+                        const wrappedLines = doc.splitTextToSize(`• ${cleanLine}`, contentWidth - 6);
+                        doc.text(wrappedLines, margin + 3, yPosition);
+                        yPosition += (wrappedLines.length * 4) + 1;
+                    }
+                });
+                yPosition += 2;
+            }
+
+            // 7. SKILLS AND LEARNING - BLACK AND WHITE
+            if (sections.SKILLS_AND_LEARNING) {
+                checkAndAddPage(10);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0); // BLACK
+                doc.text('Team Development and Project Knowledge', margin, yPosition);
+                yPosition += 6;
+
+                const skillLines = sections.SKILLS_AND_LEARNING.trim().split('\n');
+                skillLines.forEach(line => {
+                    if (!line.trim()) return;
+                    checkAndAddPage(5);
+                    
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(50, 50, 50); // DARK GRAY
+                    const cleanLine = cleanText(line.trim().replace(/^[-•]\s*/, ''));
+                    const wrappedLines = doc.splitTextToSize(`• ${cleanLine}`, contentWidth - 6);
+                    doc.text(wrappedLines, margin + 3, yPosition);
+                    yPosition += (wrappedLines.length * 4) + 1;
+                });
+            }
+
+            // Footer on all pages - BLACK AND WHITE
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
                 doc.setFontSize(8);
-                doc.setTextColor(128, 128, 128);
+                doc.setTextColor(100, 100, 100); // GRAY
+                doc.setDrawColor(150, 150, 150); // LIGHT GRAY
+                doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
                 doc.text(
-                    `Page ${i} of ${pageCount} | BuildWise AI Report | ${new Date().toLocaleDateString()}`,
+                    `Page ${i} of ${pageCount} | BuildWise Construction Management | ${new Date().toLocaleDateString()}`,
                     pageWidth / 2,
-                    pageHeight - 10,
+                    pageHeight - 8,
                     { align: 'center' }
                 );
             }
 
-            doc.save(`${report.projectName}_${report.reportType}_${new Date(report.createdAt).toISOString().split('T')[0]}.pdf`);
+            doc.save(`${report.projectName}_Accomplishment_Report_${new Date(report.createdAt).toISOString().split('T')[0]}.pdf`);
             alert('✅ PDF downloaded successfully!');
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -264,9 +593,6 @@ function GenerateReportPage() {
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                                 AI-Powered Report Generation
                             </h3>
-                            {/* <p className="text-sm text-gray-600 dark:text-slate-400">
-                                Generate comprehensive construction reports using Claude AI with ALL project data
-                            </p> */}
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -405,14 +731,14 @@ function GenerateReportPage() {
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Modal Header */}
-                            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl p-6">
+                            <div className="bg-gradient-to-r from-yellow-600 via-yellow-700 to-yellow-900 rounded-t-2xl p-6">
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <h2 className="text-2xl font-bold text-white capitalize mb-2">
-                                            {selectedReport.reportType}
+                                        <h2 className="text-2xl font-bold text-white mb-1">
+                                            Accomplishment Report
                                         </h2>
-                                        <p className="text-blue-100 text-sm">
-                                            Generated: {new Date(selectedReport.createdAt).toLocaleString()}
+                                        <p className="text-yellow-100 text-sm">
+                                            {selectedReport.projectName} • Generated: {new Date(selectedReport.createdAt).toLocaleString()}
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
@@ -433,12 +759,47 @@ function GenerateReportPage() {
                                 </div>
                             </div>
                             {/* Modal Content */}
-                            <div className="p-8 max-h-[70vh] overflow-y-auto">
-                                <div className="prose prose-lg max-w-none">
-                                    <div className="whitespace-pre-wrap text-gray-800 dark:text-slate-200 leading-relaxed">
-                                        {cleanText(selectedReport.generatedText || '')}
-                                    </div>
-                                </div>
+                            <div className="p-8 max-h-[80vh] overflow-y-auto bg-white dark:bg-slate-800">
+                                {(() => {
+                                    const sections = parseAccomplishmentReport(selectedReport.generatedText);
+                                    
+                                    return (
+                                        <div className="max-w-4xl">
+                                            {/* Header */}
+                                            {sections.HEADER && renderReportHeader(sections.HEADER)}
+                                            
+                                            {/* Employee Info */}
+                                            {sections.EMPLOYEE_INFO && renderInfoSection(sections.EMPLOYEE_INFO)}
+                                            
+                                            {/* Introduction */}
+                                            {sections.INTRODUCTION && (
+                                                <div className="mb-8">
+                                                    <h2 className="text-2xl font-bold text-yellow-900 dark:text-yellow-500 mb-4 pb-3 border-b-2 border-yellow-400 dark:border-yellow-700">
+                                                        Introduction
+                                                    </h2>
+                                                    <p className="text-gray-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-800 p-6 rounded-lg">
+                                                        {sections.INTRODUCTION.trim()}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Key Accomplishments */}
+                                            {sections.KEY_ACCOMPLISHMENTS && renderAccomplishmentSection('Key Accomplishments', sections.KEY_ACCOMPLISHMENTS)}
+                                            
+                                            {/* Financial Impact */}
+                                            {sections.FINANCIAL_IMPACT && renderAccomplishmentSection('Financial Impact', sections.FINANCIAL_IMPACT)}
+                                            
+                                            {/* In Progress Tasks */}
+                                            {sections.IN_PROGRESS_TASKS && renderAccomplishmentSection('In-Progress Construction Activities', sections.IN_PROGRESS_TASKS)}
+                                            
+                                            {/* Skills and Learning */}
+                                            {sections.SKILLS_AND_LEARNING && renderAccomplishmentSection('Team Development and Project Knowledge', sections.SKILLS_AND_LEARNING)}
+                                            
+                                            {/* Footer */}
+                                            {sections.FOOTER && renderFooter(sections.FOOTER)}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

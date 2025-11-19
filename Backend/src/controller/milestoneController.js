@@ -50,14 +50,16 @@ const autoUpdateTaskStatus = async (projectId, taskId) => {
     
     console.log(`✅ Found ${confirmedPhotos.length} confirmed photos with user input`);
     
-    // Calculate average completion from user-confirmed percentages
+    // ✅ FIXED: Sum up all percentages (accumulative) instead of averaging
+    // This way: 36% + 45% = 81% (not 40.5% from averaging)
     let completionPercentage = 0;
     
     if (confirmedPhotos.length > 0) {
       const totalPercentage = confirmedPhotos.reduce((sum, photo) => {
         return sum + (parseFloat(photo.userInputPercentage) || 0);
       }, 0);
-      completionPercentage = Math.round(totalPercentage / confirmedPhotos.length);
+      // ✅ Accumulate percentages and cap at 100%
+      completionPercentage = Math.min(Math.round(totalPercentage), 100);
     }
     
     // Determine status based on completion
@@ -75,7 +77,7 @@ const autoUpdateTaskStatus = async (projectId, taskId) => {
       status = 'completed';
     }
     
-    console.log(`📊 Task ${taskId} - Status: ${status}, Completion: ${completionPercentage}%`);
+    console.log(`📊 Task ${taskId} - Status: ${status}, Completion: ${completionPercentage}% (accumulated from ${confirmedPhotos.length} photos)`);
     
     return { status, completionPercentage };
     
@@ -362,43 +364,46 @@ export const canCompletePhase = async (req, res) => {
 };
 
 // ✅ Email helper with CORRECT table names
-const sendCompletionEmail = async (projectId, milestoneName, completionType = "milestone") => {
+const sendCompletionEmail = async (projectId, milestoneName, completionType = "milestone", loggedInUserId = null) => {
   console.log(`\n🔍 === Starting ${completionType} email process ===`);
   console.log(`📋 Project ID: ${projectId}`);
   console.log(`📌 Milestone: ${milestoneName}`);
+  console.log(`👤 Logged-in User ID: ${loggedInUserId}`);
   
   try {
-    // 1. Fetch project
-    console.log(`\n🔎 STEP 1: Fetching project...`);
-    const projectParams = {
-      TableName: "buildwiseProjects",  // ✅ CORRECT - lowercase b and w
-      Key: { projectId }
-    };
+    // 1. Get the user email from the logged-in user (not project manager)
+    let userId = loggedInUserId;
     
-    const projectResult = await docClient.send(new GetCommand(projectParams));
-    
-    if (!projectResult.Item) {
-      console.log(`❌ Project not found: ${projectId}`);
-      return false;
-    }
+    // If no logged-in user, fallback to project manager
+    if (!userId) {
+      console.log(`\n🔎 STEP 1: Fetching project...`);
+      const projectParams = {
+        TableName: "buildwiseProjects",
+        Key: { projectId }
+      };
+      
+      const projectResult = await docClient.send(new GetCommand(projectParams));
+      
+      if (!projectResult.Item) {
+        console.log(`❌ Project not found: ${projectId}`);
+        return false;
+      }
 
-    const project = projectResult.Item;
-    console.log(`✅ Project: "${project.name || project.projectName}"`);
-    
-    // 2. Get user ID
-    const userId = project.projectManagerId || project.createdBy || project.userId || project.ownerId;
+      const project = projectResult.Item;
+      userId = project.projectManagerId || project.createdBy || project.userId || project.ownerId;
+    }
     
     if (!userId) {
-      console.log(`❌ No user ID in project`);
+      console.log(`❌ No user ID found`);
       return false;
     }
 
     console.log(`✅ User ID: ${userId}`);
 
-    // 3. Fetch user
+    // 2. Fetch user
     console.log(`\n🔎 STEP 2: Fetching user...`);
     const userParams = {
-      TableName: "BuildWiseUsers",  // ✅ CORRECT - capital B and W
+      TableName: "BuildWiseUsers",
       Key: { userId }
     };
     
@@ -418,16 +423,16 @@ const sendCompletionEmail = async (projectId, milestoneName, completionType = "m
 
     console.log(`✅ Sending to: ${user.email}`);
 
-    // 4. Send email
+    // 3. Send email
     await sendMilestoneCompletionEmail(
       user.email,
       user.name || user.username || "Project Manager",
-      project.name || project.projectName || "Your Project",
+      projectId, // Will fetch project name inside if needed
       milestoneName + (completionType === "phase" ? " (Phase)" : ""),
       new Date().toISOString()
     );
 
-    console.log(`✅✅✅ Email sent successfully!\n`);
+    console.log(`✅✅✅ Email sent successfully to ${user.email}!\n`);
     return true;
     
   } catch (error) {
@@ -487,8 +492,8 @@ export const completePhase = async (req, res) => {
 
     const result = await docClient.send(new UpdateCommand(updateParams));
 
-    // Send email notification
-    sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase");
+    // ✅ AWAIT and SEND email notification to logged-in user
+    await sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase", req.user.id);
 
     res.status(200).json({
       message: 'Phase completed successfully!',

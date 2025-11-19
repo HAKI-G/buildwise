@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import { sendPhaseCompletionNotification, showToast } from '../services/notificationService';
 
 // Helper to get token
 const getToken = () => localStorage.getItem('token');
@@ -176,9 +177,9 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 for (const orphan of orphanedTasks) {
                     try {
                         await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${orphan.milestoneId}`, config);
-                        console.log(`  ✅ Auto-deleted orphaned task: ${orphan.milestoneName}`);
+                        console.log(`✅ Auto-deleted orphaned task: ${orphan.milestoneName}`);
                     } catch (err) {
-                        console.error(`  ❌ Failed to delete orphaned task: ${orphan.milestoneName}`, err);
+                        console.error(`❌ Failed to delete orphaned task: ${orphan.milestoneName}`, err);
                     }
                 }
                 
@@ -222,11 +223,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 }
             }
             
-            // Clear tasks first, then set new data
-            setTasks([]);
-            setTimeout(() => {
-                setTasks(mappedTasks);
-            }, 0);
+           setTasks(mappedTasks);
             
             await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
             setError('');
@@ -276,6 +273,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         try {
             const newStatus = task.status === "completed" ? "in progress" : "completed";
             const newCompletion = newStatus === "completed" ? 100 : (task.completionPercentage || 0);
+            const taskName = task.milestoneName || task.name || 'Unknown Task';
             
             await axios.put(
                 `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
@@ -286,11 +284,18 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 config
             );
 
+            // Show toast notification
+            if (newStatus === "completed") {
+                showToast(`✅ ${taskName} completed!`, 'success');
+            } else {
+                showToast(`ℹ️ ${taskName} marked as in progress`, 'info');
+            }
+
             console.log('✅ Task updated - Email should be sent');
             await fetchProjectTasks();
         } catch (err) {
             console.error("Error updating task:", err);
-            alert("Failed to update task status");
+            showToast('Failed to update task status', 'error');
         }
     };
 
@@ -301,18 +306,22 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         setCompletingPhase(phaseId);
         
         try {
+            // Find the phase name
+            const phase = tasks.find(t => t.milestoneId === phaseId);
+            const phaseName = phase?.milestoneName || phase?.name || 'Unknown Phase';
+            
             await axios.post(
                 `http://localhost:5001/api/milestones/${projectId}/phase/${phaseId}/complete`,
                 {},
                 config
             );
             
-            alert('✅ Phase completed successfully!');
+            // No toast notification - email will be sent silently
             await fetchProjectTasks();
         } catch (err) {
             console.error('Error completing phase:', err);
             const errorMsg = err.response?.data?.message || 'Failed to complete phase';
-            alert(`❌ ${errorMsg}`);
+            showToast(`❌ ${errorMsg}`, 'error');
         } finally {
             setCompletingPhase(null);
         }
@@ -501,18 +510,18 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             if (isPhase) {
                 const childTasks = tasks.filter(t => t.parentPhase === taskToDelete && !t.isPhase);
                 
-                console.log(`  → Deleting ${childTasks.length} child tasks first`);
+                console.log(`→ Deleting ${childTasks.length} child tasks first`);
                 
                 // Delete all child tasks first
                 for (const childTask of childTasks) {
                     await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${childTask.milestoneId}`, config);
-                    console.log(`    ✅ Deleted child task: ${childTask.milestoneName}`);
+                    console.log(`✅ Deleted child task: ${childTask.milestoneName}`);
                 }
             }
             
             // Delete the phase/task itself
             await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${taskToDelete}`, config);
-            console.log(`  ✅ Deleted ${isPhase ? 'phase' : 'task'}: ${itemToDelete?.milestoneName}`);
+            console.log(`✅ Deleted ${isPhase ? 'phase' : 'task'}: ${itemToDelete?.milestoneName}`);
             
             // Close modal and clear selection
             setShowDeleteConfirm(false);
@@ -625,7 +634,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                 </div>
                                 
                                 <div className="ml-auto flex items-center space-x-2">
-                                    {phase.milestoneId !== 'unassigned' && !isPhaseCompleted && (
+                                    {phase.milestoneId !== 'unassigned' && !readonly && (
                                         <button
                                             onClick={() => handleCompletePhase(phase.milestoneId)}
                                             disabled={!phaseStatus.canComplete || completingPhase === phase.milestoneId}
