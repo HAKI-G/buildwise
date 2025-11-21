@@ -68,7 +68,7 @@ export const createUserAdmin = async (req, res) => {
     }
     
     // Validate role
-    const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President'];
+    const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President', 'Viewer'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Invalid role', validRoles });
     }
@@ -165,7 +165,7 @@ export const updateUserAdmin = async (req, res) => {
     
     // ✅ Check if role changed and send notification
     if (role !== undefined) {
-      const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President'];
+      const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President', 'Viewer'];
       if (!validRoles.includes(role)) {
         return res.status(400).json({ error: 'Invalid role', validRoles });
       }
