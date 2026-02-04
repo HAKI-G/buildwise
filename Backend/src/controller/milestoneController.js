@@ -110,16 +110,16 @@ const autoCheckPhaseCompletion = async (projectId, phaseId) => {
       return { canComplete: false, shouldAutoComplete: false };
     }
     
-    // Check if all tasks are 100% complete
+    // Check if all tasks are completed (status = 'completed')
     const allTasksComplete = tasksInPhase.every(task => 
-      (task.completionPercentage || 0) >= 100
+      task.status === 'completed'
     );
     
     return { 
       canComplete: allTasksComplete, 
       shouldAutoComplete: allTasksComplete,
       totalTasks: tasksInPhase.length,
-      completedTasks: tasksInPhase.filter(t => (t.completionPercentage || 0) >= 100).length
+      completedTasks: tasksInPhase.filter(t => t.status === 'completed').length
     };
     
   } catch (error) {
@@ -344,9 +344,9 @@ export const canCompletePhase = async (req, res) => {
     );
 
     const allTasksCompleted = tasksInPhase.length > 0 &&
-      tasksInPhase.every(task => (task.completionPercentage || 0) >= 100);
+      tasksInPhase.every(task => task.status === 'completed');
 
-    const completedTasks = tasksInPhase.filter(t => (t.completionPercentage || 0) >= 100).length;
+    const completedTasks = tasksInPhase.filter(t => t.status === 'completed').length;
 
     res.status(200).json({
       canComplete: allTasksCompleted,
@@ -462,13 +462,13 @@ export const completePhase = async (req, res) => {
     );
 
     const allTasksCompleted = tasksInPhase.length > 0 &&
-      tasksInPhase.every(task => (task.completionPercentage || 0) >= 100);
+      tasksInPhase.every(task => task.status === 'completed');
 
     if (!allTasksCompleted) {
       return res.status(400).json({
-        message: "Cannot complete phase - not all tasks are 100% completed",
+        message: "Cannot complete phase - not all tasks are completed",
         totalTasks: tasksInPhase.length,
-        completedTasks: tasksInPhase.filter(t => (t.completionPercentage || 0) >= 100).length
+        completedTasks: tasksInPhase.filter(t => t.status === 'completed').length
       });
     }
 
@@ -493,7 +493,9 @@ export const completePhase = async (req, res) => {
     const result = await docClient.send(new UpdateCommand(updateParams));
 
     // ✅ AWAIT and SEND email notification to logged-in user
-    await sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase", req.user.id);
+    if (req.user?.id) {
+      await sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase", req.user.id);
+    }
 
     res.status(200).json({
       message: 'Phase completed successfully!',
@@ -508,7 +510,8 @@ export const completePhase = async (req, res) => {
   }
 };
 
-// PUT /api/milestones/:projectId/:milestoneId
+// ✅ FIXED: PUT /api/milestones/:projectId/:milestoneId
+// Now respects manual status updates from checkbox
 export const updateMilestone = async (req, res) => {
   const { projectId, milestoneId } = req.params;
   const updates = req.body;
@@ -532,14 +535,17 @@ export const updateMilestone = async (req, res) => {
     const oldMilestone = result.Item;
     const isTask = !oldMilestone.isPhase;
     
-    // ✅ AUTO-UPDATE TASK STATUS based on photos
-    if (isTask) {
+    // ✅ FIXED: Only auto-update when syncFromPhotos flag is present
+    // This allows manual checkbox updates while keeping photo-based auto-updates
+    if (isTask && updates.syncFromPhotos === true) {
+      console.log(`📊 Syncing task status from photos (triggered by photo confirmation)`);
+      
       const autoStatus = await autoUpdateTaskStatus(projectId, milestoneId);
       
       if (autoStatus) {
         console.log(`📊 Auto-calculated task status:`, autoStatus);
         
-        // Override any manual status updates with calculated status
+        // Override with calculated status only when explicitly syncing
         updates.status = autoStatus.status;
         updates.completionPercentage = autoStatus.completionPercentage;
         
@@ -548,10 +554,23 @@ export const updateMilestone = async (req, res) => {
           updates.completedAt = new Date().toISOString();
         }
       }
+      
+      // Remove the sync flag before saving
+      delete updates.syncFromPhotos;
     }
 
     const wasCompleted = oldMilestone.status === "completed";
     const isNowCompleted = updates.status === "completed" || (updates.completionPercentage && updates.completionPercentage >= 100);
+
+    // Add completedAt timestamp for manual completion
+    if (!wasCompleted && isNowCompleted && !updates.completedAt) {
+      updates.completedAt = new Date().toISOString();
+    }
+
+    // Clear completedAt if marking as incomplete
+    if (wasCompleted && !isNowCompleted) {
+      updates.completedAt = null;
+    }
 
     // Build update expression with proper attribute name handling
     const updateExpressions = [];
@@ -592,20 +611,19 @@ export const updateMilestone = async (req, res) => {
       const phaseCheck = await autoCheckPhaseCompletion(projectId, oldMilestone.parentPhase);
       
       if (phaseCheck.shouldAutoComplete) {
-        console.log(`✅ All tasks in phase ${oldMilestone.parentPhase} are 100% - Auto-completing phase!`);
+        console.log(`✅ All tasks in phase ${oldMilestone.parentPhase} are completed - Auto-completing phase!`);
         
         // Auto-complete the parent phase
         const phaseUpdateParams = {
           TableName: tableName,
           Key: { projectId, milestoneId: oldMilestone.parentPhase },
-          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now, completionPercentage = :hundred',
+          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now',
           ExpressionAttributeNames: {
             '#status': 'status'
           },
           ExpressionAttributeValues: {
             ':completed': 'completed',
-            ':now': new Date().toISOString(),
-            ':hundred': 100
+            ':now': new Date().toISOString()
           },
           ReturnValues: 'ALL_NEW'
         };
@@ -771,19 +789,18 @@ export const syncTaskStatusFromPhotos = async (req, res) => {
       const phaseCheck = await autoCheckPhaseCompletion(projectId, task.parentPhase);
       
       if (phaseCheck.shouldAutoComplete) {
-        console.log(`✅ All tasks in phase ${task.parentPhase} are 100% - Auto-completing phase!`);
+        console.log(`✅ All tasks in phase ${task.parentPhase} are completed - Auto-completing phase!`);
         
         const phaseUpdateParams = {
           TableName: tableName,
           Key: { projectId, milestoneId: task.parentPhase },
-          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now, completionPercentage = :hundred',
+          UpdateExpression: 'SET #status = :completed, completedAt = :now, updatedAt = :now',
           ExpressionAttributeNames: {
             '#status': 'status'
           },
           ExpressionAttributeValues: {
             ':completed': 'completed',
-            ':now': new Date().toISOString(),
-            ':hundred': 100
+            ':now': new Date().toISOString()
           },
           ReturnValues: 'ALL_NEW'
         };
