@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../utils/axios';
 import { sendPhaseCompletionNotification, showToast } from '../services/notificationService';
 
 // Helper to get token
@@ -35,6 +35,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [taskToDelete, setTaskToDelete] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [updatingTaskId, setUpdatingTaskId] = useState(null); // Track which task checkbox is being clicked
     
     const [completingPhase, setCompletingPhase] = useState(null);
     const [phaseCompletionStatus, setPhaseCompletionStatus] = useState({});
@@ -103,13 +104,11 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
     };
 
     const fetchProjectTasks = async () => {
-        const token = getToken();
-        if (!token || !projectId) return;
+        if (!projectId) return;
 
         setLoading(true);
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
+            const response = await axios.get(`/milestones/project/${projectId}`);
             
             // ✅ FIX: Map estimatedCost to internal state
             const mappedTasks = (response.data || []).map(task => {
@@ -172,11 +171,9 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 })));
                 
                 // Auto-delete orphaned tasks
-                const token = getToken();
-                const config = { headers: { Authorization: `Bearer ${token}` } };
                 for (const orphan of orphanedTasks) {
                     try {
-                        await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${orphan.milestoneId}`, config);
+                        await axios.delete(`/milestones/${projectId}/${orphan.milestoneId}`);
                         console.log(`✅ Auto-deleted orphaned task: ${orphan.milestoneName}`);
                     } catch (err) {
                         console.error(`❌ Failed to delete orphaned task: ${orphan.milestoneName}`, err);
@@ -185,7 +182,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 
                 // Re-fetch after cleanup
                 if (orphanedTasks.length > 0) {
-                    const cleanResponse = await axios.get(`http://localhost:5001/api/milestones/project/${projectId}`, config);
+                    const cleanResponse = await axios.get(`/milestones/project/${projectId}`);
                     const cleanMappedTasks = (cleanResponse.data || []).map(task => {
                         let parsedCost = 0;
                         if (task.estimatedCost !== undefined && task.estimatedCost !== null) {
@@ -216,7 +213,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                         };
                     });
                     setTasks(cleanMappedTasks);
-                    await checkAllPhasesCompletionStatus(cleanMappedTasks.filter(t => t.isPhase), config);
+                    await checkAllPhasesCompletionStatus(cleanMappedTasks.filter(t => t.isPhase));
                     setError('');
                     setLoading(false);
                     return;
@@ -225,7 +222,7 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             
            setTasks(mappedTasks);
             
-            await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase), config);
+            await checkAllPhasesCompletionStatus(mappedTasks.filter(t => t.isPhase));
             setError('');
         } catch (err) {
             console.error('Error fetching tasks:', err);
@@ -240,14 +237,13 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         }
     };
 
-    const checkAllPhasesCompletionStatus = async (phasesList, config) => {
+    const checkAllPhasesCompletionStatus = async (phasesList) => {
         const statusMap = {};
         
         for (const phase of phasesList) {
             try {
                 const response = await axios.get(
-                    `http://localhost:5001/api/milestones/${projectId}/phase/${phase.milestoneId}/can-complete`,
-                    config
+                    `/milestones/${projectId}/phase/${phase.milestoneId}/can-complete`
                 );
                 statusMap[phase.milestoneId] = response.data;
             } catch (err) {
@@ -265,44 +261,117 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
-
-    const handleQuickCompleteTask = async (task) => {
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-
-        try {
-            const newStatus = task.status === "completed" ? "in progress" : "completed";
-            const newCompletion = newStatus === "completed" ? 100 : (task.completionPercentage || 0);
-            const taskName = task.milestoneName || task.name || 'Unknown Task';
-            
-            await axios.put(
-                `http://localhost:5001/api/milestones/${projectId}/${task.milestoneId}`,
-                { 
-                    status: newStatus,
-                    completionPercentage: newCompletion
-                },
-                config
+const handleQuickCompleteTask = async (task) => {
+    console.log('🚀 === STARTING CHECKBOX UPDATE ===');
+    console.log('📋 Task before update:', JSON.stringify({
+        milestoneId: task.milestoneId,
+        name: task.milestoneName,
+        status: task.status,
+        isPhase: task.isPhase,
+        parentPhase: task.parentPhase
+    }, null, 2));
+    
+    setUpdatingTaskId(task.milestoneId);
+    
+    try {
+        const newStatus = task.status === "completed" ? "in progress" : "completed";
+        const newCompletion = newStatus === "completed" ? 100 : (task.completionPercentage || 0);
+        const taskName = task.milestoneName || task.name || 'Unknown Task';
+        
+        console.log(`📝 Update details:`, { 
+            taskId: task.milestoneId, 
+            oldStatus: task.status,
+            newStatus: newStatus,
+            newCompletion: newCompletion,
+            taskName: taskName
+        });
+        
+        // STEP 1: Optimistic UI update
+        console.log('🎨 [STEP 1] Applying optimistic UI update...');
+        setTasks(prevTasks => {
+            const updated = prevTasks.map(t => 
+                t.milestoneId === task.milestoneId 
+                    ? { 
+                        ...t, 
+                        status: newStatus, 
+                        completionPercentage: newCompletion,
+                        completedAt: newStatus === "completed" ? new Date().toISOString() : null
+                      }
+                    : t
             );
+            console.log('✅ [STEP 1] Optimistic update applied');
+            const updatedTask = updated.find(t => t.milestoneId === task.milestoneId);
+            console.log('📊 Updated task in state:', JSON.stringify({
+                milestoneId: updatedTask.milestoneId,
+                status: updatedTask.status,
+                completionPercentage: updatedTask.completionPercentage
+            }, null, 2));
+            return updated;
+        });
+        
+        // STEP 2: Send to backend
+        console.log('📡 [STEP 2] Sending request to backend...');
+        const requestBody = { 
+            status: newStatus,
+            completionPercentage: newCompletion
+        };
+        const requestUrl = `/milestones/${projectId}/${task.milestoneId}`;
+        console.log('📤 Request URL:', requestUrl);
+        console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
+        console.log('📤 ProjectId:', projectId);
+        console.log('📤 TaskId:', task.milestoneId);
+        
+        const response = await axios.put(requestUrl, requestBody);
+        
+        console.log('✅ [STEP 2] Backend response received');
+        console.log('📥 Response status:', response.status);
+        console.log('📥 Response data:', JSON.stringify(response.data, null, 2));
 
-            // Show toast notification
-            if (newStatus === "completed") {
-                showToast(`✅ ${taskName} completed!`, 'success');
-            } else {
-                showToast(`ℹ️ ${taskName} marked as in progress`, 'info');
-            }
-
-            console.log('✅ Task updated - Email should be sent');
-            await fetchProjectTasks();
-        } catch (err) {
-            console.error("Error updating task:", err);
-            showToast('Failed to update task status', 'error');
+        // STEP 3: Show toast
+        console.log('🔔 [STEP 3] Showing toast notification...');
+        if (newStatus === "completed") {
+            showToast(`✅ ${taskName} completed!`, 'success');
+        } else {
+            showToast(`ℹ️ ${taskName} marked as in progress`, 'info');
         }
-    };
+
+        // STEP 4: Wait for consistency
+        console.log('⏳ [STEP 4] Waiting 2 seconds for database consistency...');
+        const startWait = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const endWait = Date.now();
+        console.log(`✅ [STEP 4] Wait complete. Actual time: ${endWait - startWait}ms`);
+        
+        // STEP 5: Refresh from server
+        console.log('🔄 [STEP 5] Fetching fresh data from server...');
+        console.log('🔄 About to call fetchProjectTasks()...');
+        await fetchProjectTasks();
+        console.log('✅ [STEP 5] fetchProjectTasks() completed');
+        
+        console.log('🎉 === CHECKBOX UPDATE COMPLETE ===');
+        
+    } catch (err) {
+        console.error("❌ === ERROR IN CHECKBOX UPDATE ===");
+        console.error("Error object:", err);
+        console.error("Error message:", err.message);
+        console.error("Error response:", err.response?.data);
+        console.error("Error status:", err.response?.status);
+        console.error("Error stack:", err.stack);
+        
+        // Rollback
+        console.log('🔙 Rolling back optimistic update...');
+        await fetchProjectTasks();
+        
+        const errorMsg = err.response?.data?.message || err.message || 'Failed to update task status';
+        showToast(`❌ ${errorMsg}`, 'error');
+        
+    } finally {
+        setUpdatingTaskId(null);
+        console.log('🏁 === CHECKBOX UPDATE FINALLY BLOCK ===');
+    }
+};
 
     const handleCompletePhase = async (phaseId) => {
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        
         setCompletingPhase(phaseId);
         
         try {
@@ -311,9 +380,8 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             const phaseName = phase?.milestoneName || phase?.name || 'Unknown Phase';
             
             await axios.post(
-                `http://localhost:5001/api/milestones/${projectId}/phase/${phaseId}/complete`,
-                {},
-                config
+                `/milestones/${projectId}/phase/${phaseId}/complete`,
+                {}
             );
             
             // No toast notification - email will be sent silently
@@ -424,8 +492,6 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
 
     const saveTaskData = async () => {
         setIsSubmitting(true);
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
 
         try {
             // ✅ Don't include projectId in the update body (it's a key attribute)
@@ -457,10 +523,10 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
             console.log('💾 Saving task:', { editingTask, data: editingTask ? taskData : createData });
 
             if (editingTask) {
-                await axios.put(`http://localhost:5001/api/milestones/${projectId}/${editingTask}`, taskData, config);
+                await axios.put(`/milestones/${projectId}/${editingTask}`, taskData);
                 console.log('✅ Task updated successfully');
             } else {
-                await axios.post(`http://localhost:5001/api/milestones/${projectId}`, createData, config);
+                await axios.post(`/milestones/${projectId}`, createData);
                 console.log('✅ Task created successfully');
             }
 
@@ -492,9 +558,6 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
     const handleDeleteTask = async () => {
         if (!taskToDelete) return;
 
-        const token = getToken();
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-
         try {
             const itemToDelete = tasks.find(t => t.milestoneId === taskToDelete);
             const isPhase = itemToDelete?.isPhase;
@@ -514,13 +577,13 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                 
                 // Delete all child tasks first
                 for (const childTask of childTasks) {
-                    await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${childTask.milestoneId}`, config);
+                    await axios.delete(`/milestones/${projectId}/${childTask.milestoneId}`);
                     console.log(`✅ Deleted child task: ${childTask.milestoneName}`);
                 }
             }
             
             // Delete the phase/task itself
-            await axios.delete(`http://localhost:5001/api/milestones/${projectId}/${taskToDelete}`, config);
+            await axios.delete(`/milestones/${projectId}/${taskToDelete}`);
             console.log(`✅ Deleted ${isPhase ? 'phase' : 'task'}: ${itemToDelete?.milestoneName}`);
             
             // Close modal and clear selection
@@ -633,43 +696,26 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                     )}
                                 </div>
                                 
-                                <div className="ml-auto flex items-center space-x-2">
-                                    {phase.milestoneId !== 'unassigned' && !readonly && (
-                                        <button
-                                            onClick={() => handleCompletePhase(phase.milestoneId)}
-                                            disabled={!phaseStatus.canComplete || completingPhase === phase.milestoneId}
-                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                                                phaseStatus.canComplete && completingPhase !== phase.milestoneId
-                                                    ? 'bg-green-600 text-white hover:bg-green-700'
-                                                    : 'bg-gray-300 dark:bg-slate-700 text-gray-500 dark:text-slate-500 cursor-not-allowed'
-                                            }`}
-                                            title={
-                                                phaseStatus.canComplete 
-                                                    ? 'Complete this phase' 
-                                                    : `Complete all ${phaseStatus.totalTasks} tasks first`
-                                            }
-                                        >
-                                            {completingPhase === phase.milestoneId ? 'Completing...' : '✓ Complete Phase'}
-                                        </button>
-                                    )}
-                                    
-                                    {phase.milestoneId !== 'unassigned' && !readonly && (
-                                        <>
-                                            <button 
-                                                onClick={() => openEditTaskModal(phase)}
-                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium"
-                                            >
-                                                edit
-                                            </button>
-                                            <button 
-                                                onClick={() => confirmDelete(phase.milestoneId)}
-                                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs font-medium"
-                                            >
-                                                delete
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
+                               {phase.milestoneId !== 'unassigned' && !readonly && (
+                                <button
+                                    onClick={() => handleCompletePhase(phase.milestoneId)}
+                                    disabled={isPhaseCompleted || !phaseStatus.canComplete || completingPhase === phase.milestoneId}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                        !isPhaseCompleted && phaseStatus.canComplete && completingPhase !== phase.milestoneId
+                                            ? 'bg-green-600 text-white hover:bg-green-700'
+                                            : 'bg-gray-300 dark:bg-slate-700 text-gray-500 dark:text-slate-500 cursor-not-allowed'
+                                    }`}
+                                    title={
+                                        isPhaseCompleted
+                                            ? 'Phase already completed'
+                                            : phaseStatus.canComplete 
+                                            ? 'Complete this phase' 
+                                            : `Complete all ${phaseStatus.totalTasks} tasks first`
+                                    }
+                                >
+                                    {completingPhase === phase.milestoneId ? 'Completing...' : isPhaseCompleted ? '✓ Completed' : '✓ Complete Phase'}
+                                </button>
+                            )}
                             </div>
                             
                             <div className="bg-gray-50 dark:bg-slate-900/50">
@@ -683,14 +729,22 @@ const Milestones = ({ readonly, initialViewMode = 'table' }) => {
                                         }`}>
                                             <button
                                                 onClick={() => handleQuickCompleteTask(task)}
+                                                disabled={updatingTaskId === task.milestoneId}
                                                 className={`mr-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                                                    isTaskCompleted
-                                                        ? 'bg-green-600 border-green-600'
-                                                        : 'border-gray-300 dark:border-slate-600 hover:border-green-500'
+                                                    updatingTaskId === task.milestoneId 
+                                                        ? 'bg-blue-300 border-blue-300 cursor-not-allowed opacity-60'
+                                                        : isTaskCompleted
+                                                        ? 'bg-green-600 border-green-600 cursor-pointer hover:bg-green-700'
+                                                        : 'border-gray-300 dark:border-slate-600 cursor-pointer hover:border-green-500 hover:bg-green-50'
                                                 }`}
-                                                title={isTaskCompleted ? 'Mark as incomplete' : 'Mark as complete'}
+                                                title={updatingTaskId === task.milestoneId ? 'Updating...' : (isTaskCompleted ? 'Mark as incomplete' : 'Mark as complete')}
                                             >
-                                                {isTaskCompleted && (
+                                                {updatingTaskId === task.milestoneId ? (
+                                                    <svg className="w-3 h-3 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                ) : isTaskCompleted && (
                                                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                                     </svg>
