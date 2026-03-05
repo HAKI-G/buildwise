@@ -47,7 +47,7 @@ export const auth = {
   logout: () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
-    window.location.href = '/login';
+    localStorage.removeItem('darkMode'); // clean up legacy key
   }
 };
 

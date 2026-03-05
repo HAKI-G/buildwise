@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import Liquidation from './Liquidation';
+import { useNotification } from '../context/NotificationContext';
 
 const getToken = () => localStorage.getItem('token');
 
 const Updates = ({ readonly, projectData }) => {
     const { projectId } = useParams();
+    const notify = useNotification();
     const [expenses, setExpenses] = useState([]);
     const [expenseItems, setExpenseItems] = useState([]);  // ✅ Array for material + quantity items
     const [selectedMaterial, setSelectedMaterial] = useState('');  // ✅ For dropdown selection
@@ -16,6 +18,8 @@ const Updates = ({ readonly, projectData }) => {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [showLiquidation, setShowLiquidation] = useState(false);
+    const [editingExpense, setEditingExpense] = useState(null); // S19: Track expense being edited
+    const [editForm, setEditForm] = useState({ description: '', amount: '', category: '' }); // S19: Edit form data
 
     const materialPrices = {
         'Wood': 500,
@@ -51,7 +55,7 @@ const Updates = ({ readonly, projectData }) => {
             
             try {
                 const expensesRes = await axios.get(
-                    `/expenses/project/${projectId}`, 
+                    `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${projectId}`, 
                     config
                 );
                 setExpenses(expensesRes.data || []);
@@ -72,7 +76,7 @@ const Updates = ({ readonly, projectData }) => {
     const handleAddExpense = async (e) => {
         e.preventDefault();
         if (expenseItems.length === 0) {
-            alert('Please add at least one material with quantity.');
+            notify.warning('Please add at least one material with quantity.');
             return;
         }
 
@@ -102,7 +106,7 @@ const Updates = ({ readonly, projectData }) => {
 
         try {
             await axios.post(
-                `/expenses/${projectId}`, 
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/${projectId}`, 
                 newExpense, 
                 config
             );
@@ -113,7 +117,7 @@ const Updates = ({ readonly, projectData }) => {
             setSuccessMessage('Expense added successfully!');
             
             const expensesRes = await axios.get(
-                `/expenses/project/${projectId}`, 
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${projectId}`, 
                 config
             );
             setExpenses(expensesRes.data || []);
@@ -129,6 +133,74 @@ const Updates = ({ readonly, projectData }) => {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    // S19: Handle editing an expense
+    const handleEditExpense = (expense) => {
+        setEditingExpense(expense.expenseId);
+        setEditForm({
+            description: expense.description || '',
+            amount: expense.amount || '',
+            category: expense.category || 'Materials'
+        });
+    };
+
+    // S19: Save edited expense
+    const handleSaveEdit = async (expenseId) => {
+        const token = getToken();
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+
+        try {
+            await axios.put(
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/${projectId}/${expenseId}`,
+                {
+                    description: editForm.description,
+                    amount: parseFloat(editForm.amount),
+                    category: editForm.category
+                },
+                config
+            );
+            setEditingExpense(null);
+            setSuccessMessage('Expense updated successfully!');
+
+            const expensesRes = await axios.get(
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${projectId}`,
+                config
+            );
+            setExpenses(expensesRes.data || []);
+            setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (err) {
+            console.error('Error updating expense:', err);
+            setError('Failed to update expense. Please try again.');
+            setTimeout(() => setError(''), 3000);
+        }
+    };
+
+    // S19: Delete an expense
+    const handleDeleteExpense = async (expenseId) => {
+        notify.confirm('Are you sure you want to delete this expense?', async () => {
+            const token = getToken();
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+
+            try {
+                await axios.delete(
+                    `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/${projectId}/${expenseId}`,
+                    config
+                );
+                setSuccessMessage('Expense deleted successfully!');
+
+                const expensesRes = await axios.get(
+                    `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${projectId}`,
+                    config
+                );
+                setExpenses(expensesRes.data || []);
+                setTimeout(() => setSuccessMessage(''), 3000);
+            } catch (err) {
+                console.error('Error deleting expense:', err);
+                setError('Failed to delete expense. Please try again.');
+                setTimeout(() => setError(''), 3000);
+            }
+        }, { title: 'Delete Expense', confirmText: 'Delete', cancelText: 'Cancel' });
     };
 
     // Calculate total amount for display
@@ -345,6 +417,11 @@ const Updates = ({ readonly, projectData }) => {
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                                             Amount
                                         </th>
+                                        {!readonly && (
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
@@ -352,29 +429,96 @@ const Updates = ({ readonly, projectData }) => {
                                         expenses.map((expense, index) => (
                                             <tr key={expense.expenseId || index} className="hover:bg-gray-50 dark:hover:bg-slate-700">
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                        expense.category === 'Materials' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-                                                        expense.category === 'Labor' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
-                                                        expense.category === 'Equipment' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
-                                                        'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300'
-                                                    }`}>
-                                                        {expense.category || 'Others'}
-                                                    </span>
+                                                    {editingExpense === expense.expenseId ? (
+                                                        <select
+                                                            value={editForm.category}
+                                                            onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
+                                                            className="px-2 py-1 border border-blue-400 dark:border-blue-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-xs"
+                                                        >
+                                                            {categories.map(cat => (
+                                                                <option key={cat} value={cat}>{cat}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                            expense.category === 'Materials' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                                                            expense.category === 'Labor' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                                                            expense.category === 'Equipment' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
+                                                            'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300'
+                                                        }`}>
+                                                            {expense.category || 'Others'}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                                    {expense.description}
+                                                    {editingExpense === expense.expenseId ? (
+                                                        <textarea
+                                                            value={editForm.description}
+                                                            onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                                                            className="w-full px-2 py-1 border border-blue-400 dark:border-blue-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm"
+                                                            rows={2}
+                                                        />
+                                                    ) : (
+                                                        expense.description
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
                                                     {expense.date ? new Date(expense.date).toLocaleDateString() : 'N/A'}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
-                                                    ₱{parseFloat(expense.amount).toLocaleString()}
+                                                    {editingExpense === expense.expenseId ? (
+                                                        <input
+                                                            type="number"
+                                                            value={editForm.amount}
+                                                            onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
+                                                            className="w-28 px-2 py-1 border border-blue-400 dark:border-blue-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm text-right"
+                                                            min="0"
+                                                            step="0.01"
+                                                        />
+                                                    ) : (
+                                                        `₱${parseFloat(expense.amount).toLocaleString()}`
+                                                    )}
                                                 </td>
+                                                {!readonly && (
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                                        {editingExpense === expense.expenseId ? (
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleSaveEdit(expense.expenseId)}
+                                                                    className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 font-medium text-xs"
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditingExpense(null)}
+                                                                    className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 font-medium text-xs"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleEditExpense(expense)}
+                                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-xs"
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteExpense(expense.expenseId)}
+                                                                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium text-xs"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="4" className="text-center py-8 text-gray-500 dark:text-slate-400">
+                                            <td colSpan={readonly ? "4" : "5"} className="text-center py-8 text-gray-500 dark:text-slate-400">
                                                 No expenses logged yet.
                                             </td>
                                         </tr>

@@ -49,7 +49,7 @@ function RegisterPage() {
     }
 
     try {
-      const response = await axios.post('/registration/initiate', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/registration/initiate`, {
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -72,7 +72,7 @@ function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('/registration/verify', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/registration/verify`, {
         email: formData.email,
         code: verificationCode
       });
@@ -106,7 +106,7 @@ function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('/registration/resend-code', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/registration/resend-code`, {
         email: formData.email
       });
 

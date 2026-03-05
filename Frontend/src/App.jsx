@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { useMaintenanceMode } from './hooks/useMaintenanceMode';
 import MaintenanceScreen from './components/MaintenanceScreen';
 
@@ -19,18 +20,21 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import MilestoneStatusPage from './pages/MilestoneStatusPage';
 import TaskPriorityPage from './pages/TaskPriorityPage';
 import PendingTasksPage from './pages/PendingTasksPage';
-import GenerateReportPage from './pages/GenerateReportPage.jsx';
+import GenerateReportPage from './pages/GenerateReportPage.jsx'; // ✅ Add this import at top
 import ReportDetailPage from './pages/ReportDetailPage';
+import AIAdvisorPage from './pages/AIAdvisorPage';
+
+// ✅ NEW: Project Selection Page (like Statistics selection)
 import ProjectSelectionPage from './pages/ProjectSelectionPage.jsx';
 
-// View Pages
-import MilestonesViewPage from './pages/Milestonesviewpage.jsx';
-import UpdatesViewPage from './pages/Updatesviewpage.jsx';
-import PhotosViewPage from './pages/Photosviewpage.jsx';
-import ReportsViewPage from './pages/Reportsviewpage.jsx';
-import CommentsViewPage from './pages/Commentsviewpage.jsx';
-import DocumentsViewPage from './pages/Documentsviewpage.jsx';
-import MapsViewPage from './pages/Mapsviewpage.jsx';
+// ✅ Dedicated View Pages (accessed from sidebar)
+import MilestonesViewPage from './pages/MilestonesViewPage.jsx';
+import UpdatesViewPage from './pages/UpdatesViewPage.jsx';
+import PhotosViewPage from './pages/PhotosViewPage.jsx';
+import ReportsViewPage from './pages/ReportsViewPage.jsx';
+import CommentsViewPage from './pages/CommentsViewPage.jsx';
+import DocumentsViewPage from './pages/DocumentsViewPage.jsx';
+import MapsViewPage from './pages/MapsViewPage.jsx';
 
 function App() {
   const location = useLocation();
@@ -57,6 +61,7 @@ function App() {
 
   return (
     <ThemeProvider>
+      <NotificationProvider>
       {shouldShowMaintenance ? (
         <MaintenanceScreen />
       ) : (
@@ -67,7 +72,6 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/projects/:projectId/view/generate-report" element={<GenerateReportPage />} />
-
           {/* Dashboard */}
           <Route path="/dashboard" element={<DashboardPage />} />
           
@@ -77,9 +81,10 @@ function App() {
           <Route path="/projects/:projectId/:tab" element={<ProjectDetailPage />} />
           <Route path="/projects/edit/:projectId" element={<UpdateProjectPage />} />
           <Route path="/reports/:reportId" element={<ReportDetailPage />} />
+          {/* ✅ NEW: Project Selection Page (like Statistics) */}
           <Route path="/select-project" element={<ProjectSelectionPage />} />
           
-          {/* View Routes */}
+          {/* ✅ Dedicated View Routes (no tabs, no full header) */}
           <Route path="/projects/:projectId/view/milestones" element={<MilestonesViewPage />} />
           <Route path="/projects/:projectId/view/updates" element={<UpdatesViewPage />} />
           <Route path="/projects/:projectId/view/photos" element={<PhotosViewPage />} />
@@ -89,18 +94,21 @@ function App() {
           <Route path="/projects/:projectId/view/maps" element={<MapsViewPage />} />
           
           {/* Statistics Routes */}
-          {/* ✅ /statistics now shows ProjectSelectionPage (card grid to pick a project) */}
-          <Route path="/statistics" element={<ProjectSelectionPage />} />
+          <Route path="/statistics" element={<StatisticsPage />} />
           <Route path="/statistics/:projectId" element={<StatisticsPage />} />
           <Route path="/statistics/:projectId/milestone-status" element={<MilestoneStatusPage />} />
           <Route path="/statistics/:projectId/task-priority" element={<TaskPriorityPage />} />
           <Route path="/statistics/:projectId/pending-tasks" element={<PendingTasksPage />} />
           
+          {/* AI Advisor */}
+          <Route path="/ai-advisor" element={<AIAdvisorPage />} />
+
           {/* Settings */}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/setup-2fa" element={<Setup2FAPage />} />
         </Routes>
       )}
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

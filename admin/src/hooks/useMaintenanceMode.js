@@ -10,7 +10,7 @@ export const useMaintenanceMode = () => {
     const checkMaintenanceMode = async () => {
       try {
         // Get auth token
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('adminToken');
         
         // Create config with auth header if token exists
         const config = token ? {
@@ -20,7 +20,7 @@ export const useMaintenanceMode = () => {
         } : {};
 
         const response = await axios.get(
-          '/maintenance-status',
+          `${import.meta.env.VITE_API_URL || 'http://54.251.28.81'}/api/maintenance-status`,
           config
         );
         
@@ -42,7 +42,7 @@ export const useMaintenanceMode = () => {
     
     // Check every 30 seconds - but only if user is authenticated
     const interval = setInterval(() => {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('adminToken');
       if (token) {
         checkMaintenanceMode();
       }

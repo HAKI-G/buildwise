@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://47.129.233.194/api';  // ✅ Straight quotes
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api`
 });
 
 // Automatically attach token to every request

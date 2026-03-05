@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom'; // ✅ Add this import
 import api from '../services/api';
+import { useNotification } from '../context/NotificationContext';
 
 const Comments = ({ readonly }) => {
     const { projectId } = useParams(); // ✅ Get projectId from URL
+    const notify = useNotification();
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -49,12 +51,12 @@ const Comments = ({ readonly }) => {
 
     const handleAddComment = async () => {
         if (!newComment.trim()) {
-            alert('Please enter a comment');
+            notify.warning('Please enter a comment');
             return;
         }
 
         if (!projectId) {
-            alert('Project ID not found');
+            notify.error('Project ID not found');
             return;
         }
 
@@ -74,12 +76,12 @@ const Comments = ({ readonly }) => {
             await loadComments();
             
             setNewComment('');
-            alert('Comment posted successfully!');
+            notify.success('Comment posted successfully!');
         } catch (error) {
             console.error('Error posting comment:', error);
             const message = error.response?.data?.message || 'Failed to post comment';
             setError(message);
-            alert(`Failed to post comment: ${message}`);
+            notify.error(`Failed to post comment: ${message}`);
         } finally {
             setIsPosting(false);
         }

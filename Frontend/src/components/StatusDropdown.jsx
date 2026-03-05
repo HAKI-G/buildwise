@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import axios from 'axios';
+import { useNotification } from '../context/NotificationContext';
 
 const getToken = () => localStorage.getItem('token');
 
 function StatusDropdown({ projectId, currentStatus, onStatusChange }) {
     const [isUpdating, setIsUpdating] = useState(false);
+    const notify = useNotification();
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -30,7 +32,7 @@ function StatusDropdown({ projectId, currentStatus, onStatusChange }) {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             
             await axios.patch(
-                `/projects/${projectId}`,
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`,
                 { status: newStatus },
                 config
             );
@@ -41,7 +43,7 @@ function StatusDropdown({ projectId, currentStatus, onStatusChange }) {
             console.log('✅ Status updated to:', newStatus);
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status. Please try again.');
+            notify.error('Failed to update status. Please try again.');
         } finally {
             setIsUpdating(false);
         }

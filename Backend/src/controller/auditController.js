@@ -7,28 +7,32 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = "BuildWiseAuditLogs";
 
-// ✅ Helper function to get user name from userId
-const getUserName = async (userId) => {
+// ✅ Helper function to get user name AND email from userId
+const getUserInfo = async (userId) => {
   try {
     const params = {
       TableName: "BuildWiseUsers",
       Key: { userId }
     };
     const result = await docClient.send(new GetCommand(params));
-    return result.Item?.name || 'Unknown User';
+    return {
+      name: result.Item?.name || 'Unknown User',
+      email: result.Item?.email || ''
+    };
   } catch (error) {
-    console.error('Error fetching user name:', error);
-    return 'Unknown User';
+    console.error('Error fetching user info:', error);
+    return { name: 'Unknown User', email: '' };
   }
 };
 
 // ✅ NEW: Helper function to create audit log (called from other controllers)
 export const logAudit = async (logData) => {
   try {
-    const { userId, action, actionDescription, targetType, targetId, changes } = logData;
+    const { userId, action, actionDescription, targetType, targetId, changes, ipAddress, userEmail, userAgent, userName: providedName, status, oldValue, newValue, errorMessage } = logData;
     
-    // Get the actual user name
-    const userName = await getUserName(userId);
+    // Get the actual user name AND email from DB
+    const userInfo = await getUserInfo(userId);
+    const resolvedName = providedName || userInfo.name;
 
     const timestamp = Date.now();
     const logId = `log-${timestamp}`;
@@ -36,13 +40,20 @@ export const logAudit = async (logData) => {
     const auditLog = {
       logId,
       userId,
-      userName, // ✅ Include real user name
+      userName: resolvedName,
+      userEmail: userEmail || userInfo.email || '',
+      userAgent: userAgent || '',
       action,
       description: actionDescription || action,
       actionDescription: actionDescription || action,
       targetType: targetType || 'unknown',
       targetId: targetId || '',
       changes: changes || {},
+      ipAddress: ipAddress || '',
+      status: status || 'SUCCESS',
+      oldValue: oldValue || null,
+      newValue: newValue || null,
+      errorMessage: errorMessage || null,
       timestamp,
       isArchived: 'false',
       archivedAt: null,
@@ -55,7 +66,7 @@ export const logAudit = async (logData) => {
       Item: auditLog
     }));
 
-    console.log('✅ Audit log created:', action, 'by', userName);
+    console.log('✅ Audit log created:', action, 'by', resolvedName);
     return auditLog;
   } catch (error) {
     console.error('❌ Error creating audit log:', error);
@@ -67,7 +78,7 @@ export const logAudit = async (logData) => {
 // 🟢 Create a new audit log (API endpoint)
 export const createAuditLog = async (req, res) => {
   try {
-    const { userId, action, description } = req.body;
+    const { userId, action, description, userName, userEmail, userAgent, targetType, targetId, changes, ipAddress, status, oldValue, newValue } = req.body;
 
     if (!userId || !action) {
       return res.status(400).json({ message: "userId and action are required" });
@@ -75,8 +86,18 @@ export const createAuditLog = async (req, res) => {
 
     const result = await logAudit({
       userId,
+      userName,
+      userEmail,
+      userAgent,
       action,
-      actionDescription: description
+      actionDescription: description,
+      targetType,
+      targetId,
+      changes,
+      ipAddress,
+      status,
+      oldValue,
+      newValue
     });
 
     if (result) {
@@ -96,7 +117,7 @@ export const createAuditLog = async (req, res) => {
 // 🟢 Get all audit logs - ✅ UPDATED
 export const getAuditLogs = async (req, res) => {
   try {
-    const { limit } = req.query;
+    const { limit, archived } = req.query;
 
     const params = {
       TableName: TABLE_NAME,
@@ -106,34 +127,22 @@ export const getAuditLogs = async (req, res) => {
     const data = await docClient.send(new ScanCommand(params));
     console.log(`   Found ${data.Items?.length || 0} total logs`);
 
-    // ✅ Filter out archived logs and sort by timestamp descending
-    const activeLogs = (data.Items || [])
+    // Filter based on archived query param
+    const showArchived = archived === 'true';
+    const filteredLogs = (data.Items || [])
       .filter(log => {
         const isArchived = log.isArchived === 'true' || log.isArchived === true;
-        return !isArchived; // Only non-archived logs
+        return showArchived ? isArchived : !isArchived;
       })
       .sort((a, b) => {
-        // Sort by timestamp (newest first)
         const timeA = Number(a.timestamp) || new Date(a.createdAt).getTime() || 0;
         const timeB = Number(b.timestamp) || new Date(b.createdAt).getTime() || 0;
-        return timeB - timeA; // Descending (newest first)
+        return timeB - timeA;
       });
 
-    console.log(`   Active logs after filtering: ${activeLogs.length}`);
+    console.log(`   ${showArchived ? 'Archived' : 'Active'} logs: ${filteredLogs.length}`);
 
-    // Apply limit after filtering
-    const limitedLogs = limit ? activeLogs.slice(0, parseInt(limit)) : activeLogs;
-
-    console.log(`   Returning ${limitedLogs.length} logs (newest first)`);
-    
-    // Log first few for debugging
-    if (limitedLogs.length > 0) {
-      console.log('   First log:', {
-        action: limitedLogs[0].action,
-        userName: limitedLogs[0].userName,
-        timestamp: new Date(limitedLogs[0].timestamp).toISOString()
-      });
-    }
+    const limitedLogs = limit ? filteredLogs.slice(0, parseInt(limit)) : filteredLogs;
 
     res.status(200).json({
       count: limitedLogs.length,

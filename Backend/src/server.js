@@ -52,6 +52,7 @@ import { startOverdueCronJob } from './utils/checkOverdueProjects.js';
 import { protect, requireAdmin } from './middleware/authMiddleware.js';
 import { checkMaintenanceMode } from './middleware/maintenanceMiddleware.js';
 import reportRoutes from './routes/reportRoutes.js';
+import aiAdvisorRoutes from './routes/aiAdvisorRoutes.js';
 
 // Jobs
 import { scheduleAuditLogCleanup } from './jobs/auditLogCleanup.js';
@@ -152,6 +153,9 @@ app.use('/api/documents', protect, checkMaintenanceMode, documentRoutes);
 app.use('/api/expenses', protect, checkMaintenanceMode, expenseRoutes);
 app.use('/api/tasks', protect, checkMaintenanceMode, taskRoutes);
 app.use('/api/notifications', protect, notificationRoutes);
+
+// AI Advisor (protected)
+app.use('/api/ai-advisor', protect, checkMaintenanceMode, aiAdvisorRoutes);
 
 // Audit logs (protected)
 app.use('/api/audit-logs', protect, auditRoutes);

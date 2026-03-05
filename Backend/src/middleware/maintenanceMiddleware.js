@@ -49,7 +49,7 @@ export const checkMaintenanceMode = async (req, res, next) => {
       cacheDuration: 30000
     };
 
-    console.log(`🔧 Maintenance Mode: ${maintenanceMode ? 'ON' : 'OFF'} | User: ${req.user?.email || 'N/A'} | Role: ${req.user?.role || 'N/A'}`);
+    console.log(`🔧 Maintenance Mode: ${maintenanceMode ? 'ON' : 'OFF'} | User: ${req.user?.name || req.user?.email || 'N/A'} | Role: ${req.user?.role || 'N/A'}`);
 
     // If maintenance mode is ON and user is NOT admin
     if (maintenanceMode && req.user?.role !== 'Admin') {

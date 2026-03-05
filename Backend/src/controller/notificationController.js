@@ -5,21 +5,54 @@ const client = new DynamoDBClient({ region: process.env.AWS_REGION || "ap-southe
 const docClient = DynamoDBDocumentClient.from(client);
 
 const NOTIFICATIONS_TABLE = "BuildWiseNotifications";
+const USERS_TABLE = "BuildWiseUsers";
+
+// ============================================
+// 🗺️ MAP NOTIFICATION TYPES → PREFERENCE CATEGORIES
+// ============================================
+const TYPE_TO_PREFERENCE = {
+  project_created:   'projectUpdates',
+  project_updated:   'projectUpdates',
+  project_status:    'projectUpdates',
+  project_deleted:   'projectUpdates',
+  milestone_created: 'milestoneDeadlines',
+  phase_created:     'milestoneDeadlines',
+  phase_completed:   'milestoneDeadlines',
+  expense:           'expenseAlerts',
+  budget_alert:      'expenseAlerts',
+  comment:           'teamMessages',
+  team_message:      'teamMessages',
+  system:            'systemAnnouncements',
+  maintenance:       'systemAnnouncements',
+};
+
+/**
+ * Check if a user's preferences allow this notification type.
+ * Defaults to true (send) if user has no preferences saved yet.
+ */
+const userAllowsNotification = (user, type, channel = 'inApp') => {
+  const prefs = user.notificationPreferences;
+  if (!prefs) return true; // no prefs saved → default allow all
+  const category = TYPE_TO_PREFERENCE[type];
+  if (!category) return true; // unknown type → allow
+  const key = `${channel}_${category}`;
+  // Explicitly check for false — undefined/missing means enabled
+  return prefs[key] !== false;
+};
 
 // ============================================
 // 🎯 ONE FUNCTION TO RULE THEM ALL
 // ============================================
 export const sendNotification = async (type, title, message, metadata = {}, specificUserId = null) => {
   try {
-    // If specificUserId provided, send to that user only
-    if (specificUserId) {
+    // Helper to create a single notification record
+    const createNotification = (userId) => {
       const timestamp = Date.now();
       const notificationId = `notif-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-
-      await docClient.send(new PutCommand({
+      return docClient.send(new PutCommand({
         TableName: NOTIFICATIONS_TABLE,
         Item: {
-          userId: specificUserId,
+          userId,
           notificationId,
           type,
           title,
@@ -30,42 +63,40 @@ export const sendNotification = async (type, title, message, metadata = {}, spec
           createdAt: new Date().toISOString()
         }
       }));
+    };
 
+    // If specificUserId provided, send to that user only (after checking prefs)
+    if (specificUserId) {
+      // Fetch user prefs
+      const { GetCommand } = await import('@aws-sdk/lib-dynamodb');
+      const userData = await docClient.send(new GetCommand({
+        TableName: USERS_TABLE,
+        Key: { userId: specificUserId }
+      }));
+      const user = userData.Item;
+
+      if (user && !userAllowsNotification(user, type, 'inApp')) {
+        console.log(`⏭️ Notification skipped for ${specificUserId} (preference disabled: ${type})`);
+        return;
+      }
+
+      await createNotification(specificUserId);
       console.log(`✅ Notification sent to user: ${specificUserId}`);
       return;
     }
 
-    // Otherwise, send to ALL users
-    const usersParams = {
-      TableName: "BuildWiseUsers"
-    };
-
-    const usersData = await docClient.send(new ScanCommand(usersParams));
+    // Otherwise, send to all users who have the preference enabled
+    const usersData = await docClient.send(new ScanCommand({ TableName: USERS_TABLE }));
     const allUsers = usersData.Items || [];
 
-    // Send notification to EVERY user
-    const notificationPromises = allUsers.map(user => {
-      const timestamp = Date.now();
-      const notificationId = `notif-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+    // Filter users based on their notification preferences
+    const eligibleUsers = allUsers.filter(user => userAllowsNotification(user, type, 'inApp'));
 
-      return docClient.send(new PutCommand({
-        TableName: NOTIFICATIONS_TABLE,
-        Item: {
-          userId: user.userId,
-          notificationId,
-          type,
-          title,
-          message,
-          metadata,
-          timestamp,
-          read: false,
-          createdAt: new Date().toISOString()
-        }
-      }));
-    });
-
+    const notificationPromises = eligibleUsers.map(user => createNotification(user.userId));
     await Promise.all(notificationPromises);
-    console.log(`✅ Notification sent to ${allUsers.length} users`);
+
+    const skipped = allUsers.length - eligibleUsers.length;
+    console.log(`✅ Notification sent to ${eligibleUsers.length} users${skipped > 0 ? ` (${skipped} skipped by preference)` : ''}`);
 
   } catch (error) {
     console.error('❌ Error sending notification:', error);
@@ -152,6 +183,34 @@ export const markAsRead = async (req, res) => {
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ message: 'Failed to mark notification as read', error: error.message });
+  }
+};
+
+// ============================================
+// DELETE A NOTIFICATION
+// ============================================
+export const deleteNotification = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { notificationId } = req.params;
+
+    if (!notificationId) {
+      return res.status(400).json({ message: 'notificationId is required' });
+    }
+
+    const { DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+    await docClient.send(new DeleteCommand({
+      TableName: NOTIFICATIONS_TABLE,
+      Key: {
+        userId: userId,
+        notificationId: notificationId
+      }
+    }));
+
+    res.status(200).json({ message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ message: 'Failed to delete notification', error: error.message });
   }
 };
 

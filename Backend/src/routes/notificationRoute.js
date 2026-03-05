@@ -3,7 +3,8 @@ import { protect } from '../middleware/authMiddleware.js';
 import {
   getNotifications,
   markAsRead,
-  markAllAsRead
+  markAllAsRead,
+  deleteNotification
 } from '../controller/notificationController.js';
 import { sendNotification } from '../controller/notificationController.js';
 
@@ -16,6 +17,7 @@ router.use(protect);
 router.get('/', getNotifications);
 router.put('/read', markAsRead);
 router.put('/read-all', markAllAsRead);
+router.delete('/:notificationId', deleteNotification);
 
 //Notification For the user
 router.post('/send', async (req, res) => {

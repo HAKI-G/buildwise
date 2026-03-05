@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Shield } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Shield, Eye, Mail, Phone, Building2, Briefcase, Clock, Activity, X } from 'lucide-react';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
 import Input from '../components/common/Input';
 import userService from '../services/userService';
+import auditService from '../services/auditService';
 import { USER_ROLES } from '../utils/constants';
 import { useAuditLog } from '../hooks/useAuditLog';
+import { useNotification } from '../contexts/NotificationContext';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -16,6 +18,10 @@ const UserManagement = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [detailUser, setDetailUser] = useState(null);
+  const [detailLogs, setDetailLogs] = useState([]);
+  const [detailLogsLoading, setDetailLogsLoading] = useState(false);
+  const notify = useNotification();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,7 +57,7 @@ const UserManagement = () => {
       setFilteredUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);
-      alert('Failed to fetch users. Please check console for details.');
+      notify.error('Failed to fetch users. Please check console for details.');
     } finally {
       setIsLoading(false);
     }
@@ -201,7 +207,7 @@ const UserManagement = () => {
             ? { ...user, ...formData }
             : user
         ));
-        alert('User updated successfully!');
+        notify.success('User updated successfully!');
       } else {
         const newUser = await userService.createUser(formData);
         
@@ -221,7 +227,7 @@ const UserManagement = () => {
         );
         
         setUsers([...users, newUser]);
-        alert('User created successfully!');
+        notify.success('User created successfully!');
       }
       
       handleCloseModal();
@@ -251,7 +257,7 @@ const UserManagement = () => {
         );
       }
       
-      alert(errorMessage);
+      notify.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -285,7 +291,7 @@ const UserManagement = () => {
       setUsers(users.filter(user => user.userId !== selectedUser.userId));
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
-      alert('User deleted successfully!');
+      notify.success('User deleted successfully!');
     } catch (error) {
       console.error('Error deleting user:', error);
       const errorMessage = 'Error deleting user. Please try again.';
@@ -301,7 +307,7 @@ const UserManagement = () => {
         }
       );
       
-      alert(errorMessage);
+      notify.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -315,6 +321,37 @@ const UserManagement = () => {
       'Vice President': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     };
     return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  const openDetail = async (user) => {
+    setDetailUser(user);
+    setDetailLogs([]);
+    setDetailLogsLoading(true);
+    try {
+      const data = await auditService.getLogsByUser(user.userId);
+      const logs = (data?.logs || data || [])
+        .sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt))
+        .slice(0, 15);
+      setDetailLogs(logs);
+    } catch (err) {
+      console.error('Error loading user activity:', err);
+    } finally {
+      setDetailLogsLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (ts) => {
+    if (!ts) return '—';
+    const d = new Date(typeof ts === 'number' ? ts : ts);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(diff / 86400000);
+    if (days < 30) return `${days}d ago`;
+    return d.toLocaleDateString();
   };
 
   return (
@@ -398,6 +435,13 @@ const UserManagement = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => openDetail(user)}
+                        className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 mr-3"
+                        title="View Details"
+                      >
+                        <Eye className="w-5 h-5 inline" />
+                      </button>
                       <button
                         onClick={() => handleOpenModal(user)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
@@ -528,6 +572,173 @@ const UserManagement = () => {
           </div>
         </div>
       </Modal>
+
+      {/* ───────── User Detail Slide-Over ───────── */}
+      {detailUser && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/40 z-40 transition-opacity"
+            onClick={() => setDetailUser(null)}
+          />
+          {/* Panel */}
+          <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-y-auto animate-slide-in-right">
+            {/* Header */}
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between z-10">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">User Details</h2>
+              <button
+                onClick={() => setDetailUser(null)}
+                className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-6">
+              {/* Avatar + Name */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                  {detailUser.name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{detailUser.name}</h3>
+                  <span className={`mt-1 inline-block px-3 py-0.5 text-xs font-semibold rounded-full ${getRoleBadgeColor(detailUser.role)}`}>
+                    {detailUser.role}
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3">
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact Information</h4>
+
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                  <a href={`mailto:${detailUser.email}`} className="text-blue-600 dark:text-blue-400 hover:underline break-all">
+                    {detailUser.email}
+                  </a>
+                </div>
+
+                {detailUser.phone && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300">{detailUser.phone}</span>
+                  </div>
+                )}
+
+                {detailUser.company && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Building2 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300">{detailUser.company}</span>
+                  </div>
+                )}
+
+                {detailUser.jobTitle && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Briefcase className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300">{detailUser.jobTitle}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <a
+                  href={`mailto:${detailUser.email}?subject=BuildWise Admin - Account Notice`}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  Send Email
+                </a>
+                <button
+                  onClick={() => { setDetailUser(null); handleOpenModal(detailUser); }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit User
+                </button>
+              </div>
+
+              {/* Account Details */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3">
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Account Details</h4>
+
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">User ID</p>
+                    <p className="text-gray-800 dark:text-gray-200 font-mono text-xs break-all">{detailUser.userId}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">2FA Enabled</p>
+                    <p className={`font-medium text-xs ${detailUser.twoFactorEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {detailUser.twoFactorEnabled ? '✓ Active' : '✗ Disabled'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">Registered</p>
+                    <p className="text-gray-800 dark:text-gray-200 text-xs">
+                      {detailUser.createdAt ? new Date(detailUser.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">Last Updated</p>
+                    <p className="text-gray-800 dark:text-gray-200 text-xs">
+                      {detailUser.updatedAt ? formatTimeAgo(detailUser.updatedAt) : '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Recent Activity</h4>
+                </div>
+
+                {detailLogsLoading ? (
+                  <div className="space-y-3">
+                    {Array(4).fill(0).map((_, i) => (
+                      <div key={i} className="flex gap-3 animate-pulse">
+                        <div className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full mt-1.5" />
+                        <div className="flex-1">
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-1" />
+                          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : detailLogs.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {detailLogs.map((log, idx) => (
+                      <div key={log.logId || idx} className="flex gap-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-none">
+                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                          log.action?.includes('DELETE') ? 'bg-red-500' :
+                          log.action?.includes('CREATE') ? 'bg-green-500' :
+                          'bg-blue-500'
+                        }`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-800 dark:text-gray-200 truncate">
+                            {log.actionDescription || log.description || log.action}
+                          </p>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                            {formatTimeAgo(log.timestamp || log.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Clock className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No activity recorded for this user</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

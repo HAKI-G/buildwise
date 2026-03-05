@@ -3,5 +3,8 @@
     "nodemailer": "^7.0.10",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0"
+  },
+  "devDependencies": {
+    "docx": "^9.6.0"
   }
 }

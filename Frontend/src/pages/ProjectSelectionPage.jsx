@@ -1,50 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
 import { Search } from 'lucide-react';
 
 const getToken = () => localStorage.getItem('token');
 
-const statusColors = {
-    'Completed':   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-    'In Progress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    'On Hold':     'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-    'Overdue':     'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    'Not Started': 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-};
-
 function ProjectSelectionPage() {
-    const [projects, setProjects]       = useState([]);
-    const [loading, setLoading]         = useState(true);
-    const [error, setError]             = useState('');
+    const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const navigate                      = useNavigate();
-    const location                      = useLocation();
-    const [searchParams]                = useSearchParams();
-
-    const isStatisticsMode  = location.pathname === '/statistics';
-    const intendedSection   = searchParams.get('section');
-
-    const getSectionDisplayName = (section) => ({
-        'milestones': 'Milestones',
-        'updates':    'Updates',
-        'photos':     'Photos',
-        'reports':    'Reports',
-        'comments':   'Comments',
-        'documents':  'Documents',
-        'maps':       'Maps',
-    }[section] || 'Project Details');
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    
+    // ✅ Get the intended section from URL params
+    const intendedSection = searchParams.get('section');
+    
+    // ✅ Get section display name
+    const getSectionDisplayName = (section) => {
+        const names = {
+            'milestones': 'Milestones',
+            'updates': 'Updates',
+            'photos': 'Photos',
+            'reports': 'Reports',
+            'comments': 'Comments',
+            'documents': 'Documents',
+            'maps': 'Maps'
+        };
+        return names[section] || 'Project Details';
+    };
 
     useEffect(() => {
         const fetchProjects = async () => {
             const token = getToken();
-            if (!token) { navigate('/login'); return; }
+            if (!token) {
+                navigate('/login');
+                return;
+            }
             try {
-                const res = await axios.get('/projects', {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setProjects(Array.isArray(res.data) ? res.data : res.data.projects || []);
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects`, config);
+                setProjects(response.data);
             } catch (err) {
                 console.error('Error fetching projects:', err);
                 setError('Failed to load projects.');
@@ -55,114 +52,112 @@ function ProjectSelectionPage() {
         fetchProjects();
     }, [navigate]);
 
+    // ✅ Handle project selection
     const handleProjectSelect = (projectId) => {
+        // Save the selected project to localStorage
         localStorage.setItem('lastSelectedProjectId', projectId);
-        if (isStatisticsMode) {
-            navigate(`/statistics/${projectId}`);
-        } else if (intendedSection) {
+        
+        // Navigate to the intended section
+        if (intendedSection) {
             navigate(`/projects/${projectId}/view/${intendedSection}`);
         } else {
             navigate(`/projects/${projectId}`);
         }
     };
 
-    const filteredProjects = projects.filter((p) => {
-        const q = searchQuery.toLowerCase();
-        return (
-            p.name?.toLowerCase().includes(q) ||
-            p.location?.toLowerCase().includes(q)
-        );
-    });
-
-    const pageTitle = isStatisticsMode
-        ? 'Statistics'
-        : intendedSection ? getSectionDisplayName(intendedSection) : 'Select a Project';
-
     return (
-        <Layout title={pageTitle}>
-            {/* ── Header row — matches ProjectsPage exactly ── */}
-            <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {isStatisticsMode ? 'Select a Project' : pageTitle} ({filteredProjects.length})
-                </h1>
-
-                {/* Search */}
-                <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Layout title={intendedSection ? getSectionDisplayName(intendedSection) : "Select a Project"}>
+            {/* ✅ MATCHES Statistics Page Design Exactly */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-slate-700 transition-colors">
+                <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Select a Project</h2>
+                <p className="text-gray-600 dark:text-slate-400 mb-4">
+                    {intendedSection 
+                        ? `Choose a project to view its ${getSectionDisplayName(intendedSection).toLowerCase()}.`
+                        : 'Choose a project to view its details.'
+                    }
+                </p>
+                
+                {/* Search Bar */}
+                <div className="relative mb-6 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search projects..."
+                        placeholder="Search projects by name or location..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                 </div>
-            </div>
-
-            {/* ── States ── */}
-            {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-            ) : error ? (
-                <p className="text-center py-8 text-red-500">{error}</p>
-            ) : filteredProjects.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-slate-500">
-                    <p className="text-5xl mb-4">🏗️</p>
-                    <p className="text-lg font-medium">No projects found</p>
-                    {searchQuery && (
-                        <button onClick={() => setSearchQuery('')} className="mt-3 text-sm text-blue-500 hover:underline">
-                            Clear search
-                        </button>
-                    )}
-                </div>
-            ) : (
-                /* ── Card grid — IDENTICAL to ProjectsPage ── */
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredProjects.map((project) => (
-                        <div
-                            key={project.projectId}
-                            onClick={() => handleProjectSelect(project.projectId)}
-                            className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200 cursor-pointer group overflow-hidden flex flex-col"
+                
+                {loading ? (
+                    <p className="text-center py-8 text-gray-500 dark:text-slate-400">Loading projects...</p>
+                ) : error ? (
+                    <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
+                ) : projects.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-gray-500 dark:text-slate-400 mb-4">No projects found.</p>
+                        <button 
+                            onClick={() => navigate('/projects')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
-                            {/* Cover Image */}
-                            <div className="w-full h-40 bg-gray-100 dark:bg-slate-700 overflow-hidden flex-shrink-0">
-                                {project.projectImage ? (
-                                    <img
-                                        src={project.projectImage}
-                                        alt={project.name}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300 dark:text-slate-600">
-                                        🏗️
+                            Create Your First Project
+                        </button>
+                    </div>
+                ) : (
+                    /* ✅ EXACT SAME GRID AS STATISTICS PAGE */
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {projects
+                            .filter((proj) => {
+                                const searchLower = searchQuery.toLowerCase();
+                                return (
+                                    proj.name?.toLowerCase().includes(searchLower) ||
+                                    proj.location?.toLowerCase().includes(searchLower)
+                                );
+                            })
+                            .map((proj) => (
+                                <button
+                                    key={proj.projectId}
+                                    onClick={() => handleProjectSelect(proj.projectId)}
+                                    className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden text-left transform"
+                                >
+                                    <div className="p-6">
+                                        {/* ✅ EXACT SAME STYLING AS STATISTICS PAGE */}
+                                        <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-4">{proj.name}</h3>
+                                        <div className="text-sm text-gray-600 dark:text-slate-400 space-y-2">
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">Location:</span>
+                                                <span className="text-right">{proj.location}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">Budget:</span>
+                                                <span className="text-right">₱{proj.contractCost ? parseInt(proj.contractCost).toLocaleString() : 'N/A'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-2">
+                                                <span className="font-medium">Status:</span>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                    proj.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                                    proj.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                                }`}>{proj.status || 'Not Started'}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+                                </button>
+                            ))}
+                        {projects.filter((proj) => {
+                            const searchLower = searchQuery.toLowerCase();
+                            return (
+                                proj.name?.toLowerCase().includes(searchLower) ||
+                                proj.location?.toLowerCase().includes(searchLower)
+                            );
+                        }).length === 0 && (
+                            <div className="col-span-full text-center py-8 text-gray-500 dark:text-slate-400">
+                                No projects match your search.
                             </div>
-
-                            {/* Card Body */}
-                            <div className="p-4 flex flex-col flex-1">
-                                {/* Status row */}
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColors[project.status] || statusColors['Not Started']}`}>
-                                        {project.status || 'Not Started'}
-                                    </span>
-                                </div>
-
-                                {/* Project Name */}
-                                <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm leading-snug mb-1 line-clamp-2">
-                                    {project.name}
-                                </h3>
-
-                                {/* Location */}
-                                <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-auto pt-2 border-t border-gray-100 dark:border-slate-700">
-                                    📍 {project.location || 'No location set'}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
+            </div>
         </Layout>
     );
 }

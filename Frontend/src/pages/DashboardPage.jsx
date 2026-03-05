@@ -1,1198 +1,764 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import Layout from '../components/Layout';
-import { useTheme } from '../context/ThemeContext';
-import { RefreshCw, Moon, Sun, Bell, Settings, LogOut, X } from 'lucide-react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell,
-  RadialBarChart, RadialBar,
-} from 'recharts';
-import SettingsModal from '../components/SettingsModal';
+import { Search, RefreshCw, FolderKanban, Rocket, Wallet, TrendingUp, AlertTriangle, CheckCircle2, Clock, ArrowUpDown, ListFilter, SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 const getToken = () => localStorage.getItem('token');
 
+// ✅ NEW: Format large numbers intelligently
 const formatBudget = (value) => {
   if (!value || value === 0) return '₱0';
-  const n = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-  if (isNaN(n) || n === 0) return '₱0';
-  const neg = n < 0 ? '-' : '';
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000_000) return `${neg}₱${(abs/1e9).toFixed(1)}B`;
-  if (abs >= 1_000_000)     return `${neg}₱${(abs/1e6).toFixed(1)}M`;
-  if (abs >= 1_000)         return `${neg}₱${(abs/1e3).toFixed(1)}K`;
-  return `${neg}₱${abs.toFixed(2)}`;
+  // Convert to number if it's a string
+  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(numValue) || numValue === 0) return '₱0';
+  
+  const isNegative = numValue < 0;
+  const num = Math.abs(numValue);
+  const sign = isNegative ? '-' : '';
+  
+  // Format with appropriate scale
+  if (num >= 1000000000) {
+    return `${sign}₱${(num / 1000000000).toFixed(1)}B`;
+  } else if (num >= 1000000) {
+    return `${sign}₱${(num / 1000000).toFixed(1)}M`;
+  } else if (num >= 1000) {
+    return `${sign}₱${(num / 1000).toFixed(1)}K`;
+  } else {
+    return `${sign}₱${num.toFixed(2)}`;
+  }
 };
 
-const toNum = (v) => {
-  const n = typeof v === 'string' ? parseFloat(v.replace(/[^0-9.-]/g,'')) : (v||0);
-  return isNaN(n) ? 0 : n;
-};
+const ProjectRow = ({ project, taskProgress, budgetProgress, totalSpent }) => {
+  const contractCost = typeof project.contractCost === 'string' 
+    ? parseFloat(project.contractCost.replace(/[^0-9.-]/g, '')) 
+    : (project.contractCost || 0);
+  const spent = typeof totalSpent === 'string'
+    ? parseFloat(totalSpent.replace(/[^0-9.-]/g, ''))
+    : (totalSpent || 0);
+  
+  const isOverBudget = spent > contractCost;
+  const overageAmount = isOverBudget ? spent - contractCost : 0;
 
-const statusBadgeClass = (s) => ({
-  'Completed':   'bg-green-100 text-green-700',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  'On Hold':     'bg-yellow-100 text-yellow-700',
-  'Overdue':     'bg-red-100 text-red-700',
-  'Not Started': 'bg-gray-100 text-gray-600',
-}[s] || 'bg-gray-100 text-gray-600');
+  const createdDate = project.createdAt ? new Date(project.createdAt).toLocaleDateString() : null;
+  const startDate = project.contractStartDate ? new Date(project.contractStartDate).toLocaleDateString() : null;
+
+  return (
+  <div className="block hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-300">
+    <div className={`rounded-xl border shadow-sm mb-4 transition-all duration-300 hover:shadow-lg hover:scale-[1.01] ${
+      isOverBudget
+        ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
+    }`}>
+      {/* Top Row: Image, Name, Progress, Budget, Due Date, Status */}
+      <div className="flex items-center p-4">
+        {project.projectImage ? (
+          <img
+            src={project.projectImage}
+            alt={project.name}
+            className="w-12 h-12 rounded-lg mr-4 object-cover flex-shrink-0"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200 dark:bg-slate-600 flex-shrink-0"></div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+            {isOverBudget && (
+              <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-md whitespace-nowrap">
+               ⚠️ OVER BUDGET
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
+        </div>
+
+        <div className="w-1/4 mx-4 hidden md:block">
+          <div className="flex justify-between text-sm text-gray-500 dark:text-slate-400 mb-1">
+            <span>Progress</span>
+            <span>{taskProgress}%</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+            <div
+              className="bg-green-500 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${taskProgress}%` }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="w-1/4 mx-4 hidden md:block">
+          <div className="flex justify-between items-center text-sm mb-1">
+            <span className="text-gray-500 dark:text-slate-400">Budget</span>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-slate-400">{budgetProgress}%</span>
+              {isOverBudget && (
+                <span className="text-xs text-red-600 dark:text-red-400 font-bold">
+                  +₱{overageAmount.toLocaleString('en-US', {maximumFractionDigits: 0})}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all duration-500 ${
+                isOverBudget
+                  ? 'bg-red-600'
+                  : budgetProgress > 90
+                  ? 'bg-red-500'
+                  : budgetProgress > 70
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`}
+              style={{ width: `${Math.min(budgetProgress, 100)}%` }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="w-48 text-center bg-stone-100 dark:bg-slate-700 p-2 rounded-lg mx-4 hidden lg:block">
+          {(() => {
+            const dueDate = new Date(project.contractCompletionDate || project.createdAt);
+            const now = new Date();
+            const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+            const isOverdue = diffDays < 0 && project.status !== 'Completed';
+            return (
+              <div>
+                <span className="text-gray-800 dark:text-white text-xs">
+                  Due {dueDate.toLocaleDateString()}
+                </span>
+                {project.status !== 'Completed' && (
+                  <p className={`text-xs font-semibold mt-1 ${isOverdue ? 'text-red-600 dark:text-red-400' : diffDays <= 30 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {isOverdue ? `${Math.abs(diffDays)} days overdue` : `${diffDays} days left`}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="whitespace-nowrap hidden sm:block">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold inline-block ${
+              project.status === 'Completed'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                : project.status === 'In Progress'
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+            }`}
+          >
+            {project.status || 'Not Started'}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom Row: Project Details */}
+      <div className="px-4 pb-3 pt-0 border-t border-gray-100 dark:border-slate-700/50">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500 dark:text-slate-400 mt-2">
+          {createdDate && (
+            <span className="flex items-center gap-1">
+              <span>📅</span> Created: <span className="font-medium text-gray-700 dark:text-slate-300">{createdDate}</span>
+            </span>
+          )}
+          {startDate && (
+            <span className="flex items-center gap-1">
+              <span>🚀</span> Start: <span className="font-medium text-gray-700 dark:text-slate-300">{startDate}</span>
+            </span>
+          )}
+          {contractCost > 0 && (
+            <span className="flex items-center gap-1">
+              <span>💰</span> Contract: <span className="font-medium text-gray-700 dark:text-slate-300">{formatBudget(contractCost)}</span>
+            </span>
+          )}
+          {spent > 0 && (
+            <span className="flex items-center gap-1">
+              <span>📊</span> Spent: <span className={`font-medium ${isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-slate-300'}`}>{formatBudget(spent)}</span>
+            </span>
+          )}
+          {project.contractor && (
+            <span className="flex items-center gap-1">
+              <span>🏗️</span> Contractor: <span className="font-medium text-gray-700 dark:text-slate-300 truncate max-w-[150px]">{project.contractor}</span>
+            </span>
+          )}
+          {project.projectManager && (
+            <span className="flex items-center gap-1">
+              <span>👷</span> PM: <span className="font-medium text-gray-700 dark:text-slate-300 truncate max-w-[150px]">{project.projectManager}</span>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);};
 
 function DashboardPage() {
-  const [projects, setProjects]                         = useState([]);
+  const [projects, setProjects] = useState([]);
   const [projectsWithProgress, setProjectsWithProgress] = useState([]);
-  const [loading, setLoading]                           = useState(true);
-  const [isRefreshing, setIsRefreshing]                 = useState(false);
-  const [pendingTasksCount, setPendingTasksCount]       = useState(0);
-  const [modalType, setModalType]                       = useState(null);
-  const [showSettings, setShowSettings]                 = useState(false);
-  const [pmUsers, setPmUsers]                           = useState([]);
-  const [showUsersModal, setShowUsersModal]             = useState(false);
-  const [weather, setWeather]                           = useState(null);
-  const [weatherLoading, setWeatherLoading]             = useState(true);
+  const [filteredProjects, setFilteredProjects] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState('name'); // 'name', 'date', 'progress', 'budget'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'completed', 'overbudget'
+  const showOverBudgetOnly = statusFilter === 'overbudget';
+  const showCompletedOnly = statusFilter === 'completed';
+  const showActiveOnly = statusFilter === 'active';
+  const [visibleCount, setVisibleCount] = useState(5); // S1: Limit items shown in project list
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
 
-  // ── Data Fetching ──────────────────────────────────────────────
   const fetchProjectsWithProgress = async (showLoadingState = true) => {
     const token = getToken();
-    if (!token) { navigate('/login'); return; }
-    if (showLoadingState) setLoading(true); else setIsRefreshing(true);
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    if (showLoadingState) setLoading(true);
+    else setIsRefreshing(true);
+
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data: projectsData } = await axios.get('/projects', config);
+
+      const projectsResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects`, config);
+      const projectsData = projectsResponse.data;
       setProjects(projectsData);
-      let totalPending = 0;
-      const withProgress = await Promise.all(projectsData.map(async (p) => {
-        try {
-          const { data: milestones = [] } = await axios.get(`/milestones/project/${p.projectId}`, config);
-          const phases = milestones.filter(m => m.isPhase);
-          const tasks  = milestones.filter(m => !m.isPhase);
-          totalPending += tasks.filter(t => (t.completionPercentage||0) < 100).length;
-          let taskProgress = 0;
-          if (phases.length > 0) {
-            const avgs = phases.map(ph => {
-              const pt = tasks.filter(t => t.parentPhase === ph.milestoneId);
-              return pt.length ? pt.reduce((s,t)=>s+(t.completionPercentage||0),0)/pt.length : 0;
-            });
-            taskProgress = Math.round(avgs.reduce((s,a)=>s+a,0)/phases.length);
-          } else if (tasks.length > 0) {
-            taskProgress = Math.round(tasks.reduce((s,t)=>s+(t.completionPercentage||0),0)/tasks.length);
+
+      const projectsWithProgressData = await Promise.all(
+        projectsData.map(async (project) => {
+          try {
+            const milestonesResponse = await axios.get(
+              `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/milestones/project/${project.projectId}`,
+              config
+            );
+            const milestones = milestonesResponse.data || [];
+
+            // ✅ Calculate project progress based on PHASE averages (not individual tasks)
+            const phases = milestones.filter((m) => m.isPhase === true);
+            const tasks = milestones.filter((m) => m.isPhase !== true);
+            
+            let taskProgress = 0;
+            
+            if (phases.length > 0) {
+              // Group tasks by phase and calculate each phase's average
+              const phaseAverages = phases.map(phase => {
+                const phaseTasks = tasks.filter(task => task.parentPhase === phase.milestoneId);
+                
+                if (phaseTasks.length === 0) return 0;
+                
+                const totalCompletion = phaseTasks.reduce((sum, task) => {
+                  return sum + (task.completionPercentage || 0);
+                }, 0);
+                
+                return totalCompletion / phaseTasks.length;
+              });
+              
+              // Calculate project progress as average of all phase averages
+              const totalPhaseCompletion = phaseAverages.reduce((sum, avg) => sum + avg, 0);
+              taskProgress = Math.round(totalPhaseCompletion / phases.length);
+            } else if (tasks.length > 0) {
+              // Fallback: If no phases, calculate from tasks directly
+              const totalCompletion = tasks.reduce((sum, task) => {
+                return sum + (task.completionPercentage || 0);
+              }, 0);
+              taskProgress = Math.round(totalCompletion / tasks.length);
+            }
+
+            const expensesResponse = await axios.get(
+              `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${project.projectId}`,
+              config
+            );
+            const expenses = expensesResponse.data || [];
+
+            const totalSpent = expenses.reduce(
+              (sum, expense) => sum + (parseFloat(expense.amount) || 0),
+              0
+            );
+            const budgetProgress =
+              project.contractCost > 0
+                ? Math.min(Math.round((totalSpent / project.contractCost) * 100), 100)
+                : 0;
+
+            return { ...project, taskProgress, budgetProgress, totalSpent };
+          } catch (err) {
+            console.warn(`Could not fetch progress for project ${project.projectId}:`, err);
+            return { ...project, taskProgress: 0, budgetProgress: 0, totalSpent: 0 };
           }
-          const { data: expenses = [] } = await axios.get(`/expenses/project/${p.projectId}`, config);
-          const totalSpent = expenses.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-          return { ...p, taskProgress, totalSpent };
-        } catch { return { ...p, taskProgress: 0, totalSpent: 0 }; }
-      }));
-      setProjectsWithProgress(withProgress);
-      setPendingTasksCount(totalPending);
-    } catch { /* silent */ }
-    finally { setLoading(false); setIsRefreshing(false); }
-  };
+        })
+      );
 
-  const fetchUsers = async () => {
-    const token = getToken();
-    if (!token) return;
-    const fallback = [{
-      userId: localStorage.getItem('userId') || 'me',
-      name:   localStorage.getItem('userName') || 'Me',
-      email:  localStorage.getItem('userEmail') || '',
-      role:   localStorage.getItem('userRole') || 'User',
-      avatar: localStorage.getItem('userAvatar') || '',
-    }];
-    for (const ep of ['/users/all', '/admin/users', '/users']) {
-      try {
-        const { data: raw } = await axios.get(ep, { headers: { Authorization: `Bearer ${token}` } });
-        const users = Array.isArray(raw) ? raw : raw.users || raw.data || raw.Items || [];
-        if (users.length > 0) {
-          setPmUsers(users.map(u => ({
-            userId: u.userId || u.id || String(Math.random()),
-            name:   u.name || u.fullName || u.email?.split('@')[0] || 'User',
-            email:  u.email || '',
-            role:   u.role || 'User',
-            avatar: u.avatar || u.profileImage || '',
-          })));
-          return;
-        }
-      } catch { /* try next */ }
+      setProjectsWithProgress(projectsWithProgressData);
+      setFilteredProjects(projectsWithProgressData);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+      setError('Failed to fetch projects. Your session may have expired.');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
-    setPmUsers(fallback);
   };
 
-  const getWeatherInfo = (code) => {
-    if (code === 0)   return { label:'Clear Sky',     emoji:'☀️',  bg:'from-yellow-400 to-orange-400' };
-    if (code <= 2)    return { label:'Partly Cloudy', emoji:'⛅',  bg:'from-blue-400 to-sky-300' };
-    if (code === 3)   return { label:'Overcast',      emoji:'☁️',  bg:'from-gray-400 to-slate-400' };
-    if (code <= 49)   return { label:'Foggy',         emoji:'🌫️', bg:'from-gray-400 to-slate-300' };
-    if (code <= 59)   return { label:'Drizzle',       emoji:'🌦️', bg:'from-blue-500 to-cyan-400' };
-    if (code <= 69)   return { label:'Rain',          emoji:'🌧️', bg:'from-blue-600 to-blue-500' };
-    if (code <= 79)   return { label:'Snow',          emoji:'❄️',  bg:'from-sky-200 to-blue-200' };
-    if (code <= 82)   return { label:'Rain Showers',  emoji:'🌧️', bg:'from-blue-600 to-indigo-500' };
-    if (code <= 99)   return { label:'Thunderstorm',  emoji:'⛈️',  bg:'from-gray-700 to-slate-600' };
-    return                   { label:'Unknown',       emoji:'🌡️', bg:'from-gray-400 to-gray-500' };
-  };
-
-  const fetchWeather = async () => {
-    setWeatherLoading(true);
-    const setFromCoords = async (lat, lon, city) => {
-      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weathercode&wind_speed_unit=kmh&timezone=auto`);
-      const d = await r.json();
-      const c = d.current;
-      setWeather({ temp: Math.round(c.temperature_2m), feelsLike: Math.round(c.apparent_temperature), humidity: c.relative_humidity_2m, windSpeed: Math.round(c.wind_speed_10m), city, ...getWeatherInfo(c.weathercode) });
-    };
-    try {
-      const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000}));
-      const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
-      const gd  = await geo.json();
-      await setFromCoords(pos.coords.latitude, pos.coords.longitude, gd.address?.city || gd.address?.town || 'Your Location');
-    } catch {
-      try { await setFromCoords(14.5995, 120.9842, 'Manila'); } catch { setWeather(null); }
-    } finally { setWeatherLoading(false); }
-  };
-
-  useEffect(() => { fetchProjectsWithProgress(); fetchUsers(); fetchWeather(); }, []);
   useEffect(() => {
-    if (!loading && location.pathname === '/dashboard') fetchProjectsWithProgress(false);
+    fetchProjectsWithProgress();
+  }, []);
+
+  useEffect(() => {
+    if (!loading && location.pathname === '/dashboard') {
+      fetchProjectsWithProgress(false);
+    }
   }, [location.pathname]);
 
-  // ── Stats ──────────────────────────────────────────────────────
-  const totalBudget    = projects.reduce((s,p) => s+toNum(p.contractCost), 0);
-  const totalSpent     = projectsWithProgress.reduce((s,p) => s+toNum(p.totalSpent), 0);
-  const avgCompletion  = projectsWithProgress.length ? Math.round(projectsWithProgress.reduce((s,p)=>s+p.taskProgress,0)/projectsWithProgress.length) : 0;
-  const activeProjects = projects.filter(p=>p.status==='In Progress').length;
-  const pendingProjects= projects.filter(p=>p.status==='Not Started').length;
-  const overBudget     = projectsWithProgress.filter(p=>toNum(p.totalSpent)>toNum(p.contractCost)).length;
-  const atRisk         = projectsWithProgress.filter(p=>p.taskProgress<50&&p.status==='In Progress').length;
-
-  const chartData = projectsWithProgress.map(p => ({
-    name:      p.name?.length > 12 ? p.name.substring(0,10)+'…' : p.name||'Project',
-    Spent:     Math.round(toNum(p.totalSpent)),
-    Remaining: Math.round(Math.max(toNum(p.contractCost)-toNum(p.totalSpent), 0)),
-  }));
-
-  const ResourceTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-sm shadow-xl">
-        <p className="font-bold mb-1">{label}</p>
-        {payload.map(e => <p key={e.name} style={{color:e.fill}}>{e.name}: {formatBudget(e.value)}</p>)}
-      </div>
-    );
+  const handleManualRefresh = () => {
+    fetchProjectsWithProgress(false);
   };
 
-  // ── Users Modal ────────────────────────────────────────────────
-  const UsersModal = () => {
-    if (!showUsersModal) return null;
-    const roleColor = (r) => ({
-      'Admin':           'bg-red-100 text-red-700',
-      'Project Manager': 'bg-blue-100 text-blue-700',
-      'Vice President':  'bg-purple-100 text-purple-700',
-    }[r] || 'bg-gray-100 text-gray-600');
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={()=>setShowUsersModal(false)}>
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200 dark:border-slate-700" onClick={e=>e.stopPropagation()}>
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-white">Registered Users</h2>
-              <p className="text-white/70 text-xs">{pmUsers.length} user{pmUsers.length!==1?'s':''} in the system</p>
-            </div>
-            <button onClick={()=>setShowUsersModal(false)} className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"><X className="w-4 h-4"/></button>
-          </div>
-          <div className="overflow-y-auto flex-1 p-5 space-y-3">
-            {pmUsers.length === 0
-              ? <div className="flex flex-col items-center justify-center py-16 text-gray-400"><p className="text-4xl mb-3">👥</p><p className="font-medium">No users found</p></div>
-              : pmUsers.map((u,i) => (
-                <div key={u.userId||i} className="flex items-center gap-4 p-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50 hover:shadow-md transition-all">
-                  {u.avatar
-                    ? <img src={u.avatar} alt={u.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0 border-2 border-white shadow"/>
-                    : <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 border-2 border-white shadow" style={{background:`hsl(${(i*67+210)%360},65%,55%)`}}>
-                        {(u.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
-                      </div>
-                  }
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate">{u.name||'Unnamed User'}</p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{u.email||'—'}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${roleColor(u.role)}`}>{u.role||'User'}</span>
-                </div>
-              ))
-            }
-          </div>
-          <div className="border-t border-gray-200 dark:border-slate-700 px-5 py-3 bg-gray-50 dark:bg-slate-800/50 flex justify-end">
-            <button onClick={()=>setShowUsersModal(false)} className="px-4 py-2 bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg transition-colors">Close</button>
-          </div>
-        </div>
-      </div>
-    );
+  useEffect(() => {
+    let results = projectsWithProgress;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      results = results.filter(
+        (project) =>
+          project.name?.toLowerCase().includes(searchLower) ||
+          project.location?.toLowerCase().includes(searchLower) ||
+          project.status?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter === 'overbudget') {
+      results = results.filter((p) => {
+        const contractCost = typeof p.contractCost === 'string' 
+          ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) 
+          : (p.contractCost || 0);
+        const spent = typeof p.totalSpent === 'string'
+          ? parseFloat(p.totalSpent.replace(/[^0-9.-]/g, ''))
+          : (p.totalSpent || 0);
+        return spent > contractCost;
+      });
+    } else if (statusFilter === 'completed') {
+      results = results.filter((p) => p.status === 'Completed');
+    } else if (statusFilter === 'active') {
+      results = results.filter((p) => p.status !== 'Completed');
+    }
+
+    // Sorting
+    results.sort((a, b) => {
+      let compareValue = 0;
+      
+      if (sortBy === 'name') {
+        compareValue = (a.name || '').localeCompare(b.name || '');
+      } else if (sortBy === 'date') {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        compareValue = dateA - dateB;
+      } else if (sortBy === 'progress') {
+        compareValue = (a.taskProgress || 0) - (b.taskProgress || 0);
+      } else if (sortBy === 'budget') {
+        const costA = typeof a.contractCost === 'string' ? parseFloat(a.contractCost.replace(/[^0-9.-]/g, '')) : (a.contractCost || 0);
+        const costB = typeof b.contractCost === 'string' ? parseFloat(b.contractCost.replace(/[^0-9.-]/g, '')) : (b.contractCost || 0);
+        compareValue = costA - costB;
+      }
+
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+
+    setFilteredProjects(results);
+    setVisibleCount(5);
+  }, [searchQuery, projectsWithProgress, sortBy, sortOrder, statusFilter]);
+
+  const stats = {
+    totalProjects: projects.length,
+    totalBudget: projects.reduce((sum, p) => {
+      const cost = typeof p.contractCost === 'string' 
+        ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) 
+        : (p.contractCost || 0);
+      return sum + (isNaN(cost) ? 0 : cost);
+    }, 0),
+    totalSpent: projectsWithProgress.reduce((sum, p) => {
+      const spent = typeof p.totalSpent === 'string'
+        ? parseFloat(p.totalSpent.replace(/[^0-9.-]/g, ''))
+        : (p.totalSpent || 0);
+      return sum + (isNaN(spent) ? 0 : spent);
+    }, 0),
+    avgCompletion:
+      projectsWithProgress.length > 0
+        ? Math.round(
+            projectsWithProgress.reduce((sum, p) => sum + p.taskProgress, 0) /
+              projectsWithProgress.length
+          )
+        : 0,
+    activeProjects: projects.filter((p) => p.status === 'In Progress').length,
+    completedProjects: projects.filter((p) => p.status === 'Completed').length,
+    notStartedProjects: projects.filter((p) => p.status === 'Not Started' || !p.status).length,
+    overdueProjects: projects.filter((p) => {
+      if (p.status === 'Completed') return false;
+      const dueDate = new Date(p.contractCompletionDate);
+      return dueDate < new Date() && !isNaN(dueDate.getTime());
+    }).length,
+    overBudgetProjects: projectsWithProgress.filter((p) => {
+      const cost = typeof p.contractCost === 'string' ? parseFloat(p.contractCost.replace(/[^0-9.-]/g, '')) : (p.contractCost || 0);
+      const spent = typeof p.totalSpent === 'string' ? parseFloat(p.totalSpent.replace(/[^0-9.-]/g, '')) : (p.totalSpent || 0);
+      return spent > cost && cost > 0;
+    }).length,
   };
 
-  // ── Budget Pie Chart Modal ─────────────────────────────────────
-  const PIE_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#f97316','#6366f1','#14b8a6','#ec4899'];
-
-  const BudgetPieModal = () => {
-    if (modalType !== 'budget') return null;
-
-    const pieData = projectsWithProgress
-      .filter(p => toNum(p.contractCost) > 0)
-      .map(p => ({
-        name:      p.name || 'Unnamed',
-        allocated: toNum(p.contractCost),
-        spent:     toNum(p.totalSpent),
-        left:      Math.max(toNum(p.contractCost) - toNum(p.totalSpent), 0),
-        over:      toNum(p.totalSpent) > toNum(p.contractCost),
-        projectId: p.projectId,
-      }));
-
-    const allocPieData = pieData.map(p => ({ name: p.name, value: p.allocated }));
-    const spentPieData = [
-      { name: 'Spent',     value: totalSpent },
-      { name: 'Remaining', value: Math.max(totalBudget - totalSpent, 0) },
-    ];
-
-    const [activeIndex, setActiveIndex] = React.useState(null);
-
-    const CustomTooltip = ({ active, payload }) => {
-      if (!active || !payload?.length) return null;
-      const d = payload[0];
-      return (
-        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-gray-700">
-          <p className="font-bold mb-0.5">{d.name}</p>
-          <p style={{color: d.payload.fill || d.color}}>{formatBudget(d.value)}</p>
-          <p className="text-gray-400">{((d.value / totalBudget) * 100).toFixed(1)}% of total</p>
-        </div>
-      );
-    };
-
-    const SpentTooltip = ({ active, payload }) => {
-      if (!active || !payload?.length) return null;
-      const d = payload[0];
-      const pct = totalBudget > 0 ? ((d.value / totalBudget) * 100).toFixed(1) : 0;
-      return (
-        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-gray-700">
-          <p className="font-bold mb-0.5">{d.name}</p>
-          <p style={{color: d.name === 'Spent' ? '#ef4444' : '#10b981'}}>{formatBudget(d.value)}</p>
-          <p className="text-gray-400">{pct}% of total</p>
-        </div>
-      );
-    };
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={()=>setModalType(null)}>
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-200 dark:border-slate-700" onClick={e=>e.stopPropagation()}>
-
-          {/* Header */}
-          <div className="bg-green-600 px-6 py-3 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <h2 className="text-base font-bold text-white">Budget Overview</h2>
-              <span className="text-white/60 text-xs hidden sm:block">— {formatBudget(totalBudget)} allocated</span>
-            </div>
-            <button onClick={()=>setModalType(null)} className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"><X className="w-4 h-4"/></button>
+  return (
+    <Layout
+      title="Dashboard"
+      headerContent={
+        <div className="relative flex-1 max-w-xl ml-4 sm:ml-8 flex items-center gap-2 sm:gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-100 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
           </div>
 
-          {/* Body */}
-          <div className="overflow-y-auto flex-1 p-6">
-            {pieData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                <p className="text-5xl mb-4">💰</p>
-                <p className="text-lg font-medium">No budget data available</p>
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2"
+            title="Refresh data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden md:inline">Refresh</span>
+          </button>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        {/* Total Projects Card */}
+        <div className="group relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl border border-gray-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/10 transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-indigo-500/5 to-transparent dark:from-indigo-400/5 rounded-bl-full" />
+          <div className="p-5 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <FolderKanban className="w-5 h-5 text-white" />
               </div>
-            ) : (
-              <>
-                {/* Summary cards */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-green-600 font-medium mb-1">Total Allocated</p>
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{formatBudget(totalBudget)}</p>
-                  </div>
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-red-600 font-medium mb-1">Total Spent</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatBudget(totalSpent)}</p>
-                  </div>
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-blue-600 font-medium mb-1">Remaining</p>
-                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatBudget(Math.max(totalBudget - totalSpent, 0))}</p>
-                  </div>
-                </div>
-
-                {/* Charts side by side */}
-                <div className="grid grid-cols-2 gap-6">
-
-                  {/* Left: Budget allocation per project */}
-                  <div className="bg-gray-50 dark:bg-slate-700/30 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
-                    <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">Budget Allocation per Project</h4>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={allocPieData}
-                          cx="50%" cy="50%"
-                          innerRadius={55} outerRadius={90}
-                          paddingAngle={3}
-                          dataKey="value"
-                          onMouseEnter={(_,i)=>setActiveIndex(i)}
-                          onMouseLeave={()=>setActiveIndex(null)}
-                        >
-                          {allocPieData.map((_, i) => (
-                            <Cell
-                              key={i}
-                              fill={PIE_COLORS[i % PIE_COLORS.length]}
-                              opacity={activeIndex === null || activeIndex === i ? 1 : 0.5}
-                              stroke="none"
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip/>}/>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Legend */}
-                    <div className="mt-2 space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                      {allocPieData.map((d, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background: PIE_COLORS[i % PIE_COLORS.length]}}/>
-                            <span className="text-gray-600 dark:text-gray-400 truncate">{d.name}</span>
-                          </div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{formatBudget(d.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right: Spent vs Remaining */}
-                  <div className="bg-gray-50 dark:bg-slate-700/30 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
-                    <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">Spent vs. Remaining</h4>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={spentPieData}
-                          cx="50%" cy="50%"
-                          innerRadius={55} outerRadius={90}
-                          paddingAngle={4}
-                          dataKey="value"
-                          startAngle={90} endAngle={-270}
-                        >
-                          <Cell fill="#ef4444" stroke="none"/>
-                          <Cell fill="#10b981" stroke="none"/>
-                        </Pie>
-                        <Tooltip content={<SpentTooltip/>}/>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Center label */}
-                    <div className="mt-2 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"/><span className="text-gray-600 dark:text-gray-400">Spent</span></div>
-                        <span className="font-semibold text-red-600">{formatBudget(totalSpent)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0"/><span className="text-gray-600 dark:text-gray-400">Remaining</span></div>
-                        <span className="font-semibold text-green-600">{formatBudget(Math.max(totalBudget - totalSpent, 0))}</span>
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-600 flex items-center justify-between text-xs">
-                        <span className="text-gray-500">Utilization</span>
-                        <span className="font-bold text-gray-700 dark:text-gray-300">
-                          {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Per-project breakdown table */}
-                <div className="mt-6">
-                  <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Per-Project Breakdown</h4>
-                  <div className="space-y-2">
-                    {pieData.map((p, i) => {
-                      const pct = p.allocated > 0 ? Math.min((p.spent / p.allocated) * 100, 100) : 0;
-                      return (
-                        <div key={p.projectId}
-                          onClick={()=>{navigate(`/projects/${p.projectId}/milestones`);setModalType(null);}}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 hover:shadow-md cursor-pointer transition-all group">
-                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{background: PIE_COLORS[i % PIE_COLORS.length]}}/>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-sm font-semibold text-gray-800 dark:text-white truncate group-hover:text-green-600 transition-colors">{p.name}</p>
-                              {p.over && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full flex-shrink-0">⚠️ Over</span>}
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5">
-                              <div className="h-1.5 rounded-full transition-all" style={{width:`${pct}%`, background: p.over ? '#ef4444' : PIE_COLORS[i % PIE_COLORS.length]}}/>
-                            </div>
-                          </div>
-                          <div className="flex gap-4 text-xs text-right flex-shrink-0">
-                            <div><p className="text-gray-400">Budget</p><p className="font-semibold text-gray-700 dark:text-gray-300">{formatBudget(p.allocated)}</p></div>
-                            <div><p className="text-gray-400">Spent</p><p className={`font-semibold ${p.over ? 'text-red-600' : 'text-gray-700 dark:text-gray-300'}`}>{formatBudget(p.spent)}</p></div>
-                            <div><p className="text-gray-400">Left</p><p className="font-semibold text-green-600">{formatBudget(p.left)}</p></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+              <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full">
+                Total
+              </span>
+            </div>
+            <p className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {stats.totalProjects}
+            </p>
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mt-1 mb-3">Total Projects</p>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className="flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="w-3 h-3" />{stats.completedProjects} done</span>
+              <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400"><Rocket className="w-3 h-3" />{stats.activeProjects} active</span>
+              <span className="flex items-center gap-1 text-gray-400 dark:text-slate-500"><Clock className="w-3 h-3" />{stats.notStartedProjects} pending</span>
+            </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-slate-800/50 flex-shrink-0">
-            <p className="text-sm text-gray-500">{pieData.length} project{pieData.length!==1?'s':''} shown</p>
-            <div className="flex gap-3">
-              <button onClick={()=>{navigate('/projects');setModalType(null);}} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors">Go to Projects</button>
-              <button onClick={()=>setModalType(null)} className="px-4 py-2 bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg transition-colors">Close</button>
+        {/* Active Projects Card */}
+        <div className="group relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl border border-gray-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10 transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-400" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/5 to-transparent dark:from-blue-400/5 rounded-bl-full" />
+          <div className="p-5 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <Rocket className="w-5 h-5 text-white" />
+              </div>
+              {stats.overdueProjects > 0 ? (
+                <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />{stats.overdueProjects} overdue
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />On track
+                </span>
+              )}
+            </div>
+            <p className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {stats.activeProjects}
+            </p>
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mt-1 mb-3">Active Projects</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-700" style={{ width: stats.totalProjects > 0 ? `${(stats.activeProjects / stats.totalProjects) * 100}%` : '0%' }} />
+              </div>
+              <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{stats.totalProjects > 0 ? Math.round((stats.activeProjects / stats.totalProjects) * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Budget Card */}
+        <div className="group relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl border border-gray-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 dark:hover:shadow-emerald-500/10 transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-400" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/5 to-transparent dark:from-emerald-400/5 rounded-bl-full" />
+          <div className="p-5 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <Wallet className="w-5 h-5 text-white" />
+              </div>
+              {stats.overBudgetProjects > 0 ? (
+                <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />{stats.overBudgetProjects} over
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">Budget</span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-600/70 dark:text-emerald-400/70">Allocated</p>
+                <p className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight truncate">
+                  {formatBudget(stats.totalBudget)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-slate-700/50">
+                <div className="flex-1">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-slate-500">Spent</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                    {formatBudget(stats.totalSpent)}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full border-[3px] border-emerald-200 dark:border-emerald-800 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    {stats.totalBudget > 0 ? Math.round((stats.totalSpent / stats.totalBudget) * 100) : 0}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Avg. Completion Card */}
+        <div className="group relative overflow-hidden bg-white dark:bg-slate-800 rounded-2xl border border-gray-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-xl hover:shadow-violet-500/5 dark:hover:shadow-violet-500/10 transition-all duration-300 hover:-translate-y-0.5">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-400" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-violet-500/5 to-transparent dark:from-violet-400/5 rounded-bl-full" />
+          <div className="p-5 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">Avg.</span>
+            </div>
+            <p className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {stats.avgCompletion}%
+            </p>
+            <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mt-1 mb-3">Avg. Completion</p>
+            <div className="space-y-1.5">
+              <div className="w-full h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-1000 ease-out" 
+                  style={{ width: `${stats.avgCompletion}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-violet-600 dark:text-violet-400">Overall progress across all projects</p>
             </div>
           </div>
         </div>
       </div>
-    );
-  };
 
-  // ── Shared dark tooltip ───────────────────────────────────────
-  const DarkTooltip = ({ active, payload, label, formatter }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-xs shadow-xl">
-        {label && <p className="font-bold mb-1 text-sm">{label}</p>}
-        {payload.map((e,i) => (
-          <p key={i} style={{color: e.color || e.fill || '#fff'}}>
-            {e.name}: {formatter ? formatter(e.value) : e.value}
+      {isRefreshing && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Updating project data...
+        </div>
+      )}
+
+      {/* ═══ TOOLBAR ═══ */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        {/* Status Filter Tabs */}
+        <div className="flex items-center bg-white dark:bg-slate-800 rounded-xl border border-gray-200/80 dark:border-slate-700/60 p-1 shadow-sm">
+          {[
+            { key: 'all', label: 'All', icon: null },
+            { key: 'active', label: 'Active', color: 'text-blue-600 dark:text-blue-400' },
+            { key: 'completed', label: 'Completed', color: 'text-green-600 dark:text-green-400' },
+            { key: 'overbudget', label: 'Over Budget', color: 'text-red-600 dark:text-red-400' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(statusFilter === tab.key ? 'all' : tab.key)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                statusFilter === tab.key
+                  ? tab.key === 'overbudget' ? 'bg-red-500 text-white shadow-sm'
+                    : tab.key === 'completed' ? 'bg-green-500 text-white shadow-sm'
+                    : tab.key === 'active' ? 'bg-blue-500 text-white shadow-sm'
+                    : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Sort Controls */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center bg-white dark:bg-slate-800 rounded-xl border border-gray-200/80 dark:border-slate-700/60 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 dark:text-slate-500 border-r border-gray-200 dark:border-slate-700">
+              <ArrowUpDown className="w-3 h-3" />
+              <span className="font-medium hidden sm:inline">Sort</span>
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-2 py-1.5 bg-white dark:bg-slate-800 text-xs font-medium text-gray-700 dark:text-slate-300 focus:outline-none cursor-pointer appearance-none pr-5 rounded-none"
+              style={{ backgroundImage: 'none' }}
+            >
+              <option value="name">Name</option>
+              <option value="date">Date Created</option>
+              <option value="progress">Progress</option>
+              <option value="budget">Budget</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-2.5 py-1.5 text-xs font-medium text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700/50 border-l border-gray-200 dark:border-slate-700 transition-colors"
+              title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+        </div>
+
+        {/* Count Badge */}
+        <span className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
+          {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      <div>
+        {/* Active Projects Section */}
+        <div>
+          <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
+            {showOverBudgetOnly
+              ? `OVER BUDGET PROJECTS (${filteredProjects.length})`
+              : showCompletedOnly
+              ? `COMPLETED PROJECTS (${filteredProjects.length})`
+              : showActiveOnly
+              ? `ACTIVE PROJECTS (${filteredProjects.length})`
+              : `ALL PROJECTS (${filteredProjects.length})`}
           </p>
-        ))}
-      </div>
-    );
-  };
 
-  // ── Unified Chart Modal ────────────────────────────────────────
-  const ChartModal = () => {
-    if (!modalType || modalType === 'budget') return null;
+          {loading && (
+            <p className="text-center py-8 text-gray-500 dark:text-slate-400">
+              Loading projects...
+            </p>
+          )}
+          {error && (
+            <p className="text-center py-8 text-red-500 dark:text-red-400">{error}</p>
+          )}
 
-    // ── Config per modal type ──────────────────────────────────
-    const STATUS_COLORS = {
-      'Completed':   '#10b981',
-      'In Progress': '#3b82f6',
-      'On Hold':     '#f59e0b',
-      'Overdue':     '#ef4444',
-      'Not Started': '#9ca3af',
-    };
-
-    const configs = {
-      // ── TOTAL PROJECTS ─ pie by status ─────────────────────
-      total: {
-        title: 'Total Projects', subtitle: `${projects.length} total`, headerColor: 'bg-gray-700',
-        summaryCards: [
-          { label:'Total',       value: projects.length,                                        color:'bg-gray-100 border-gray-300',      text:'text-gray-800' },
-          { label:'In Progress', value: projects.filter(p=>p.status==='In Progress').length,    color:'bg-blue-50 border-blue-200',        text:'text-blue-700' },
-          { label:'Completed',   value: projects.filter(p=>p.status==='Completed').length,      color:'bg-green-50 border-green-200',      text:'text-green-700' },
-          { label:'On Hold',     value: projects.filter(p=>p.status==='On Hold').length,        color:'bg-yellow-50 border-yellow-200',    text:'text-yellow-700' },
-        ],
-        charts: () => {
-          const statusGroups = ['Completed','In Progress','On Hold','Not Started','Overdue'].map(s => ({
-            name: s, value: projects.filter(p=>p.status===s).length,
-          })).filter(d=>d.value>0);
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              {/* Pie */}
-              <div className="bg-gray-50 dark:bg-slate-700/30 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Projects by Status</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={statusGroups} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                      {statusGroups.map((d,i) => <Cell key={i} fill={STATUS_COLORS[d.name]||PIE_COLORS[i]} stroke="none"/>)}
-                    </Pie>
-                    <Tooltip content={<DarkTooltip/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  {statusGroups.map((d,i) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:STATUS_COLORS[d.name]||PIE_COLORS[i]}}/><span className="text-gray-600 dark:text-gray-400">{d.name}</span></div>
-                      <span className="font-bold text-gray-700 dark:text-gray-300">{d.value}</span>
-                    </div>
+          {!loading && !error && (
+            <div>
+              {filteredProjects.length > 0 ? (
+                <>
+                  {filteredProjects.slice(0, visibleCount).map((project) => (
+                    <ProjectRow
+                      key={project.projectId}
+                      project={project}
+                      taskProgress={project.taskProgress}
+                      budgetProgress={project.budgetProgress}
+                      totalSpent={project.totalSpent}
+                    />
                   ))}
-                </div>
-              </div>
-              {/* Completion bar per project */}
-              <div className="bg-gray-50 dark:bg-slate-700/30 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 text-center">Completion per Project</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={projectsWithProgress.map(p=>({name:p.name?.substring(0,10)||'?', progress:p.taskProgress}))} layout="vertical" margin={{left:0,right:20,top:0,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false}/>
-                    <XAxis type="number" domain={[0,100]} tick={{fontSize:10}} tickFormatter={v=>`${v}%`} axisLine={false} tickLine={false}/>
-                    <YAxis type="category" dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false} width={70}/>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                    <Bar dataKey="progress" radius={[0,4,4,0]}>
-                      {projectsWithProgress.map((p,i)=><Cell key={i} fill={p.taskProgress>=75?'#10b981':p.taskProgress>=40?'#3b82f6':'#ef4444'}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          );
-        },
-        tableData: projectsWithProgress,
-        tableColor: 'gray',
-      },
-
-      // ── ACTIVE PROJECTS ─ progress bars + completion bar chart ─
-      active: {
-        title: 'Active Projects', subtitle: `${activeProjects} in progress`, headerColor: 'bg-blue-600',
-        summaryCards: [
-          { label:'Active',      value: activeProjects,                                                                                         color:'bg-blue-50 border-blue-200',     text:'text-blue-700' },
-          { label:'Avg Progress',value: `${activeProjects>0?Math.round(projectsWithProgress.filter(p=>p.status==='In Progress').reduce((s,p)=>s+p.taskProgress,0)/activeProjects):0}%`, color:'bg-cyan-50 border-cyan-200',     text:'text-cyan-700' },
-          { label:'On Time',     value: projectsWithProgress.filter(p=>p.status==='In Progress'&&p.taskProgress>=50).length,                   color:'bg-green-50 border-green-200',   text:'text-green-700' },
-          { label:'Behind',      value: projectsWithProgress.filter(p=>p.status==='In Progress'&&p.taskProgress<50).length,                    color:'bg-red-50 border-red-200',       text:'text-red-700' },
-        ],
-        charts: () => {
-          const activeData = projectsWithProgress.filter(p=>p.status==='In Progress');
-          const barData = activeData.map(p=>({ name: p.name?.substring(0,12)||'?', progress: p.taskProgress, budget: toNum(p.contractCost), spent: toNum(p.totalSpent) }));
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-blue-50 dark:bg-slate-700/30 rounded-xl p-4 border border-blue-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Completion Progress</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={barData} layout="vertical" margin={{left:0,right:25,top:0,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" horizontal={false}/>
-                    <XAxis type="number" domain={[0,100]} tick={{fontSize:10}} tickFormatter={v=>`${v}%`} axisLine={false} tickLine={false}/>
-                    <YAxis type="category" dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false} width={72}/>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                    <Bar dataKey="progress" radius={[0,4,4,0]}>
-                      {barData.map((d,i)=><Cell key={i} fill={d.progress>=75?'#10b981':d.progress>=40?'#3b82f6':'#ef4444'}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="bg-blue-50 dark:bg-slate-700/30 rounded-xl p-4 border border-blue-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Budget vs Spent</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={barData} margin={{left:0,right:10,top:0,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" vertical={false}/>
-                    <XAxis dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
-                    <YAxis tickFormatter={v=>formatBudget(v)} tick={{fontSize:9}} axisLine={false} tickLine={false} width={52}/>
-                    <Tooltip content={<DarkTooltip formatter={formatBudget}/>}/>
-                    <Legend iconSize={10} wrapperStyle={{fontSize:10}}/>
-                    <Bar dataKey="budget" fill="#93c5fd" radius={[4,4,0,0]} name="Budget"/>
-                    <Bar dataKey="spent"  fill="#3b82f6" radius={[4,4,0,0]} name="Spent"/>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          );
-        },
-        tableData: projectsWithProgress.filter(p=>p.status==='In Progress'),
-        tableColor: 'blue',
-      },
-
-      // ── AVG COMPLETION ─ radial + sorted bar ───────────────────
-      completion: {
-        title: 'Avg. Completion', subtitle: `${avgCompletion}% overall`, headerColor: 'bg-purple-600',
-        summaryCards: [
-          { label:'Avg. Completion', value:`${avgCompletion}%`,                                                                   color:'bg-purple-50 border-purple-200', text:'text-purple-700' },
-          { label:'≥ 75% Done',      value: projectsWithProgress.filter(p=>p.taskProgress>=75).length,                           color:'bg-green-50 border-green-200',   text:'text-green-700' },
-          { label:'40–74%',          value: projectsWithProgress.filter(p=>p.taskProgress>=40&&p.taskProgress<75).length,        color:'bg-blue-50 border-blue-200',     text:'text-blue-700' },
-          { label:'< 40%',           value: projectsWithProgress.filter(p=>p.taskProgress<40).length,                            color:'bg-red-50 border-red-200',       text:'text-red-700' },
-        ],
-        charts: () => {
-          const sorted = [...projectsWithProgress].sort((a,b)=>b.taskProgress-a.taskProgress);
-          const radialData = sorted.map((p,i) => ({ name: p.name?.substring(0,14)||'?', progress: p.taskProgress, fill: PIE_COLORS[i%PIE_COLORS.length] }));
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-purple-50 dark:bg-slate-700/30 rounded-xl p-4 border border-purple-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Radial Progress</h4>
-                <ResponsiveContainer width="100%" height={210}>
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" data={radialData} startAngle={180} endAngle={0}>
-                    <RadialBar minAngle={5} dataKey="progress" cornerRadius={4} background={{fill:'#e5e7eb'}}/>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                    <Legend iconSize={8} wrapperStyle={{fontSize:10, paddingTop:8}}/>
-                  </RadialBarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="bg-purple-50 dark:bg-slate-700/30 rounded-xl p-4 border border-purple-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Completion Ranking</h4>
-                <ResponsiveContainer width="100%" height={210}>
-                  <BarChart data={sorted.map(p=>({name:p.name?.substring(0,10)||'?',progress:p.taskProgress}))} layout="vertical" margin={{left:0,right:25,top:0,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e9d5ff" horizontal={false}/>
-                    <XAxis type="number" domain={[0,100]} tick={{fontSize:10}} tickFormatter={v=>`${v}%`} axisLine={false} tickLine={false}/>
-                    <YAxis type="category" dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false} width={70}/>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                    <Bar dataKey="progress" radius={[0,4,4,0]}>
-                      {sorted.map((p,i)=><Cell key={i} fill={p.taskProgress>=75?'#10b981':p.taskProgress>=40?'#8b5cf6':'#ef4444'}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          );
-        },
-        tableData: [...projectsWithProgress].sort((a,b)=>b.taskProgress-a.taskProgress),
-        tableColor: 'purple',
-      },
-
-      // ── PENDING PROJECTS ─ pie status + timeline bar ───────────
-      pending: {
-        title: 'Pending Projects', subtitle: `${pendingProjects} not started`, headerColor: 'bg-yellow-500',
-        summaryCards: [
-          { label:'Not Started',  value: pendingProjects,                                                         color:'bg-yellow-50 border-yellow-200',  text:'text-yellow-700' },
-          { label:'Total Budget', value: formatBudget(projectsWithProgress.filter(p=>p.status==='Not Started').reduce((s,p)=>s+toNum(p.contractCost),0)), color:'bg-green-50 border-green-200', text:'text-green-700' },
-          { label:'On Hold',      value: projects.filter(p=>p.status==='On Hold').length,                        color:'bg-orange-50 border-orange-200',  text:'text-orange-700' },
-          { label:'All Inactive', value: projects.filter(p=>!['In Progress','Completed'].includes(p.status)).length, color:'bg-gray-50 border-gray-200', text:'text-gray-700' },
-        ],
-        charts: () => {
-          const notStarted = projectsWithProgress.filter(p=>p.status==='Not Started');
-          const onHold     = projectsWithProgress.filter(p=>p.status==='On Hold');
-          const pieData    = [
-            { name:'Not Started', value: notStarted.length },
-            { name:'On Hold',     value: onHold.length },
-          ].filter(d=>d.value>0);
-          const barData = [...notStarted,...onHold].map(p=>({
-            name:   p.name?.substring(0,12)||'?',
-            budget: toNum(p.contractCost),
-            status: p.status,
-          }));
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-yellow-50 dark:bg-slate-700/30 rounded-xl p-4 border border-yellow-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Inactive Breakdown</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                      <Cell fill="#f59e0b" stroke="none"/>
-                      <Cell fill="#f97316" stroke="none"/>
-                    </Pie>
-                    <Tooltip content={<DarkTooltip/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  {pieData.map((d,i)=>(
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:i===0?'#f59e0b':'#f97316'}}/><span className="text-gray-600 dark:text-gray-400">{d.name}</span></div>
-                      <span className="font-bold text-gray-700 dark:text-gray-300">{d.value}</span>
+                  {/* S1: Show More / Show Less buttons */}
+                  {filteredProjects.length > 5 && (
+                    <div className="flex justify-center gap-3 mt-4">
+                      {visibleCount < filteredProjects.length && (
+                        <button
+                          onClick={() => setVisibleCount(prev => Math.min(prev + 5, filteredProjects.length))}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Show More ({filteredProjects.length - visibleCount} remaining)
+                        </button>
+                      )}
+                      {visibleCount > 5 && (
+                        <button
+                          onClick={() => setVisibleCount(5)}
+                          className="px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-sm rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+                        >
+                          Show Less
+                        </button>
+                      )}
                     </div>
-                  ))}
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">
+                  <p className="text-gray-500 dark:text-slate-400 mb-4">
+                    {showOverBudgetOnly
+                      ? 'No over-budget projects found.'
+                      : showCompletedOnly
+                      ? 'No completed projects found.'
+                      : showActiveOnly
+                      ? 'No active projects found.'
+                      : 'No projects found.'}
+                  </p>
+                  {showActiveOnly && (
+                    <button
+                      onClick={() => navigate('/projects')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Create Your First Project
+                    </button>
+                  )}
                 </div>
-              </div>
-              <div className="bg-yellow-50 dark:bg-slate-700/30 rounded-xl p-4 border border-yellow-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Budget Allocation</h4>
-                {barData.length === 0
-                  ? <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No pending projects</div>
-                  : <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={barData} margin={{left:0,right:10,top:0,bottom:0}}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#fef3c7" vertical={false}/>
-                        <XAxis dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
-                        <YAxis tickFormatter={v=>formatBudget(v)} tick={{fontSize:9}} axisLine={false} tickLine={false} width={52}/>
-                        <Tooltip content={<DarkTooltip formatter={formatBudget}/>}/>
-                        <Bar dataKey="budget" radius={[4,4,0,0]} name="Budget">
-                          {barData.map((d,i)=><Cell key={i} fill={d.status==='On Hold'?'#f97316':'#f59e0b'}/>)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                }
-              </div>
+              )}
             </div>
-          );
-        },
-        tableData: projectsWithProgress.filter(p=>!['In Progress','Completed'].includes(p.status)),
-        tableColor: 'yellow',
-      },
+          )}
+        </div>
 
-      // ── OVER BUDGET ─ grouped bar spent vs budget ──────────────
-      overbudget: {
-        title: 'Over Budget', subtitle: `${overBudget} exceeding budget`, headerColor: 'bg-red-600',
-        summaryCards: [
-          { label:'Over Budget',   value: overBudget,                                                                                                              color:'bg-red-50 border-red-200',   text:'text-red-700' },
-          { label:'Total Overage', value: formatBudget(projectsWithProgress.filter(p=>toNum(p.totalSpent)>toNum(p.contractCost)).reduce((s,p)=>s+(toNum(p.totalSpent)-toNum(p.contractCost)),0)), color:'bg-rose-50 border-rose-200', text:'text-rose-700' },
-          { label:'Within Budget', value: projectsWithProgress.filter(p=>toNum(p.totalSpent)<=toNum(p.contractCost)).length,                                     color:'bg-green-50 border-green-200', text:'text-green-700' },
-          { label:'All Projects',  value: projects.length,                                                                                                         color:'bg-gray-50 border-gray-200', text:'text-gray-700' },
-        ],
-        charts: () => {
-          const allBudgetData = projectsWithProgress.map(p=>({
-            name:    p.name?.substring(0,11)||'?',
-            budget:  toNum(p.contractCost),
-            spent:   toNum(p.totalSpent),
-            overage: Math.max(toNum(p.totalSpent)-toNum(p.contractCost),0),
-            over:    toNum(p.totalSpent)>toNum(p.contractCost),
-          }));
-          const overData = allBudgetData.filter(d=>d.over);
-          const pieData2 = [
-            { name:'Over Budget',   value: overBudget },
-            { name:'Within Budget', value: projects.length - overBudget },
-          ].filter(d=>d.value>0);
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-red-50 dark:bg-slate-700/30 rounded-xl p-4 border border-red-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Budget Health</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieData2} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                      <Cell fill="#ef4444" stroke="none"/>
-                      <Cell fill="#10b981" stroke="none"/>
-                    </Pie>
-                    <Tooltip content={<DarkTooltip/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  {pieData2.map((d,i)=>(
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:i===0?'#ef4444':'#10b981'}}/><span className="text-gray-600 dark:text-gray-400">{d.name}</span></div>
-                      <span className="font-bold text-gray-700 dark:text-gray-300">{d.value}</span>
+        {/* Completed Projects Section */}
+        {!showCompletedOnly && !showOverBudgetOnly && !showActiveOnly && !loading && !error && projectsWithProgress.filter(p => p.status === 'Completed').length > 0 && (
+          <div className="mt-8">
+            <p className="text-gray-500 dark:text-slate-400 font-semibold mb-4">
+              COMPLETED PROJECTS ({projectsWithProgress.filter(p => p.status === 'Completed').length})
+            </p>
+            <div>
+              {projectsWithProgress.filter(p => p.status === 'Completed').slice(0, 5).map((project) => (
+                <div key={project.projectId} className="block hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-300">
+                  <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm mb-4 hover:shadow-lg hover:scale-[1.02] hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300">
+                    <div className="flex items-center flex-1 min-w-0">
+                      {project.projectImage ? (
+                        <img
+                          src={project.projectImage}
+                          alt={project.name}
+                          className="w-12 h-12 rounded-lg mr-4 object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg mr-4 bg-gray-200 dark:bg-slate-600 flex-shrink-0"></div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 dark:text-white truncate">{project.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 truncate">{project.location}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-red-50 dark:bg-slate-700/30 rounded-xl p-4 border border-red-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Budget vs Spent (All Projects)</h4>
-                {allBudgetData.length === 0
-                  ? <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No data</div>
-                  : <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={allBudgetData} margin={{left:0,right:10,top:0,bottom:0}}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#fee2e2" vertical={false}/>
-                        <XAxis dataKey="name" tick={{fontSize:9}} axisLine={false} tickLine={false}/>
-                        <YAxis tickFormatter={v=>formatBudget(v)} tick={{fontSize:9}} axisLine={false} tickLine={false} width={52}/>
-                        <Tooltip content={<DarkTooltip formatter={formatBudget}/>}/>
-                        <Legend iconSize={10} wrapperStyle={{fontSize:10}}/>
-                        <Bar dataKey="budget" fill="#fca5a5" radius={[4,4,0,0]} name="Budget"/>
-                        <Bar dataKey="spent"  radius={[4,4,0,0]} name="Spent">
-                          {allBudgetData.map((d,i)=><Cell key={i} fill={d.over?'#ef4444':'#3b82f6'}/>)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                }
-              </div>
-            </div>
-          );
-        },
-        tableData: projectsWithProgress.filter(p=>toNum(p.totalSpent)>toNum(p.contractCost)),
-        tableColor: 'red',
-      },
 
-      // ── AT RISK ─ scatter-style bar: progress vs target ────────
-      atrisk: {
-        title: 'At Risk', subtitle: `${atRisk} behind schedule`, headerColor: 'bg-indigo-600',
-        summaryCards: [
-          { label:'At Risk',      value: atRisk,                                                                                            color:'bg-indigo-50 border-indigo-200', text:'text-indigo-700' },
-          { label:'Avg Progress', value: `${atRisk>0?Math.round(projectsWithProgress.filter(p=>p.taskProgress<50&&p.status==='In Progress').reduce((s,p)=>s+p.taskProgress,0)/atRisk):0}%`, color:'bg-red-50 border-red-200', text:'text-red-700' },
-          { label:'Active Safe',  value: projectsWithProgress.filter(p=>p.status==='In Progress'&&p.taskProgress>=50).length,              color:'bg-green-50 border-green-200',   text:'text-green-700' },
-          { label:'Total Active', value: activeProjects,                                                                                     color:'bg-blue-50 border-blue-200',     text:'text-blue-700' },
-        ],
-        charts: () => {
-          const riskData = projectsWithProgress.filter(p=>p.status==='In Progress').map(p=>({
-            name:     p.name?.substring(0,12)||'?',
-            progress: p.taskProgress,
-            risk:     p.taskProgress < 50,
-          }));
-          const pieRisk = [
-            { name:'At Risk',  value: atRisk },
-            { name:'On Track', value: Math.max(activeProjects-atRisk,0) },
-          ].filter(d=>d.value>0);
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-indigo-50 dark:bg-slate-700/30 rounded-xl p-4 border border-indigo-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Risk Overview</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieRisk} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                      <Cell fill="#ef4444" stroke="none"/>
-                      <Cell fill="#10b981" stroke="none"/>
-                    </Pie>
-                    <Tooltip content={<DarkTooltip/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  {pieRisk.map((d,i)=>(
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:i===0?'#ef4444':'#10b981'}}/><span className="text-gray-600 dark:text-gray-400">{d.name}</span></div>
-                      <span className="font-bold text-gray-700 dark:text-gray-300">{d.value}</span>
+                    <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                      <div className="hidden sm:block text-center">
+                        <span className="text-xs text-gray-500 dark:text-slate-400">Completed</span>
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">✓</p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/projects/${project.projectId}`)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                      >
+                        View
+                      </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-indigo-50 dark:bg-slate-700/30 rounded-xl p-4 border border-indigo-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Progress of Active Projects</h4>
-                {riskData.length === 0
-                  ? <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No active projects</div>
-                  : <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={riskData} layout="vertical" margin={{left:0,right:25,top:0,bottom:0}}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" horizontal={false}/>
-                        <XAxis type="number" domain={[0,100]} tick={{fontSize:10}} tickFormatter={v=>`${v}%`} axisLine={false} tickLine={false}/>
-                        <YAxis type="category" dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false} width={72}/>
-                        <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                        <Bar dataKey="progress" radius={[0,4,4,0]}>
-                          {riskData.map((d,i)=><Cell key={i} fill={d.risk?'#ef4444':'#10b981'}/>)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                }
-              </div>
-            </div>
-          );
-        },
-        tableData: projectsWithProgress.filter(p=>p.taskProgress<50&&p.status==='In Progress'),
-        tableColor: 'indigo',
-      },
-
-      // ── PENDING TASKS ─ bar chart per project ─────────────────
-      tasks: {
-        title: 'Pending Tasks', subtitle: `${pendingTasksCount} need attention`, headerColor: 'bg-teal-600',
-        summaryCards: [
-          { label:'Pending Tasks',  value: pendingTasksCount,                                                                color:'bg-teal-50 border-teal-200',   text:'text-teal-700' },
-          { label:'Projects w/ Tasks', value: projectsWithProgress.filter(p=>p.taskProgress<100).length,                   color:'bg-cyan-50 border-cyan-200',   text:'text-cyan-700' },
-          { label:'Completed',      value: projectsWithProgress.filter(p=>p.taskProgress===100).length,                    color:'bg-green-50 border-green-200', text:'text-green-700' },
-          { label:'Avg. Completion',value: `${avgCompletion}%`,                                                             color:'bg-purple-50 border-purple-200', text:'text-purple-700' },
-        ],
-        charts: () => {
-          const taskData = projectsWithProgress.map(p=>({
-            name:     p.name?.substring(0,12)||'?',
-            done:     p.taskProgress,
-            pending:  100 - p.taskProgress,
-          }));
-          const pieTask = [
-            { name:'Done',    value: Math.round(projectsWithProgress.reduce((s,p)=>s+p.taskProgress,0)/Math.max(projectsWithProgress.length,1)) },
-            { name:'Pending', value: 100 - Math.round(projectsWithProgress.reduce((s,p)=>s+p.taskProgress,0)/Math.max(projectsWithProgress.length,1)) },
-          ].filter(d=>d.value>0);
-          return (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-teal-50 dark:bg-slate-700/30 rounded-xl p-4 border border-teal-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Overall Task Status</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieTask} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" startAngle={90} endAngle={-270}>
-                      <Cell fill="#10b981" stroke="none"/>
-                      <Cell fill="#f59e0b" stroke="none"/>
-                    </Pie>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs"><div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"/><span className="text-gray-600 dark:text-gray-400">Done</span></div><span className="font-bold text-green-600">{pieTask[0]?.value}%</span></div>
-                  <div className="flex items-center justify-between text-xs"><div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500"/><span className="text-gray-600 dark:text-gray-400">Pending</span></div><span className="font-bold text-yellow-600">{pieTask[1]?.value || 0}%</span></div>
-                </div>
-              </div>
-              <div className="bg-teal-50 dark:bg-slate-700/30 rounded-xl p-4 border border-teal-200 dark:border-slate-600">
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-center">Done vs Pending per Project</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={taskData} margin={{left:0,right:10,top:0,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" vertical={false}/>
-                    <XAxis dataKey="name" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
-                    <YAxis domain={[0,100]} tickFormatter={v=>`${v}%`} tick={{fontSize:9}} axisLine={false} tickLine={false} width={40}/>
-                    <Tooltip content={<DarkTooltip formatter={v=>`${v}%`}/>}/>
-                    <Legend iconSize={10} wrapperStyle={{fontSize:10}}/>
-                    <Bar dataKey="done"    stackId="a" fill="#10b981" name="Done"/>
-                    <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending" radius={[4,4,0,0]}/>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          );
-        },
-        tableData: projectsWithProgress.filter(p=>p.taskProgress<100),
-        tableColor: 'teal',
-      },
-    };
-
-    const cfg = configs[modalType];
-    if (!cfg) return null;
-
-    const tableAccent = {
-      gray:   'hover:border-gray-400',
-      blue:   'hover:border-blue-400',
-      purple: 'hover:border-purple-400',
-      yellow: 'hover:border-yellow-400',
-      red:    'hover:border-red-400',
-      indigo: 'hover:border-indigo-400',
-      teal:   'hover:border-teal-400',
-    }[cfg.tableColor] || 'hover:border-blue-400';
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={()=>setModalType(null)}>
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-200 dark:border-slate-700" onClick={e=>e.stopPropagation()}>
-
-          {/* Header */}
-          <div className={`${cfg.headerColor} px-6 py-3 flex items-center justify-between flex-shrink-0`}>
-            <div className="flex items-center gap-3">
-              <h2 className="text-base font-bold text-white">{cfg.title}</h2>
-              <span className="text-white/60 text-xs hidden sm:block">— {cfg.subtitle}</span>
-            </div>
-            <button onClick={()=>setModalType(null)} className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"><X className="w-4 h-4"/></button>
-          </div>
-
-          <div className="overflow-y-auto flex-1 p-6 space-y-5">
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-3">
-              {cfg.summaryCards.map((c,i)=>(
-                <div key={i} className={`${c.color} border rounded-xl p-3 text-center`}>
-                  <p className="text-xs text-gray-500 font-medium mb-1">{c.label}</p>
-                  <p className={`text-xl font-bold ${c.text}`}>{c.value}</p>
+                  </div>
                 </div>
               ))}
             </div>
-
-            {/* Charts */}
-            {cfg.charts()}
-
-            {/* Project Table */}
-            {cfg.tableData.length > 0 && (
-              <div>
-                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Project Details</h4>
-                <div className="space-y-2">
-                  {cfg.tableData.map((p,i) => {
-                    const alloc=toNum(p.contractCost), spent=toNum(p.totalSpent), left=Math.max(alloc-spent,0), over=spent>alloc;
-                    return (
-                      <div key={p.projectId||i}
-                        onClick={()=>{navigate(`/projects/${p.projectId}/milestones`);setModalType(null);}}
-                        className={`flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 cursor-pointer hover:shadow-md transition-all group ${tableAccent}`}>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-semibold text-gray-800 dark:text-white truncate group-hover:text-blue-600 transition-colors">{p.name||'Unnamed'}</p>
-                            <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${statusBadgeClass(p.status)}`}>{p.status||'—'}</span>
-                            {over && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full flex-shrink-0">⚠️ Over</span>}
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full transition-all" style={{width:`${p.taskProgress}%`, background: p.taskProgress>=75?'#10b981':p.taskProgress>=40?'#3b82f6':'#ef4444'}}/>
-                          </div>
-                        </div>
-                        <div className="flex gap-4 text-xs text-right flex-shrink-0">
-                          <div><p className="text-gray-400">Progress</p><p className="font-bold text-gray-700 dark:text-gray-300">{p.taskProgress}%</p></div>
-                          <div><p className="text-gray-400">Budget</p><p className="font-semibold text-gray-700 dark:text-gray-300">{formatBudget(alloc)}</p></div>
-                          <div><p className="text-gray-400">Spent</p><p className={`font-semibold ${over?'text-red-600':'text-gray-700 dark:text-gray-300'}`}>{formatBudget(spent)}</p></div>
-                          <div><p className="text-gray-400">Left</p><p className="font-semibold text-green-600">{formatBudget(left)}</p></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-slate-800/50 flex-shrink-0">
-            <p className="text-sm text-gray-500">{cfg.tableData.length} project{cfg.tableData.length!==1?'s':''} shown</p>
-            <div className="flex gap-3">
-              <button onClick={()=>{navigate('/projects');setModalType(null);}} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Go to Projects</button>
-              <button onClick={()=>setModalType(null)} className="px-4 py-2 bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg transition-colors">Close</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (loading) return (
-    <Layout title="Dashboard">
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    </Layout>
-  );
-
-  return (
-    <Layout title="Dashboard">
-      <div className="space-y-5">
-
-        {/* ══════════════════════════════════════════════════════
-            ROW 1 — Weather (left) + Icons & Users (right)
-        ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* Colorful Weather Card */}
-          <div className={`relative overflow-hidden rounded-xl shadow-md border border-white/20 p-6 text-white bg-gradient-to-br ${weather ? weather.bg : 'from-blue-500 to-sky-400'} transition-all duration-700`}>
-            <div className="absolute -top-4 -right-4 text-9xl opacity-20 select-none pointer-events-none">
-              {weatherLoading ? '🌡️' : (weather?.emoji || '🌡️')}
-            </div>
-            {weatherLoading ? (
-              <div className="flex items-center gap-3 animate-pulse">
-                <div className="w-12 h-12 bg-white/30 rounded-full"/>
-                <div className="space-y-2">
-                  <div className="h-4 bg-white/30 rounded w-28"/>
-                  <div className="h-8 bg-white/30 rounded w-20"/>
-                </div>
-              </div>
-            ) : weather ? (
-              <>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <button onClick={()=>navigate('/dashboard')} className="text-white/90 font-bold text-sm underline underline-offset-4 hover:text-white transition-colors">Welcome</button>
-                    <p className="text-white/80 text-sm font-medium mt-0.5">📍 {weather.city}</p>
-                    <h2 className="text-white font-bold text-lg">{weather.label}</h2>
-                  </div>
-                  <span className="text-5xl">{weather.emoji}</span>
-                </div>
-                <div className="flex items-end gap-3 mb-3">
-                  <p className="text-6xl font-extrabold tracking-tight leading-none">{weather.temp}°</p>
-                  <div className="mb-1">
-                    <p className="text-white/70 text-xs">Feels like</p>
-                    <p className="text-white font-semibold">{weather.feelsLike}°C</p>
-                  </div>
-                </div>
-                <div className="flex gap-5">
-                  <div className="flex items-center gap-1.5">
-                    <span>💧</span>
-                    <div><p className="text-white/60 text-xs">Humidity</p><p className="text-white font-semibold text-sm">{weather.humidity}%</p></div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span>💨</span>
-                    <div><p className="text-white/60 text-xs">Wind</p><p className="text-white font-semibold text-sm">{weather.windSpeed} km/h</p></div>
-                  </div>
-                  <button onClick={fetchWeather} className="ml-auto self-end text-white/60 hover:text-white transition-colors" title="Refresh"><RefreshCw className="w-4 h-4"/></button>
-                </div>
-              </>
-            ) : (
-              <div>
-                <button onClick={()=>navigate('/dashboard')} className="text-white font-bold underline mb-2">Welcome</button>
-                <p className="text-white/80 text-sm">Weather unavailable</p>
-                <button onClick={fetchWeather} className="mt-2 text-sm underline text-white/70 hover:text-white">Retry</button>
-              </div>
-            )}
-          </div>
-
-          {/* Icons + Users — stacked vertically */}
-          <div className="flex flex-col gap-3">
-            {/* Icon row */}
-            <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-700/40 dark:to-slate-800/40 px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-600/50 shadow-md flex justify-end items-center gap-2">
-              <button onClick={toggleTheme} className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow transition-all" title="Toggle theme">
-                {theme==='light' ? <Moon className="w-4 h-4"/> : <Sun className="w-4 h-4"/>}
-              </button>
-              <button className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow transition-all" title="Notifications">
-                <Bell className="w-4 h-4"/>
-              </button>
-              <button onClick={()=>setShowSettings(true)} className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow transition-all" title="Settings">
-                <Settings className="w-4 h-4"/>
-              </button>
-              <button onClick={()=>{['token','userName','userEmail','userRole','userAvatar','userId','lastSelectedProjectId'].forEach(k=>localStorage.removeItem(k));navigate('/login');}}
-                className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-all" title="Logout">
-                <LogOut className="w-4 h-4"/>
-              </button>
-            </div>
-
-            {/* Users card */}
-            <div onClick={()=>setShowUsersModal(true)}
-              className="flex-1 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-700/40 dark:to-slate-800/40 p-4 rounded-xl border border-gray-300 dark:border-slate-600/50 shadow-md flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all">
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Team Members</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">{pmUsers.length} user{pmUsers.length!==1?'s':''} registered</p>
-              <div className="flex -space-x-3 justify-center">
-                {pmUsers.slice(0,5).map((u,i) => (
-                  u.avatar
-                    ? <img key={u.userId||i} src={u.avatar} alt={u.name} title={`${u.name} — ${u.role}`} className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm"/>
-                    : <div key={u.userId||i} title={`${u.name} — ${u.role}`}
-                        className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold border-2 border-white dark:border-slate-800 shadow-sm"
-                        style={{background:`hsl(${(i*67+200)%360},60%,52%)`}}>
-                        {(u.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
-                      </div>
-                ))}
-                {pmUsers.length > 5 && (
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center bg-gray-400 dark:bg-slate-600 text-white text-xs font-bold border-2 border-white dark:border-slate-800">
-                    +{pmUsers.length-5}
-                  </div>
-                )}
-              </div>
-              {pmUsers.length > 0 && <p className="mt-3 text-xs text-blue-500 dark:text-blue-400 font-medium">View all →</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════
-            ROW 2 — Top 4 Stat Cards (left) + Chart (right)
-        ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* Top 4 Stat Cards — 2×2 grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Gray — Total Projects */}
-            <div onClick={()=>setModalType('total')} className="cursor-pointer bg-gradient-to-br from-slate-100 to-gray-200 dark:from-slate-700/40 dark:to-slate-800/40 p-5 rounded-xl border border-gray-300 dark:border-slate-600/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">Total Projects</p>
-              <p className="text-4xl font-bold text-gray-900 dark:text-white mb-1">{projects.length}</p>
-              <p className="text-xs text-gray-500">Across all categories</p>
-            </div>
-            {/* Blue — Active Projects */}
-            <div onClick={()=>setModalType('active')} className="cursor-pointer bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/20 p-5 rounded-xl border border-blue-200 dark:border-blue-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-              <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-3">Active Projects</p>
-              <p className="text-4xl font-bold text-blue-800 dark:text-blue-300 mb-1">{activeProjects}</p>
-              <p className="text-xs text-blue-500">Currently in progress</p>
-            </div>
-            {/* Green — Total Budget */}
-            <div onClick={()=>setModalType('budget')} className="cursor-pointer bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/20 p-5 rounded-xl border border-green-200 dark:border-green-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-              <p className="text-sm font-medium text-green-600 dark:text-green-400 mb-3">Total Budget</p>
-              <p className="text-2xl font-bold text-green-700 dark:text-green-300 mb-1 truncate">{formatBudget(totalBudget)}</p>
-              <p className="text-xs text-green-500">Allocated • {formatBudget(totalSpent)} Spent</p>
-            </div>
-            {/* Purple — Avg. Completion */}
-            <div onClick={()=>setModalType('completion')} className="cursor-pointer bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/20 p-5 rounded-xl border border-purple-200 dark:border-purple-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-              <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-3">Avg. Completion</p>
-              <p className="text-4xl font-bold text-purple-800 dark:text-purple-300 mb-1">{avgCompletion}%</p>
-              <p className="text-xs text-purple-500">Overall progress</p>
-            </div>
-          </div>
-
-          {/* Resource Allocation Chart */}
-          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700 shadow-md flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">Resource allocation</h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400">Budget Spent vs. Remaining per Project</p>
-            </div>
-            {chartData.length === 0
-              ? <div className="flex items-center justify-center flex-1 text-gray-400 text-sm">No budget data available</div>
-              : (
-                <ResponsiveContainer width="100%" height={210}>
-                  <BarChart data={chartData} margin={{top:10, right:10, left:0, bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false}/>
-                    <XAxis dataKey="name" stroke="#6b7280" tick={{fontSize:11}} axisLine={false} tickLine={false}/>
-                    <YAxis stroke="#6b7280" tickFormatter={v=>formatBudget(v)} tick={{fontSize:10}} axisLine={false} tickLine={false} width={52}/>
-                    <Tooltip content={<ResourceTooltip/>}/>
-                    <Legend iconSize={10} wrapperStyle={{fontSize:11}}/>
-                    <Bar dataKey="Spent"     stackId="a" fill="#3b82f6"/>
-                    <Bar dataKey="Remaining" stackId="a" fill="#10b981" radius={[6,6,0,0]}/>
-                  </BarChart>
-                </ResponsiveContainer>
-              )
-            }
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════
-            ROW 3 — Bottom 4 Stat Cards (full width)
-        ══════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Yellow — Pending Projects */}
-          <div onClick={()=>setModalType('pending')} className="cursor-pointer bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/30 dark:to-orange-900/20 p-5 rounded-xl border border-yellow-200 dark:border-yellow-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400 mb-3">Pending Projects</p>
-            <p className="text-4xl font-bold text-yellow-800 dark:text-yellow-300 mb-1">{pendingProjects}</p>
-            <p className="text-xs text-yellow-500">Not started yet</p>
-          </div>
-          {/* Red — Over Budget */}
-          <div onClick={()=>setModalType('overbudget')} className="cursor-pointer bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/20 p-5 rounded-xl border border-red-200 dark:border-red-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">Over Budget</p>
-            <p className="text-4xl font-bold text-red-800 dark:text-red-300 mb-1">{overBudget}</p>
-            <p className="text-xs text-red-500">Exceeding allocated budget</p>
-          </div>
-          {/* Indigo — At Risk */}
-          <div onClick={()=>setModalType('atrisk')} className="cursor-pointer bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/30 dark:to-violet-900/20 p-5 rounded-xl border border-indigo-200 dark:border-indigo-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-3">At Risk</p>
-            <p className="text-4xl font-bold text-indigo-800 dark:text-indigo-300 mb-1">{atRisk}</p>
-            <p className="text-xs text-indigo-500">Behind schedule</p>
-          </div>
-          {/* Teal — Pending Tasks */}
-          <div onClick={()=>setModalType('tasks')} className="cursor-pointer bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/30 dark:to-cyan-900/20 p-5 rounded-xl border border-teal-200 dark:border-teal-700/50 shadow-md transition-all hover:shadow-lg hover:scale-105">
-            <p className="text-sm font-medium text-teal-600 dark:text-teal-400 mb-3">Pending Tasks</p>
-            <p className="text-4xl font-bold text-teal-800 dark:text-teal-300 mb-1">{pendingTasksCount}</p>
-            <p className="text-xs text-teal-500">Need attention</p>
-          </div>
-        </div>
-
-        {isRefreshing && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 text-blue-800 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin"/> Updating project data...
           </div>
         )}
-
       </div>
-
-      {/* Modals */}
-      <UsersModal/>
-      <BudgetPieModal/>
-      <ChartModal/>
-      <SettingsModal isOpen={showSettings} onClose={()=>setShowSettings(false)}/>
     </Layout>
   );
 }

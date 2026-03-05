@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = '47.129.233.194/api';
+const API_BASE_URL = `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api`;
 
 class UserService {
   constructor() {

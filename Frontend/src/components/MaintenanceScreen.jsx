@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Settings, Clock, AlertTriangle, ArrowLeft, Send, CheckCircle } from 'lucide-react';
+import { useNotification } from '../context/NotificationContext';
 
 const MaintenanceScreen = () => {
   const [showSupportForm, setShowSupportForm] = useState(false);
+  const notify = useNotification();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -28,7 +30,7 @@ const MaintenanceScreen = () => {
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.email || !formData.accountId || !formData.subject || !formData.message) {
-      alert('Please fill in all required fields');
+      notify.warning('Please fill in all required fields');
       return;
     }
 
@@ -52,7 +54,7 @@ const MaintenanceScreen = () => {
       // Get API URL from environment variable or use default
       const API_URL = import.meta.env.VITE_API_URL 
         ? `${import.meta.env.VITE_API_URL}/support-tickets`
-        : '/support-tickets';
+        : `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/support-tickets`;
       
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -74,7 +76,7 @@ const MaintenanceScreen = () => {
       
     } catch (error) {
       console.error('Error submitting ticket:', error);
-      alert('Failed to submit ticket. Please try again or contact support directly at buildwisecapstone@gmail.com');
+      notify.error('Failed to submit ticket. Please try again or contact support directly at buildwisecapstone@gmail.com');
     } finally {
       setIsSubmitting(false);
     }

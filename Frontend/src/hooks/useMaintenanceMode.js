@@ -8,7 +8,7 @@ export const useMaintenanceMode = () => {
   useEffect(() => {
     const checkMaintenanceMode = async () => {
       try {
-        const response = await axios.get('/maintenance-status');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/maintenance-status`);
         const maintenanceEnabled = response.data.value === true;
         setIsMaintenanceMode(maintenanceEnabled);
       } catch (error) {

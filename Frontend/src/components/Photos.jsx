@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { Upload, Trash2, Eye, CheckCircle, Image as ImageIcon } from "lucide-react";
-import axios from '../utils/axios';  // ✅ Use configured axios
+import { useNotification } from '../context/NotificationContext';
+import axios from "axios";
+
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api`;
+
+const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
+
+const getAuthHeaders = () => ({
+  'Authorization': `Bearer ${getToken()}`,
+  'Content-Type': 'application/json'
+});
 
 const Photos = ({ projectId, readonly = false }) => {
+  const notify = useNotification();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [caption, setCaption] = useState("");
-  const [selectedTask, setSelectedTask] = useState("");
+  const [selectedTask, setSelectedTask] = useState(""); // ✅ Just task selection
   const [tasks, setTasks] = useState([]);
+  const [phasesList, setPhasesList] = useState([]); // S12: Phase list for phase-level uploads
   const [viewModal, setViewModal] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [photoSortOrder, setPhotoSortOrder] = useState("newest");
-  const [expandedPhases, setExpandedPhases] = useState({});
+  const [photoSortOrder, setPhotoSortOrder] = useState("newest"); // 'newest' or 'oldest'
+  const [expandedPhases, setExpandedPhases] = useState({}); // Track which phases are expanded
 
   useEffect(() => {
     if (projectId && showUploadForm) {
@@ -31,13 +43,19 @@ const Photos = ({ projectId, readonly = false }) => {
     try {
       console.log('📋 Fetching tasks for project:', projectId);
       
-      const response = await axios.get(`/milestones/project/${projectId}`);
+      const response = await axios.get(
+        `${API_URL}/milestones/project/${projectId}`,
+        { headers: getAuthHeaders() }
+      );
       
-      // ✅ Filter only tasks (not phases)
-      const tasksOnly = response.data.filter(item => item.isPhase !== true);
+      // ✅ Keep both phases and tasks for S12 phase-level uploads
+      const allItems = response.data || [];
+      const phasesOnly = allItems.filter(item => item.isPhase === true);
+      const tasksOnly = allItems.filter(item => item.isPhase !== true);
       
       setTasks(tasksOnly);
-      console.log(`✅ Loaded ${tasksOnly.length} tasks`);
+      setPhasesList(phasesOnly);
+      console.log(`✅ Loaded ${tasksOnly.length} tasks and ${phasesOnly.length} phases`);
     } catch (err) {
       console.error("❌ Error fetching tasks:", err);
     }
@@ -50,7 +68,10 @@ const Photos = ({ projectId, readonly = false }) => {
     try {
       console.log('📷 Fetching confirmed photos for project:', projectId);
       
-      const response = await axios.get(`/photos/project/${projectId}`);
+      const response = await axios.get(
+        `${API_URL}/photos/project/${projectId}`,
+        { headers: getAuthHeaders() }
+      );
       
       const confirmedOnly = response.data.filter(
         photo => photo.confirmationStatus === 'confirmed'
@@ -61,7 +82,7 @@ const Photos = ({ projectId, readonly = false }) => {
     } catch (err) {
       console.error("❌ Error fetching photos:", err);
       if (err.response?.status === 401) {
-        alert('Session expired. Please login again.');
+        notify.warning('Session expired. Please login again.');
       }
     } finally {
       setLoading(false);
@@ -82,14 +103,15 @@ const Photos = ({ projectId, readonly = false }) => {
     return `UPD-${timestamp}-${random}`;
   };
 
+  // ✅ UPDATED: No completion percentage during upload
   const handleUpload = async () => {
     if (!selectedFile || !projectId) {
-      alert("Please select a file");
+      notify.warning('Please select a file.');
       return;
     }
 
     if (!selectedTask) {
-      alert("Please select a task");
+      notify.warning('Please select a task or phase.');
       return;
     }
 
@@ -98,23 +120,35 @@ const Photos = ({ projectId, readonly = false }) => {
     const updateId = generateUpdateId();
     console.log('📤 Uploading photo with Update ID:', updateId);
 
-    const taskDetails = tasks.find(t => t.milestoneId === selectedTask);
+    // S12: Check if selected item is a phase or task
+    const isPhaseUpload = phasesList.some(p => p.milestoneId === selectedTask);
+    const taskDetails = isPhaseUpload 
+      ? phasesList.find(p => p.milestoneId === selectedTask)
+      : tasks.find(t => t.milestoneId === selectedTask);
 
     const formData = new FormData();
     formData.append("photo", selectedFile); 
     formData.append("caption", caption);
     formData.append("projectId", projectId);
     formData.append("taskId", selectedTask);
-    formData.append("taskName", taskDetails?.milestoneName || "Unknown Task");
+    formData.append("taskName", taskDetails?.milestoneName || "Unknown");
+    if (isPhaseUpload) {
+      formData.append("isPhaseUpload", "true");
+    }
 
     try {
       console.log('🚀 Sending to backend for AI analysis...');
       
-      const response = await axios.post(`/photos/${updateId}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await axios.post(
+        `${API_URL}/photos/${updateId}`, 
+        formData, 
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       console.log("✅ Photo uploaded successfully:", response.data);
       console.log("🤖 AI Analysis:", response.data.aiAnalysis);
@@ -126,23 +160,26 @@ const Photos = ({ projectId, readonly = false }) => {
       setShowUploadForm(false);
       document.querySelector('input[type="file"]').value = "";
 
-      // ✅ Enhanced success message with AI percentage
-      const aiPercentage = response.data.aiSuggestedPercentage || 
-                          response.data.aiAnalysis?.ai_suggestion?.ai_estimated_completion ||
+      // ✅ Enhanced success message with AI analysis
+      const aiPercentage = response.data.photo?.aiSuggestedPercentage || 
+                          response.data.aiAnalysis?.ai_suggestion?.suggested_percentage ||
+                          response.data.aiAnalysis?.progress_assessment?.estimated_completion_percentage ||
                           null;
       
       setSuccessModal({
         task: taskDetails?.milestoneName,
         updateId: updateId,
         aiPercentage: aiPercentage,
-        aiStatus: response.data.aiAnalysis?.success ? 'Analyzed ✓' : 'Pending Analysis'
+        aiStatus: response.data.aiAnalysis?.success ? 'Analyzed ✓' : 'Pending Analysis',
+        aiSummary: response.data.aiAnalysis?.summary || null,
+        aiSafety: response.data.aiAnalysis?.safety_assessment?.overall_rating || null
       });
     } catch (err) {
       console.error("❌ Upload failed:", err);
       if (err.response?.status === 401) {
-        alert("Session expired. Please login again.");
+        notify.warning('Session expired. Please login again.');
       } else {
-        alert("❌ Upload failed: " + (err.response?.data?.message || err.message));
+        notify.error('Upload failed: ' + (err.response?.data?.message || err.message));
       }
     } finally {
       setUploading(false);
@@ -156,7 +193,7 @@ const Photos = ({ projectId, readonly = false }) => {
 
   const handleDelete = async (photo) => {
     if (readonly) {
-      alert("🔒 Cannot delete photos in view-only mode");
+      notify.warning('Cannot delete photos in view-only mode.');
       return;
     }
     setDeleteModal(photo);
@@ -167,21 +204,25 @@ const Photos = ({ projectId, readonly = false }) => {
     
     setIsDeleting(true);
     try {
-      await axios.delete(`/photos/${deleteModal.photoId}`, {
-        data: {
-          updateId: deleteModal.updateId,
-          s3Key: deleteModal.s3Key,
-          taskId: deleteModal.taskId,
-          projectId: projectId
-        },
-      });
+      await axios.delete(
+        `${API_URL}/photos/${deleteModal.photoId}`, 
+        {
+          headers: getAuthHeaders(),
+          data: {
+            updateId: deleteModal.updateId,
+            s3Key: deleteModal.s3Key,
+            taskId: deleteModal.taskId,
+            projectId: projectId
+          },
+        }
+      );
 
       await fetchConfirmedPhotosForProject();
       setDeleteModal(null);
       setDeleteSuccessModal(true);
     } catch (err) {
       console.error("❌ Error deleting photo:", err);
-      alert("❌ Failed to delete photo");
+      notify.error('Failed to delete photo.');
     } finally {
       setIsDeleting(false);
     }
@@ -190,7 +231,9 @@ const Photos = ({ projectId, readonly = false }) => {
   const openViewModal = (photo) => setViewModal(photo);
   const closeViewModal = () => setViewModal(null);
 
+  // ✅ Group photos by phase/task with sorting
   const getGroupedPhotos = () => {
+    // First, group by phase, then by task within each phase
     const grouped = photos.reduce((acc, photo) => {
       const phaseName = photo.phaseName || "Ungrouped";
       const taskName = photo.taskName || "No Task";
@@ -206,6 +249,7 @@ const Photos = ({ projectId, readonly = false }) => {
       return acc;
     }, {});
 
+    // Sort photos within each task by upload date
     Object.keys(grouped).forEach(phaseName => {
       Object.keys(grouped[phaseName]).forEach(taskName => {
         grouped[phaseName][taskName].sort((a, b) => {
@@ -219,6 +263,7 @@ const Photos = ({ projectId, readonly = false }) => {
     return grouped;
   };
 
+  // Toggle phase expansion
   const togglePhase = (phaseName) => {
     setExpandedPhases(prev => ({
       ...prev,
@@ -255,7 +300,8 @@ const Photos = ({ projectId, readonly = false }) => {
               <span>ℹ️</span>
               <span>
                 <strong>AI-Powered Analysis:</strong> Select a task and upload a photo. 
-                Our YOLOv11 model will analyze it and suggest a completion percentage. 
+                Our Claude Vision AI will analyze the construction progress, detect materials 
+                and safety concerns, and suggest a completion percentage. 
                 Go to the <strong>REPORTS tab</strong> to review, edit, and approve.
               </span>
             </p>
@@ -280,25 +326,36 @@ const Photos = ({ projectId, readonly = false }) => {
               )}
             </div>
 
-            {/* Task Dropdown */}
+            {/* ✅ UPDATED: Task Dropdown WITHOUT completion percentage */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Select Task <span className="text-red-500">*</span>
+                Select Task or Phase <span className="text-red-500">*</span>
               </label>
               <select
                 value={selectedTask}
                 onChange={(e) => setSelectedTask(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">-- Select a Task --</option>
-                {tasks.map((task) => (
-                  <option key={task.milestoneId} value={task.milestoneId}>
-                    {task.milestoneName}
-                  </option>
-                ))}
+                <option value="">-- Select a Task or Phase --</option>
+                {phasesList.length > 0 && (
+                  <optgroup label="📁 Phases (general phase photos)">
+                    {phasesList.map((phase) => (
+                      <option key={`phase-${phase.milestoneId}`} value={phase.milestoneId}>
+                        📁 {phase.milestoneName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="📋 Tasks">
+                  {tasks.map((task) => (
+                    <option key={task.milestoneId} value={task.milestoneId}>
+                      {task.milestoneName}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                AI will analyze this photo and suggest completion percentage in Reports
+                Select a phase for general photos, or a specific task for AI completion analysis
               </p>
             </div>
 
@@ -507,7 +564,7 @@ const Photos = ({ projectId, readonly = false }) => {
         )}
       </div>
 
-      {/* View Modal */}
+      {/* View Modal - Enhanced */}
       {viewModal && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -619,26 +676,96 @@ const Photos = ({ projectId, readonly = false }) => {
                     <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
                     </svg>
-                    <h4 className="font-bold text-gray-900 dark:text-white">AI Analysis</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white">AI Analysis (Claude Vision)</h4>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Objects</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{viewModal.totalObjects || 0}</p>
+                  
+                  {/* AI Summary */}
+                  {viewModal.aiSummary && (
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-1 font-semibold">📝 AI Summary</p>
+                      <p className="text-sm text-gray-800 dark:text-slate-300">{viewModal.aiSummary}</p>
                     </div>
-                    {viewModal.aiSuggestion && (
-                      <>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Milestone</p>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{viewModal.aiSuggestion.milestone}</p>
-                        </div>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">Confidence</p>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white capitalize">{viewModal.aiSuggestion.confidence}</p>
-                        </div>
-                      </>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-3 text-center mb-3">
+                    {/* Progress Stage */}
+                    {viewModal.aiProgressStage && (
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">🏗️ Stage</p>
+                        <p className="text-xs font-bold text-gray-900 dark:text-white">{viewModal.aiProgressStage}</p>
+                      </div>
+                    )}
+                    {/* Safety Rating */}
+                    {viewModal.aiSafetyRating && (
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">🛡️ Safety</p>
+                        <p className={`text-sm font-bold capitalize ${
+                          viewModal.aiSafetyRating === 'safe' ? 'text-green-600 dark:text-green-400' :
+                          viewModal.aiSafetyRating === 'caution' ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>{viewModal.aiSafetyRating}</p>
+                      </div>
+                    )}
+                    {/* Confidence */}
+                    {viewModal.aiConfidence && (
+                      <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mb-1">🎯 Confidence</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white capitalize">{viewModal.aiConfidence}</p>
+                      </div>
                     )}
                   </div>
+
+                  {/* Construction Details */}
+                  {viewModal.aiAnalysis.construction_details && (
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-2 font-semibold">🔍 Construction Details</p>
+                      <div className="space-y-1">
+                        {viewModal.aiAnalysis.construction_details.materials_detected?.length > 0 && (
+                          <p className="text-xs text-gray-700 dark:text-slate-300">
+                            <span className="font-semibold">Materials:</span> {viewModal.aiAnalysis.construction_details.materials_detected.join(', ')}
+                          </p>
+                        )}
+                        {viewModal.aiAnalysis.construction_details.equipment_detected?.length > 0 && (
+                          <p className="text-xs text-gray-700 dark:text-slate-300">
+                            <span className="font-semibold">Equipment:</span> {viewModal.aiAnalysis.construction_details.equipment_detected.join(', ')}
+                          </p>
+                        )}
+                        {viewModal.aiAnalysis.construction_details.visible_work?.length > 0 && (
+                          <p className="text-xs text-gray-700 dark:text-slate-300">
+                            <span className="font-semibold">Visible Work:</span> {viewModal.aiAnalysis.construction_details.visible_work.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Safety Observations */}
+                  {viewModal.aiAnalysis.safety_assessment?.observations?.length > 0 && (
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-2 font-semibold">🛡️ Safety Observations</p>
+                      <ul className="text-xs text-gray-700 dark:text-slate-300 space-y-1">
+                        {viewModal.aiAnalysis.safety_assessment.observations.map((obs, i) => (
+                          <li key={i} className="flex items-start gap-1">
+                            <span className="text-yellow-500 mt-0.5">•</span> {obs}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Actionable Insights */}
+                  {viewModal.aiAnalysis.actionable_insights?.recommendations?.length > 0 && (
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-400 mb-2 font-semibold">💡 AI Recommendations</p>
+                      <ul className="text-xs text-gray-700 dark:text-slate-300 space-y-1">
+                        {viewModal.aiAnalysis.actionable_insights.recommendations.map((rec, i) => (
+                          <li key={i} className="flex items-start gap-1">
+                            <span className="text-blue-500 mt-0.5">→</span> {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -658,8 +785,8 @@ const Photos = ({ projectId, readonly = false }) => {
 
       {/* Success Modal */}
       {successModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-gray-200 dark:border-slate-700">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mr-3">
                 <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
@@ -686,6 +813,21 @@ const Photos = ({ projectId, readonly = false }) => {
                 <span className="text-blue-600 dark:text-blue-400 font-semibold">AI Status:</span>
                 <span className="font-bold text-blue-600 dark:text-blue-400">{successModal.aiStatus}</span>
               </div>
+              {successModal.aiSafety && (
+                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-slate-700">
+                  <span className="text-gray-600 dark:text-slate-400">Safety Rating:</span>
+                  <span className={`font-semibold capitalize ${
+                    successModal.aiSafety === 'safe' ? 'text-green-600' :
+                    successModal.aiSafety === 'caution' ? 'text-yellow-600' : 'text-red-600'
+                  }`}>{successModal.aiSafety}</span>
+                </div>
+              )}
+              {successModal.aiSummary && (
+                <div className="py-2 bg-purple-50 dark:bg-purple-900/20 rounded px-3 mt-2">
+                  <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">AI Summary:</p>
+                  <p className="text-xs text-gray-700 dark:text-slate-300">{successModal.aiSummary}</p>
+                </div>
+              )}
             </div>
 
             <p className="text-gray-600 dark:text-slate-400 mb-6 text-sm">
@@ -695,7 +837,7 @@ const Photos = ({ projectId, readonly = false }) => {
             <div className="flex justify-end">
               <button
                 onClick={() => setSuccessModal(null)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
               >
                 OK
               </button>
@@ -706,8 +848,8 @@ const Photos = ({ projectId, readonly = false }) => {
 
       {/* Delete Success Modal */}
       {deleteSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 text-center shadow-2xl border border-gray-200 dark:border-slate-700">
             <div className="flex items-center mb-4">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mr-3">
                 <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
@@ -718,7 +860,7 @@ const Photos = ({ projectId, readonly = false }) => {
             <div className="flex justify-end">
               <button
                 onClick={() => setDeleteSuccessModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
               >
                 OK
               </button>
@@ -729,8 +871,8 @@ const Photos = ({ projectId, readonly = false }) => {
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-gray-200 dark:border-slate-700">
             <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Confirm Delete</h3>
             <p className="text-gray-600 dark:text-slate-400 mb-6">
               Are you sure you want to delete this item? This action cannot be undone.
@@ -739,14 +881,14 @@ const Photos = ({ projectId, readonly = false }) => {
               <button
                 onClick={() => setDeleteModal(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 text-gray-600 dark:text-slate-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50"
+                className="px-6 py-3 text-gray-700 dark:text-slate-300 bg-gray-200 dark:bg-slate-700 rounded-xl hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50 font-semibold transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={isDeleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl disabled:opacity-50 font-semibold transition-all shadow-lg hover:shadow-xl"
               >
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>

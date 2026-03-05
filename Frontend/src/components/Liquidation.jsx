@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useNotification } from '../context/NotificationContext';
 
 const Liquidation = ({ 
     expenses = [], 
@@ -9,6 +10,7 @@ const Liquidation = ({
     projectLocation = ""
 }) => {
     const reportRef = useRef(null);
+    const notify = useNotification();
 
     // Calculate total expenses
     const totalExpenses = expenses.reduce((sum, expense) => 
@@ -111,7 +113,7 @@ const Liquidation = ({
             pdf.save(filename);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
+            notify.error('Failed to generate PDF. Please try again.');
         }
     };
 

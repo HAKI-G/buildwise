@@ -11,6 +11,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { logAudit } from "./auditController.js";
 import { uploadToS3, deleteFromS3 } from "../utils/s3Upload.js";
+import { sendNotification } from "./notificationController.js";
 
 const client = new DynamoDBClient({
   region: "ap-southeast-1",
@@ -192,6 +193,19 @@ export const updateProjectStatus = async (req, res) => {
             targetId: projectId,
             changes: { status }
         });
+
+        // Send notification
+        try {
+          const projectName = result.Attributes?.name || projectId;
+          await sendNotification(
+            'project_status',
+            'Project Status Updated',
+            `"${projectName}" status changed to ${status}`,
+            { projectId, projectName, status }
+          );
+        } catch (notifErr) {
+          console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+        }
         
         console.log(`✅ Project status manually updated to: ${status}`);
         
@@ -244,6 +258,27 @@ export const createProject = async (req, res) => {
   
   if (!name || !location) {
     return res.status(400).json({ message: "Please provide at least a project name and location." });
+  }
+
+  // S8: Validate client data
+  const validationErrors = [];
+  if (!contractor || !contractor.trim()) validationErrors.push('Contractor name is required');
+  if (!projectManager || !projectManager.trim()) validationErrors.push('Project manager name is required');
+  if (projectManager && projectManager.trim().split(/\s+/).length < 2) {
+    validationErrors.push('Project manager must have at least first and last name');
+  }
+  const nameRegex = /^[a-zA-Z\s.\-,]+$/;
+  if (projectManager && projectManager.trim() && !nameRegex.test(projectManager.trim())) {
+    validationErrors.push('Project manager name should only contain letters, spaces, and basic punctuation');
+  }
+  if (contractCost && parseFloat(contractCost) <= 0) {
+    validationErrors.push('Contract cost must be a positive number');
+  }
+  if (dateStarted && contractCompletionDate && new Date(contractCompletionDate) <= new Date(dateStarted)) {
+    validationErrors.push('Completion date must be after the start date');
+  }
+  if (validationErrors.length > 0) {
+    return res.status(400).json({ message: validationErrors.join('. ') });
   }
 
   try {
@@ -326,6 +361,18 @@ export const createProject = async (req, res) => {
       targetId: projectId,
       changes: { name, location, contractor, hasImage: !!projectImageUrl }
     });
+
+    // Send notification to all users
+    try {
+      await sendNotification(
+        'project_created',
+        'New Project Created',
+        `"${name}" has been created${location ? ` in ${location}` : ''}`,
+        { projectId, projectName: name }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
 
     res.status(201).json({
       message: "Project created successfully!",
@@ -459,6 +506,18 @@ export const updateProject = async (req, res) => {
       changes: { name, location, contractor, status }
     });
 
+    // Send notification
+    try {
+      await sendNotification(
+        'project_updated',
+        'Project Updated',
+        `"${name || id}" has been updated`,
+        { projectId: id, projectName: name || id }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
+
     res.status(200).json({
       message: `Project ${id} updated successfully!`,
       updatedProject: data.Attributes,
@@ -536,6 +595,22 @@ export const patchProject = async (req, res) => {
       changes: updateData
     });
 
+    // Send notification for significant changes
+    try {
+      const projectName = result.Attributes?.name || id;
+      const notifMessage = updateData.status
+        ? `"${projectName}" status changed to ${updateData.status}`
+        : `"${projectName}" has been updated`;
+      await sendNotification(
+        updateData.status ? 'project_status' : 'project_updated',
+        updateData.status ? 'Project Status Updated' : 'Project Updated',
+        notifMessage,
+        { projectId: id, projectName }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
+
     console.log(`✅ Project ${id} patched successfully`);
     res.status(200).json({
       success: true,
@@ -572,6 +647,11 @@ export const deleteProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
+    // S5: Prevent deletion of completed projects
+    if (project.status === 'Completed') {
+      return res.status(403).json({ message: "Cannot delete a completed project. Completed projects are archived and protected." });
+    }
+
     if (project.projectImage) {
       try {
         await deleteFromS3(project.projectImage);
@@ -594,6 +674,18 @@ export const deleteProject = async (req, res) => {
       targetType: 'project',
       targetId: id
     });
+
+    // Send notification
+    try {
+      await sendNotification(
+        'project_deleted',
+        'Project Deleted',
+        `"${project.name}" has been removed`,
+        { projectName: project.name }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
 
     res.status(200).json({ message: `Project ${id} deleted successfully.` });
   } catch (error) {

@@ -9,7 +9,7 @@ export const useAuditLog = () => {
     if (user) return user;
     
     // Fallback to localStorage
-    const storedUser = localStorage.getItem('admin_user');
+    const storedUser = localStorage.getItem('adminUser');
     if (storedUser) {
       try {
         return JSON.parse(storedUser);

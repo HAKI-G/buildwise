@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useNotification } from '../context/NotificationContext';
 import axios from 'axios';
 
 const getToken = () => localStorage.getItem('token');
 
 function Documents({ readonly }) {
     const { projectId } = useParams();
+    const notify = useNotification();
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -26,7 +28,7 @@ function Documents({ readonly }) {
         try {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`/documents/project/${projectId}`, config);
+            const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/project/${projectId}`, config);
             setDocuments(res.data);
         } catch (error) {
             console.error('Error fetching documents:', error);
@@ -39,7 +41,7 @@ function Documents({ readonly }) {
         const file = e.target.files[0];
         if (file) {
             if (file.size > 50 * 1024 * 1024) {
-                alert('File size must be less than 50MB');
+                notify.warning('File size must be less than 50MB.');
                 e.target.value = '';
                 return;
             }
@@ -58,7 +60,7 @@ function Documents({ readonly }) {
             ];
 
             if (!allowedTypes.includes(file.type)) {
-                alert('File type not supported. Please upload PDF, Word, Excel, PowerPoint, Text, or Image files.');
+                notify.warning('File type not supported. Please upload PDF, Word, Excel, PowerPoint, Text, or Image files.');
                 e.target.value = '';
                 return;
             }
@@ -71,7 +73,7 @@ function Documents({ readonly }) {
         e.preventDefault();
 
         if (!uploadData.file) {
-            alert('Please select a file');
+            notify.warning('Please select a file.');
             return;
         }
 
@@ -92,7 +94,7 @@ function Documents({ readonly }) {
                 }
             };
 
-            await axios.post('/documents/upload', formData, config);
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/upload`, formData, config);
             
             setUploadData({
                 file: null,
@@ -106,10 +108,10 @@ function Documents({ readonly }) {
             setShowUploadModal(false);
             fetchDocuments();
             
-            alert('Document uploaded successfully!');
+            notify.success('Document uploaded successfully!');
         } catch (error) {
             console.error('Error uploading document:', error);
-            alert(error.response?.data?.message || 'Failed to upload document');
+            notify.error(error.response?.data?.message || 'Failed to upload document.');
         } finally {
             setUploading(false);
         }
@@ -124,49 +126,57 @@ function Documents({ readonly }) {
             };
 
             const res = await axios.get(
-                `/documents/${documentId}/download`,
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/${documentId}/download`,
                 config
             );
             
             if (res.data.downloadUrl) {
+                // S4 Fix: Fetch the file as a blob to handle cross-origin S3 URLs
+                // The <a download> attribute doesn't work for cross-origin URLs
+                const fileResponse = await fetch(res.data.downloadUrl);
+                const blob = await fileResponse.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
                 const link = document.createElement('a');
-                link.href = res.data.downloadUrl;
+                link.href = blobUrl;
                 link.download = filename;
-                link.target = '_blank';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                
+                // Clean up the blob URL
+                window.URL.revokeObjectURL(blobUrl);
             }
         } catch (error) {
             console.error('Error downloading document:', error);
-            alert(error.response?.data?.message || 'Failed to download document');
+            notify.error(error.response?.data?.message || 'Failed to download document.');
         }
     };
 
     const handleView = (documentId) => {
         window.open(
-            `/documents/${documentId}/view?projectId=${projectId}`,
+            `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/${documentId}/view?projectId=${projectId}`,
             '_blank'
         );
     };
 
     const handleDelete = async (documentId) => {
-        if (!window.confirm('Are you sure you want to delete this document?')) return;
-
-        try {
-            const token = getToken();
-            const config = {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { projectId }
-            };
-            
-            await axios.delete(`/documents/${documentId}`, config);
-            fetchDocuments();
-            alert('Document deleted successfully');
-        } catch (error) {
-            console.error('Error deleting document:', error);
-            alert(error.response?.data?.message || 'Failed to delete document');
-        }
+        notify.confirm('Are you sure you want to delete this document?', async () => {
+            try {
+                const token = getToken();
+                const config = {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: { projectId }
+                };
+                
+                await axios.delete(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/${documentId}`, config);
+                fetchDocuments();
+                notify.success('Document deleted successfully.');
+            } catch (error) {
+                console.error('Error deleting document:', error);
+                notify.error(error.response?.data?.message || 'Failed to delete document.');
+            }
+        }, { title: 'Delete Document', confirmText: 'Delete', cancelText: 'Cancel' });
     };
 
     const updateStatus = async (documentId, newStatus) => {
@@ -175,7 +185,7 @@ function Documents({ readonly }) {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             
             await axios.put(
-                `/documents/${documentId}/status`,
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/documents/${documentId}/status`,
                 { status: newStatus, projectId },
                 config
             );
@@ -183,7 +193,7 @@ function Documents({ readonly }) {
             fetchDocuments();
         } catch (error) {
             console.error('Error updating status:', error);
-            alert(error.response?.data?.message || 'Failed to update status');
+            notify.error(error.response?.data?.message || 'Failed to update status.');
         }
     };
 
@@ -266,8 +276,8 @@ function Documents({ readonly }) {
 
             {/* Upload Modal */}
             {showUploadModal && !readonly && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border border-gray-200 dark:border-slate-700">
                         <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Upload Document</h3>
                         <form onSubmit={handleUpload} className="space-y-4">
                             <div>

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, LifeBuoy, Settings, X } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, LifeBuoy, Settings, X, FolderOpen, BarChart3, Megaphone, Download, UserCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -17,9 +17,14 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/users', icon: Users, label: 'User Management' },
+    { path: '/projects', icon: FolderOpen, label: 'Projects' },
     { path: '/audit-logs', icon: FileText, label: 'Audit Logs' },
     { path: '/support-tickets', icon: LifeBuoy, label: 'Support Tickets' },
+    { path: '/announcements', icon: Megaphone, label: 'Announcements' },
+    { path: '/export', icon: Download, label: 'Export Center' },
+    { path: '/profile', icon: UserCircle, label: 'My Profile' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
