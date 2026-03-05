@@ -49,7 +49,7 @@ function RegisterPage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:5001/api/registration/initiate', {
+      const response = await axios.post('/registration/initiate', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -72,7 +72,7 @@ function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5001/api/registration/verify', {
+      const response = await axios.post('/registration/verify', {
         email: formData.email,
         code: verificationCode
       });
@@ -106,7 +106,7 @@ function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5001/api/registration/resend-code', {
+      const response = await axios.post('/registration/resend-code', {
         email: formData.email
       });
 

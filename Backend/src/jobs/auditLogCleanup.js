@@ -70,7 +70,14 @@ export const cleanupOldAuditLogs = async () => {
     console.log(`✅ Successfully archived ${oldLogs.length} audit logs`);
 
   } catch (error) {
-    console.error('❌ Error cleaning up audit logs:', error);
+    // Suppress AWS credential errors in development
+    if (error.__type === 'com.amazon.coral.service#UnrecognizedClientException') {
+      console.debug('⚠️ [Audit Log Cleanup] Skipped: AWS credentials not configured. Configure .env for production use.');
+    } else if (error.name === 'AccessDenied') {
+      console.debug('⚠️ [Audit Log Cleanup] Skipped: Insufficient AWS permissions.');
+    } else {
+      console.error('❌ Error cleaning up audit logs:', error.message);
+    }
   }
 };
 

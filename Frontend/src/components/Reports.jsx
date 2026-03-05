@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../utils/axios'; // ✅ FIX 1: Use configured axios (was 'axios')
 
 const Reports = ({ projectId }) => {
     const [pendingPhotos, setPendingPhotos] = useState([]);
@@ -12,11 +12,9 @@ const Reports = ({ projectId }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [taskCompletions, setTaskCompletions] = useState({});
     const [phaseCompletions, setPhaseCompletions] = useState({});
-    const [confirmResultModal, setConfirmResultModal] = useState(null); 
-    
-    const API_URL = 'http://localhost:5001/api';
+    const [confirmResultModal, setConfirmResultModal] = useState(null);
 
-    // ✅ GET AUTH TOKEN
+    // ✅ Checks both localStorage AND sessionStorage for token
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         return {
@@ -31,13 +29,12 @@ const Reports = ({ projectId }) => {
         }
     }, [projectId]);
 
-    // ✅ NEW: Calculate task averages from confirmed photos
     const calculateTaskAverages = (confirmedPhotos) => {
         const taskGroups = {};
-        
+
         confirmedPhotos.forEach(photo => {
             if (!photo.taskId || !photo.userInputPercentage) return;
-            
+
             if (!taskGroups[photo.taskId]) {
                 taskGroups[photo.taskId] = {
                     taskName: photo.taskName || 'Unknown Task',
@@ -45,12 +42,11 @@ const Reports = ({ projectId }) => {
                     photoCount: 0
                 };
             }
-            
+
             taskGroups[photo.taskId].percentages.push(photo.userInputPercentage);
             taskGroups[photo.taskId].photoCount++;
         });
-        
-        // Calculate averages
+
         const averages = {};
         Object.keys(taskGroups).forEach(taskId => {
             const percentages = taskGroups[taskId].percentages;
@@ -60,17 +56,16 @@ const Reports = ({ projectId }) => {
                 average: avg
             };
         });
-        
+
         return averages;
     };
 
     const calculatePhaseAverages = (confirmedPhotos, milestones) => {
         const phaseGroups = {};
-        
-        // Group photos by phase
+
         confirmedPhotos.forEach(photo => {
             if (!photo.phaseId || !photo.userInputPercentage) return;
-            
+
             if (!phaseGroups[photo.phaseId]) {
                 phaseGroups[photo.phaseId] = {
                     phaseName: photo.phaseName || 'Unknown Phase',
@@ -78,8 +73,7 @@ const Reports = ({ projectId }) => {
                     totalPhotos: 0
                 };
             }
-            
-            // Group by task within phase
+
             if (!phaseGroups[photo.phaseId].taskCompletions[photo.taskId]) {
                 phaseGroups[photo.phaseId].taskCompletions[photo.taskId] = {
                     taskName: photo.taskName || 'Unknown Task',
@@ -87,19 +81,17 @@ const Reports = ({ projectId }) => {
                     photoCount: 0
                 };
             }
-            
+
             phaseGroups[photo.phaseId].taskCompletions[photo.taskId].percentages.push(photo.userInputPercentage);
             phaseGroups[photo.phaseId].taskCompletions[photo.taskId].photoCount++;
             phaseGroups[photo.phaseId].totalPhotos++;
         });
-        
-        // Calculate phase averages
+
         const phaseAverages = {};
         Object.keys(phaseGroups).forEach(phaseId => {
             const phase = phaseGroups[phaseId];
             const taskAverages = [];
-            
-            // Calculate average for each task in this phase
+
             Object.keys(phase.taskCompletions).forEach(taskId => {
                 const task = phase.taskCompletions[taskId];
                 const taskAvg = Math.round(
@@ -107,12 +99,11 @@ const Reports = ({ projectId }) => {
                 );
                 taskAverages.push(taskAvg);
             });
-            
-            // Calculate phase average from task averages
+
             const phaseAvg = taskAverages.length > 0
                 ? Math.round(taskAverages.reduce((sum, avg) => sum + avg, 0) / taskAverages.length)
                 : 0;
-            
+
             phaseAverages[phaseId] = {
                 phaseName: phase.phaseName,
                 average: phaseAvg,
@@ -120,47 +111,36 @@ const Reports = ({ projectId }) => {
                 photoCount: phase.totalPhotos
             };
         });
-        
+
         return phaseAverages;
     };
 
-    // ✅ UPDATED: Load photos and calculate averages
     const loadPhotos = async () => {
         if (!projectId) return;
 
         setLoading(true);
         try {
             console.log('🔄 Loading photos for project:', projectId);
-            
-            // Fetch photos
-            const photosResponse = await axios.get(
-                `${API_URL}/photos/project/${projectId}`,
-                { headers: getAuthHeaders() }
-            );
-            
-            // Fetch milestones to get phase information
-            const milestonesResponse = await axios.get(
-                `${API_URL}/milestones/project/${projectId}`,
-                { headers: getAuthHeaders() }
-            );
-            
+
+            // ✅ axios utility handles base URL, getAuthHeaders handles token from both storages
+            const photosResponse = await axios.get(`/photos/project/${projectId}`, { headers: getAuthHeaders() });
+            const milestonesResponse = await axios.get(`/milestones/project/${projectId}`, { headers: getAuthHeaders() });
+
             const photos = photosResponse.data || [];
             const milestones = milestonesResponse.data || [];
 
-            // ✅ Show all pending photos, even if AI didn't process them
             const pending = photos.filter(p => p.confirmationStatus === 'pending');
             const confirmed = photos.filter(p => p.confirmationStatus === 'confirmed');
 
             setPendingPhotos(pending);
             setConfirmedPhotos(confirmed);
-            
-            // ✅ Calculate both task and phase averages
+
             const taskAvgs = calculateTaskAverages(confirmed);
             setTaskCompletions(taskAvgs);
-            
+
             const phaseAvgs = calculatePhaseAverages(confirmed, milestones);
             setPhaseCompletions(phaseAvgs);
-            
+
             console.log(`✅ Loaded ${pending.length} pending and ${confirmed.length} confirmed photos`);
             console.log('📊 Task averages:', taskAvgs);
             console.log('📊 Phase averages:', phaseAvgs);
@@ -176,16 +156,15 @@ const Reports = ({ projectId }) => {
 
     const openConfirmModal = (photo) => {
         setSelectedPhoto(photo);
-        // Pre-fill with AI suggestion from multiple possible sources
-        const aiSuggested = photo.aiSuggestedPercentage || 
-                          photo.aiSuggestion?.ai_estimated_completion || 
-                          photo.aiSuggestion?.suggested_percentage || 
-                          '';
+        const aiSuggested = photo.aiSuggestedPercentage ||
+            photo.aiSuggestion?.ai_estimated_completion ||
+            photo.aiSuggestion?.suggested_percentage ||
+            '';
         setUserPercentage(aiSuggested);
         setShowConfirmModal(true);
     };
 
-    // ✅ UPDATED: Confirm with taskId and projectId
+    // ✅ FIX 2: handleConfirm now shows result IMMEDIATELY, reloads in background
     const handleConfirm = async (confirmed) => {
         if (!selectedPhoto) return;
 
@@ -198,7 +177,7 @@ const Reports = ({ projectId }) => {
 
         try {
             const milestoneToConfirm = selectedPhoto.userSelectedMilestone || selectedPhoto.aiSuggestion?.milestone || 'Unknown';
-            
+
             console.log('📤 Confirming photo:', {
                 photoId: selectedPhoto.photoId,
                 milestone: milestoneToConfirm,
@@ -208,28 +187,33 @@ const Reports = ({ projectId }) => {
                 projectId: selectedPhoto.projectId
             });
 
-            // ✅ Send confirmation with task and project IDs
+            // ✅ FIX 1: axios utility handles base URL, getAuthHeaders handles token from both storages
             await axios.post(
-                `${API_URL}/photos/${selectedPhoto.photoId}/confirm`,
+                `/photos/${selectedPhoto.photoId}/confirm`,
                 {
                     updateId: selectedPhoto.updateId,
                     milestone: milestoneToConfirm,
                     userPercentage: parseInt(userPercentage),
                     confirmed: confirmed,
-                    taskId: selectedPhoto.taskId,        // ✅ Links photo to task
-                    projectId: selectedPhoto.projectId   // ✅ Links photo to project
+                    taskId: selectedPhoto.taskId,
+                    projectId: selectedPhoto.projectId
                 },
                 { headers: getAuthHeaders() }
             );
 
+            const aiPercentage = selectedPhoto.aiSuggestedPercentage ||
+                selectedPhoto.aiSuggestion?.ai_estimated_completion ||
+                null;
+
+            const difference = aiPercentage ? parseInt(userPercentage) - aiPercentage : null;
+
+            // ✅ FIX 2: Close modal and show result IMMEDIATELY (no waiting)
+            setShowConfirmModal(false);
+            setSelectedPhoto(null);
+            setUserPercentage('');
+            setIsSubmitting(false); // ✅ FIX 2: Reset submitting state before reload
+
             if (confirmed) {
-                // ✅ Enhanced success message with comparison
-                const aiPercentage = selectedPhoto.aiSuggestedPercentage || 
-                                   selectedPhoto.aiSuggestion?.ai_estimated_completion || 
-                                   null;
-                
-                const difference = aiPercentage ? parseInt(userPercentage) - aiPercentage : null;
-                
                 setConfirmResultModal({
                     success: true,
                     task: selectedPhoto.taskName || 'Unknown',
@@ -238,25 +222,21 @@ const Reports = ({ projectId }) => {
                     difference: difference
                 });
             } else {
-                setConfirmResultModal({
-                    success: false
-                });
+                setConfirmResultModal({ success: false });
             }
 
-            setShowConfirmModal(false);
-            setSelectedPhoto(null);
-            setUserPercentage('');
-            await loadPhotos();
+            // ✅ FIX 2: loadPhotos runs in background — no await, no blocking
+            loadPhotos();
+
         } catch (error) {
             console.error('❌ Error confirming photo:', error);
+            setIsSubmitting(false);
             if (error.response?.status === 401) {
                 alert('Session expired. Please login again.');
             } else {
                 const errorMsg = error.response?.data?.message || error.message;
                 alert(`❌ Failed to save confirmation: ${errorMsg}`);
             }
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -269,11 +249,10 @@ const Reports = ({ projectId }) => {
         return colors[confidence] || colors.low;
     };
 
-    // ✅ NEW: Calculate overall average from phase averages
     const calculateOverallProgress = () => {
         const phaseAvgs = Object.values(phaseCompletions);
         if (phaseAvgs.length === 0) return 0;
-        
+
         const totalAvg = phaseAvgs.reduce((sum, phase) => sum + phase.average, 0);
         return Math.round(totalAvg / phaseAvgs.length);
     };
@@ -295,10 +274,9 @@ const Reports = ({ projectId }) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pendingPhotos.map((photo) => (
                     <div key={photo.photoId} className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                        {/* Photo */}
                         <div className="relative">
-                            <img 
-                                src={photo.fileURL} 
+                            <img
+                                src={photo.fileURL}
                                 alt={photo.caption}
                                 className="w-full h-64 object-cover"
                             />
@@ -309,7 +287,6 @@ const Reports = ({ projectId }) => {
                             </div>
                         </div>
 
-                        {/* AI Analysis */}
                         <div className="p-6">
                             <div className="mb-4">
                                 <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2">Photo Details</h3>
@@ -317,7 +294,6 @@ const Reports = ({ projectId }) => {
                                 <p className="text-sm text-gray-500 dark:text-slate-400">
                                     Uploaded: {new Date(photo.uploadedAt).toLocaleString()}
                                 </p>
-                                {/* ✅ Show task name */}
                                 {photo.taskName && (
                                     <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                                         📋 Task: {photo.taskName}
@@ -325,7 +301,6 @@ const Reports = ({ projectId }) => {
                                 )}
                             </div>
 
-                            {/* AI Suggestion */}
                             {photo.aiSuggestion && (
                                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-4">
                                     <div className="flex items-start justify-between mb-3">
@@ -360,7 +335,6 @@ const Reports = ({ projectId }) => {
                                 </div>
                             )}
 
-                            {/* Action Button */}
                             <button
                                 onClick={() => openConfirmModal(photo)}
                                 className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center"
@@ -377,7 +351,6 @@ const Reports = ({ projectId }) => {
         );
     };
 
-    // ✅ UPDATED: Confirmed photos show task average
     const renderConfirmedPhotos = () => {
         if (confirmedPhotos.length === 0) {
             return (
@@ -394,14 +367,13 @@ const Reports = ({ projectId }) => {
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {confirmedPhotos.map((photo) => {
-                    // ✅ Get task average completion
                     const taskInfo = taskCompletions[photo.taskId];
-                    
+
                     return (
                         <div key={photo.photoId} className="bg-white dark:bg-slate-800 rounded-lg border border-green-200 dark:border-green-900 shadow-sm overflow-hidden">
                             <div className="relative">
-                                <img 
-                                    src={photo.fileURL} 
+                                <img
+                                    src={photo.fileURL}
                                     alt={photo.caption}
                                     className="w-full h-48 object-cover"
                                 />
@@ -426,15 +398,13 @@ const Reports = ({ projectId }) => {
                                 </div>
 
                                 <div className="space-y-2 text-sm">
-                                    {/* ✅ Show Task Name */}
                                     <div className="flex justify-between items-center py-2 border-t border-gray-200 dark:border-slate-700">
                                         <span className="text-gray-600 dark:text-slate-400">Task</span>
                                         <span className="font-semibold text-gray-900 dark:text-white">
                                             {photo.taskName || 'Unknown'}
                                         </span>
                                     </div>
-                                    
-                                    {/* ✅ AI vs USER PERCENTAGE COMPARISON */}
+
                                     {photo.aiSuggestedPercentage && (
                                         <div className="py-2 border-t border-gray-200 dark:border-slate-700">
                                             <div className="flex justify-between items-center mb-1">
@@ -449,14 +419,12 @@ const Reports = ({ projectId }) => {
                                                     {photo.userInputPercentage || 0}%
                                                 </span>
                                             </div>
-                                            {/* Show difference */}
                                             {Math.abs((photo.userInputPercentage || 0) - photo.aiSuggestedPercentage) > 0 && (
                                                 <div className="mt-2 text-xs text-center">
-                                                    <span className={`px-2 py-1 rounded ${
-                                                        (photo.userInputPercentage || 0) > photo.aiSuggestedPercentage 
-                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                                                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                                    }`}>
+                                                    <span className={`px-2 py-1 rounded ${(photo.userInputPercentage || 0) > photo.aiSuggestedPercentage
+                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                                        }`}>
                                                         {(photo.userInputPercentage || 0) > photo.aiSuggestedPercentage ? '+' : ''}
                                                         {(photo.userInputPercentage || 0) - photo.aiSuggestedPercentage}% difference
                                                     </span>
@@ -464,8 +432,7 @@ const Reports = ({ projectId }) => {
                                             )}
                                         </div>
                                     )}
-                                    
-                                    {/* Fallback if no AI percentage */}
+
                                     {!photo.aiSuggestedPercentage && (
                                         <div className="flex justify-between items-center py-2 border-t border-gray-200 dark:border-slate-700">
                                             <span className="text-gray-600 dark:text-slate-400">This Photo</span>
@@ -474,8 +441,7 @@ const Reports = ({ projectId }) => {
                                             </span>
                                         </div>
                                     )}
-                                    
-                                    {/* ✅ IMPORTANT: Show TASK AVERAGE completion */}
+
                                     {taskInfo && (
                                         <div className="flex justify-between items-center py-2 border-t-2 border-gray-200 dark:border-slate-700 bg-green-50 dark:bg-green-900/20 -mx-5 px-5 mt-3">
                                             <div>
@@ -537,25 +503,22 @@ const Reports = ({ projectId }) => {
                     </div>
                 </div>
 
-                {/* Tabs */}
                 <nav className="flex space-x-8 px-6" aria-label="Tabs">
                     <button
                         onClick={() => setActiveTab('pending')}
-                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                            activeTab === 'pending'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
-                        }`}
+                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'pending'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
+                            }`}
                     >
                         Pending Review ({pendingPhotos.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('confirmed')}
-                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                            activeTab === 'confirmed'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
-                        }`}
+                        className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'confirmed'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
+                            }`}
                     >
                         Confirmed Reports ({confirmedPhotos.length})
                     </button>
@@ -573,11 +536,10 @@ const Reports = ({ projectId }) => {
                 )}
             </div>
 
-            {/* Confirmation Modal - Enhanced Design */}
+            {/* Confirmation Modal */}
             {showConfirmModal && selectedPhoto && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-slate-700">
-                        {/* Header */}
                         <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800">
                             <div>
                                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -600,10 +562,9 @@ const Reports = ({ projectId }) => {
                         </div>
 
                         <div className="px-6 py-5">
-                            {/* Photo Preview */}
                             <div className="mb-6 relative group">
-                                <img 
-                                    src={selectedPhoto.fileURL} 
+                                <img
+                                    src={selectedPhoto.fileURL}
                                     alt={selectedPhoto.caption}
                                     className="w-full h-80 object-cover rounded-xl border-2 border-gray-200 dark:border-slate-700 shadow-lg"
                                 />
@@ -613,7 +574,6 @@ const Reports = ({ projectId }) => {
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-4 mb-6">
-                                {/* ✅ Task Info */}
                                 {selectedPhoto.taskName && (
                                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-5 border-2 border-blue-200 dark:border-blue-700 shadow-sm">
                                         <div className="flex items-center gap-2 mb-2">
@@ -629,7 +589,6 @@ const Reports = ({ projectId }) => {
                                     </div>
                                 )}
 
-                                {/* ✅ AI Analysis */}
                                 {selectedPhoto.aiSuggestion && (
                                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-5 border-2 border-purple-200 dark:border-purple-700 shadow-sm">
                                         <div className="flex items-center gap-2 mb-2">
@@ -670,10 +629,10 @@ const Reports = ({ projectId }) => {
                                             Suggested %
                                         </p>
                                         <p className="text-6xl font-black text-green-600 dark:text-green-400">
-                                            {selectedPhoto.aiSuggestedPercentage || 
-                                             selectedPhoto.aiSuggestion?.ai_estimated_completion || 
-                                             selectedPhoto.aiSuggestion?.suggested_percentage || 
-                                             <span className="text-3xl text-gray-400 dark:text-slate-500">N/A</span>}
+                                            {selectedPhoto.aiSuggestedPercentage ||
+                                                selectedPhoto.aiSuggestion?.ai_estimated_completion ||
+                                                selectedPhoto.aiSuggestion?.suggested_percentage ||
+                                                <span className="text-3xl text-gray-400 dark:text-slate-500">N/A</span>}
                                             {(selectedPhoto.aiSuggestedPercentage || selectedPhoto.aiSuggestion?.ai_estimated_completion || selectedPhoto.aiSuggestion?.suggested_percentage) && <span className="text-3xl">%</span>}
                                         </p>
                                     </div>
@@ -770,7 +729,7 @@ const Reports = ({ projectId }) => {
                                 {confirmResultModal.success ? 'Progress Confirmed Successfully!' : 'Photo Rejected'}
                             </h3>
                         </div>
-                        
+
                         {confirmResultModal.success ? (
                             <>
                                 <div className="mb-6 space-y-2 text-sm">
@@ -799,7 +758,6 @@ const Reports = ({ projectId }) => {
                                         </>
                                     )}
                                 </div>
-
                                 <p className="text-gray-600 dark:text-slate-400 mb-6 text-sm">
                                     The task's completion percentage has been updated automatically.
                                 </p>

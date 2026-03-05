@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-// Set base URL
-axios.defaults.baseURL = 'http://localhost:5001';
+// Configure global axios defaults
+axios.defaults.baseURL = 'http://47.129.233.194/api';
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
-// Add request interceptor to include token in every request
+// Add request interceptor
 axios.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -12,17 +13,14 @@ axios.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add response interceptor to handle 401 errors
+// Add response interceptor
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
       localStorage.clear();
       window.location.href = '/login';
     }

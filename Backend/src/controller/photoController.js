@@ -327,7 +327,7 @@ export const confirmAISuggestion = async (req, res) => {
         
         // Call the sync endpoint to recalculate status from ALL photos
         const token = req.headers.authorization; // Forward the auth token
-        const apiUrl = process.env.API_URL || 'http://localhost:5001';
+        const apiUrl = process.env.API_URL || '47.129.233.194';
         
         console.log(`📡 Calling sync endpoint: ${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`);
         
@@ -529,7 +529,7 @@ export const deletePhoto = async (req, res) => {
                 console.log('🔄 Triggering auto-status update after photo deletion...');
                 
                 const token = req.headers.authorization;
-                const apiUrl = process.env.API_URL || 'http://localhost:5001';
+                const apiUrl = process.env.API_URL || '47.129.233.194';
                 
                 await axios.post(
                     `${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`,

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css';
+import './utils/axios';  // ← ADD THIS LINE
 
 // ✅ Suppress extension-related message channel errors
 window.addEventListener('error', (event) => {

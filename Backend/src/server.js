@@ -64,7 +64,15 @@ const client = new DynamoDBClient({ region: process.env.AWS_REGION || "ap-southe
 const docClient = DynamoDBDocumentClient.from(client);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://buildwise-frontend.s3-website-ap-southeast-1.amazonaws.com',
+    'http://buildwise-admin.s3-website-ap-southeast-1.amazonaws.com'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 

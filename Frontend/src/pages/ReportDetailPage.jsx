@@ -255,7 +255,7 @@ function GenerateReportPage() {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
+            const response = await axios.get(`/projects/${projectId}`, config);
             setProject(response.data);
         } catch (error) {
             console.error('Error fetching project:', error);
@@ -271,7 +271,7 @@ function GenerateReportPage() {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
-                `http://localhost:5001/api/reports/project/${projectId}`,
+                `/reports/project/${projectId}`,
                 config
             );
             setReports(response.data || []);
@@ -296,7 +296,7 @@ function GenerateReportPage() {
                 timeout: 120000
             };
             await axios.post(
-                `http://localhost:5001/api/reports/generate/${projectId}`,
+                `/reports/generate/${projectId}`,
                 { reportType },
                 config
             );
@@ -567,7 +567,7 @@ function GenerateReportPage() {
         try {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(`http://localhost:5001/api/reports/${reportId}`, config);
+            await axios.delete(`/reports/${reportId}`, config);
             setReports(reports.filter(r => r.reportId !== reportId));
             if (selectedReport?.reportId === reportId) {
                 setShowModal(false);

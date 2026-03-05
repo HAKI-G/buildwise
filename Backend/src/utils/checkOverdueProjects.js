@@ -56,7 +56,14 @@ export const checkOverdueProjects = async () => {
         console.log(`✅ [CRON] Overdue check complete. ${overdueCount} project(s) marked as overdue.`);
         
     } catch (error) {
-        console.error('❌ [CRON] Error checking overdue projects:', error);
+        // Suppress AWS credential errors in development
+        if (error.__type === 'com.amazon.coral.service#UnrecognizedClientException') {
+            console.debug('⚠️ [Overdue Check] Skipped: AWS credentials not configured. Configure .env for production use.');
+        } else if (error.name === 'AccessDenied') {
+            console.debug('⚠️ [Overdue Check] Skipped: Insufficient AWS permissions.');
+        } else {
+            console.error('❌ [CRON] Error checking overdue projects:', error.message);
+        }
     }
 };
 

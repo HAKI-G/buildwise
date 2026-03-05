@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Upload, Trash2, Eye, CheckCircle, Image as ImageIcon } from "lucide-react";
-import axios from "axios";
-
-const API_URL = "http://localhost:5001/api";
-
-const getToken = () => localStorage.getItem("token") || sessionStorage.getItem("token");
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${getToken()}`,
-  'Content-Type': 'application/json'
-});
+import axios from '../utils/axios';  // ✅ Use configured axios
 
 const Photos = ({ projectId, readonly = false }) => {
   const [photos, setPhotos] = useState([]);
@@ -17,12 +8,12 @@ const Photos = ({ projectId, readonly = false }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [caption, setCaption] = useState("");
-  const [selectedTask, setSelectedTask] = useState(""); // ✅ Just task selection
+  const [selectedTask, setSelectedTask] = useState("");
   const [tasks, setTasks] = useState([]);
   const [viewModal, setViewModal] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [photoSortOrder, setPhotoSortOrder] = useState("newest"); // 'newest' or 'oldest'
-  const [expandedPhases, setExpandedPhases] = useState({}); // Track which phases are expanded
+  const [photoSortOrder, setPhotoSortOrder] = useState("newest");
+  const [expandedPhases, setExpandedPhases] = useState({});
 
   useEffect(() => {
     if (projectId && showUploadForm) {
@@ -40,10 +31,7 @@ const Photos = ({ projectId, readonly = false }) => {
     try {
       console.log('📋 Fetching tasks for project:', projectId);
       
-      const response = await axios.get(
-        `${API_URL}/milestones/project/${projectId}`,
-        { headers: getAuthHeaders() }
-      );
+      const response = await axios.get(`/milestones/project/${projectId}`);
       
       // ✅ Filter only tasks (not phases)
       const tasksOnly = response.data.filter(item => item.isPhase !== true);
@@ -62,10 +50,7 @@ const Photos = ({ projectId, readonly = false }) => {
     try {
       console.log('📷 Fetching confirmed photos for project:', projectId);
       
-      const response = await axios.get(
-        `${API_URL}/photos/project/${projectId}`,
-        { headers: getAuthHeaders() }
-      );
+      const response = await axios.get(`/photos/project/${projectId}`);
       
       const confirmedOnly = response.data.filter(
         photo => photo.confirmationStatus === 'confirmed'
@@ -97,7 +82,6 @@ const Photos = ({ projectId, readonly = false }) => {
     return `UPD-${timestamp}-${random}`;
   };
 
-  // ✅ UPDATED: No completion percentage during upload
   const handleUpload = async () => {
     if (!selectedFile || !projectId) {
       alert("Please select a file");
@@ -122,21 +106,15 @@ const Photos = ({ projectId, readonly = false }) => {
     formData.append("projectId", projectId);
     formData.append("taskId", selectedTask);
     formData.append("taskName", taskDetails?.milestoneName || "Unknown Task");
-    // ✅ REMOVED: completionPercentage - AI will suggest it in Reports tab
 
     try {
       console.log('🚀 Sending to backend for AI analysis...');
       
-      const response = await axios.post(
-        `${API_URL}/photos/${updateId}`, 
-        formData, 
-        {
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await axios.post(`/photos/${updateId}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       console.log("✅ Photo uploaded successfully:", response.data);
       console.log("🤖 AI Analysis:", response.data.aiAnalysis);
@@ -189,18 +167,14 @@ const Photos = ({ projectId, readonly = false }) => {
     
     setIsDeleting(true);
     try {
-      await axios.delete(
-        `${API_URL}/photos/${deleteModal.photoId}`, 
-        {
-          headers: getAuthHeaders(),
-          data: {
-            updateId: deleteModal.updateId,
-            s3Key: deleteModal.s3Key,
-            taskId: deleteModal.taskId,
-            projectId: projectId
-          },
-        }
-      );
+      await axios.delete(`/photos/${deleteModal.photoId}`, {
+        data: {
+          updateId: deleteModal.updateId,
+          s3Key: deleteModal.s3Key,
+          taskId: deleteModal.taskId,
+          projectId: projectId
+        },
+      });
 
       await fetchConfirmedPhotosForProject();
       setDeleteModal(null);
@@ -216,9 +190,7 @@ const Photos = ({ projectId, readonly = false }) => {
   const openViewModal = (photo) => setViewModal(photo);
   const closeViewModal = () => setViewModal(null);
 
-  // ✅ Group photos by phase/task with sorting
   const getGroupedPhotos = () => {
-    // First, group by phase, then by task within each phase
     const grouped = photos.reduce((acc, photo) => {
       const phaseName = photo.phaseName || "Ungrouped";
       const taskName = photo.taskName || "No Task";
@@ -234,7 +206,6 @@ const Photos = ({ projectId, readonly = false }) => {
       return acc;
     }, {});
 
-    // Sort photos within each task by upload date
     Object.keys(grouped).forEach(phaseName => {
       Object.keys(grouped[phaseName]).forEach(taskName => {
         grouped[phaseName][taskName].sort((a, b) => {
@@ -248,7 +219,6 @@ const Photos = ({ projectId, readonly = false }) => {
     return grouped;
   };
 
-  // Toggle phase expansion
   const togglePhase = (phaseName) => {
     setExpandedPhases(prev => ({
       ...prev,
@@ -310,7 +280,7 @@ const Photos = ({ projectId, readonly = false }) => {
               )}
             </div>
 
-            {/* ✅ UPDATED: Task Dropdown WITHOUT completion percentage */}
+            {/* Task Dropdown */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
                 Select Task <span className="text-red-500">*</span>
@@ -537,7 +507,7 @@ const Photos = ({ projectId, readonly = false }) => {
         )}
       </div>
 
-      {/* View Modal - Enhanced */}
+      {/* View Modal */}
       {viewModal && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"

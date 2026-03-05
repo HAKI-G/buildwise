@@ -18,7 +18,7 @@ function Setup2FAPage() {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:5001/api/2fa/setup',
+        '/2fa/setup',
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -43,7 +43,7 @@ function Setup2FAPage() {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        'http://localhost:5001/api/2fa/verify',
+        '/2fa/verify',
         { token: verificationCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );

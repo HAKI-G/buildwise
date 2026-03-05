@@ -34,7 +34,7 @@ function Maps() {
         try {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
+            const res = await axios.get(`/projects/${projectId}`, config);
             setProject(res.data);
             
             // Try to geocode the location

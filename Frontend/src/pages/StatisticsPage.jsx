@@ -43,7 +43,7 @@ function StatisticsPage() {
             }
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get('http://localhost:5001/api/projects', config);
+                const response = await axios.get('/projects', config);
                 setProjects(response.data || []);
             } catch (err) {
                 console.error('Error fetching projects:', err);
@@ -70,11 +70,11 @@ function StatisticsPage() {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 
-                const projectRes = await axios.get(`http://localhost:5001/api/projects/${selectedProjectId}`, config);
+                const projectRes = await axios.get(`/projects/${selectedProjectId}`, config);
                 setProject(projectRes.data);
 
                 try {
-                    const milestonesRes = await axios.get(`http://localhost:5001/api/milestones/project/${selectedProjectId}`, config);
+                    const milestonesRes = await axios.get(`/milestones/project/${selectedProjectId}`, config);
                     setMilestones(milestonesRes.data || []);
                 } catch (err) {
                     console.warn('Could not fetch milestones:', err);
@@ -82,7 +82,7 @@ function StatisticsPage() {
                 }
 
                 try {
-                    const expensesRes = await axios.get(`http://localhost:5001/api/expenses/project/${selectedProjectId}`, config);
+                    const expensesRes = await axios.get(`/expenses/project/${selectedProjectId}`, config);
                     setExpenses(expensesRes.data || []);
                 } catch (err) {
                     console.warn('Could not fetch expenses:', err);
@@ -90,7 +90,7 @@ function StatisticsPage() {
                 }
 
                 try {
-                    const photosRes = await axios.get(`http://localhost:5001/api/photos/project/${selectedProjectId}`, config);
+                    const photosRes = await axios.get(`/photos/project/${selectedProjectId}`, config);
                     setPhotos(photosRes.data || []);
                     console.log('✅ Photos loaded:', photosRes.data?.length);
                 } catch (err) {

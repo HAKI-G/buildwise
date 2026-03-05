@@ -20,7 +20,7 @@ export const useMaintenanceMode = () => {
         } : {};
 
         const response = await axios.get(
-          'http://localhost:5001/api/maintenance-status',
+          '/maintenance-status',
           config
         );
         

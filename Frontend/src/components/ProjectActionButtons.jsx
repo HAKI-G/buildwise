@@ -38,10 +38,10 @@ const ProjectActionButtons = ({ projectId, projectName, onProjectDeleted, showPr
             };
 
             // Delete project (backend creates audit log automatically)
-            await axios.delete(`http://localhost:5001/api/projects/${projectId}`, config);
+            await axios.delete(`/projects/${projectId}`, config);
             
             // ✅ Send notification
-            await axios.post('http://localhost:5001/api/notifications/send', {
+            await axios.post('/notifications/send', {
                 type: 'PROJECT_DELETED',
                 title: 'Project Deleted',
                 message: `${projectName} has been deleted`,

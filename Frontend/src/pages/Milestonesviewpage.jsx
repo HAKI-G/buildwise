@@ -43,7 +43,7 @@ function MilestonesViewPage() {
             
             // Update status via API
             await axios.patch(
-                `http://localhost:5001/api/projects/${projectId}`,
+                `/projects/${projectId}`,
                 { status: newStatus },
                 config
             );
@@ -70,7 +70,7 @@ function MilestonesViewPage() {
 
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
+                const response = await axios.get(`/projects/${projectId}`, config);
                 setProject(response.data);
                 
                 // Store last selected project

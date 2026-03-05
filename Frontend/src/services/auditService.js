@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ⚙️ Your backend URL
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = '47.129.233.194/api';
 
 export const LOG_TYPES = {
   USER_LOGIN: 'USER_LOGIN',

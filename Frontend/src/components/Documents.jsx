@@ -26,7 +26,7 @@ function Documents({ readonly }) {
         try {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`http://localhost:5001/api/documents/project/${projectId}`, config);
+            const res = await axios.get(`/documents/project/${projectId}`, config);
             setDocuments(res.data);
         } catch (error) {
             console.error('Error fetching documents:', error);
@@ -92,7 +92,7 @@ function Documents({ readonly }) {
                 }
             };
 
-            await axios.post('http://localhost:5001/api/documents/upload', formData, config);
+            await axios.post('/documents/upload', formData, config);
             
             setUploadData({
                 file: null,
@@ -124,7 +124,7 @@ function Documents({ readonly }) {
             };
 
             const res = await axios.get(
-                `http://localhost:5001/api/documents/${documentId}/download`,
+                `/documents/${documentId}/download`,
                 config
             );
             
@@ -145,7 +145,7 @@ function Documents({ readonly }) {
 
     const handleView = (documentId) => {
         window.open(
-            `http://localhost:5001/api/documents/${documentId}/view?projectId=${projectId}`,
+            `/documents/${documentId}/view?projectId=${projectId}`,
             '_blank'
         );
     };
@@ -160,7 +160,7 @@ function Documents({ readonly }) {
                 params: { projectId }
             };
             
-            await axios.delete(`http://localhost:5001/api/documents/${documentId}`, config);
+            await axios.delete(`/documents/${documentId}`, config);
             fetchDocuments();
             alert('Document deleted successfully');
         } catch (error) {
@@ -175,7 +175,7 @@ function Documents({ readonly }) {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             
             await axios.put(
-                `http://localhost:5001/api/documents/${documentId}/status`,
+                `/documents/${documentId}/status`,
                 { status: newStatus, projectId },
                 config
             );

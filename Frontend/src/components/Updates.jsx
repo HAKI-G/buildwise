@@ -51,7 +51,7 @@ const Updates = ({ readonly, projectData }) => {
             
             try {
                 const expensesRes = await axios.get(
-                    `http://localhost:5001/api/expenses/project/${projectId}`, 
+                    `/expenses/project/${projectId}`, 
                     config
                 );
                 setExpenses(expensesRes.data || []);
@@ -102,7 +102,7 @@ const Updates = ({ readonly, projectData }) => {
 
         try {
             await axios.post(
-                `http://localhost:5001/api/expenses/${projectId}`, 
+                `/expenses/${projectId}`, 
                 newExpense, 
                 config
             );
@@ -113,7 +113,7 @@ const Updates = ({ readonly, projectData }) => {
             setSuccessMessage('Expense added successfully!');
             
             const expensesRes = await axios.get(
-                `http://localhost:5001/api/expenses/project/${projectId}`, 
+                `/expenses/project/${projectId}`, 
                 config
             );
             setExpenses(expensesRes.data || []);

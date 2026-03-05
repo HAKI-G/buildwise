@@ -43,7 +43,7 @@ function UpdateProjectPage() {
         
         setLoading(true);
         try {
-            const projectRes = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
+            const projectRes = await axios.get(`/projects/${projectId}`, config);
             setFormData(projectRes.data);
             setOriginalData(projectRes.data);
             setError('');
@@ -76,10 +76,10 @@ function UpdateProjectPage() {
 
         try {
             // 1️⃣ Update the project (backend creates audit log automatically)
-            await axios.put(`http://localhost:5001/api/projects/${projectId}`, formData, config);
+            await axios.put(`/projects/${projectId}`, formData, config);
 
             // 2️⃣ Send notification to all users
-            await axios.post('http://localhost:5001/api/notifications/send', {
+            await axios.post('/notifications/send', {
                 type: 'PROJECT_UPDATED',
                 title: 'Project Updated',
                 message: `${formData.name} has been updated`,

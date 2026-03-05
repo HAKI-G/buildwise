@@ -8,7 +8,7 @@ export const useMaintenanceMode = () => {
   useEffect(() => {
     const checkMaintenanceMode = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/maintenance-status');
+        const response = await axios.get('/maintenance-status');
         const maintenanceEnabled = response.data.value === true;
         setIsMaintenanceMode(maintenanceEnabled);
       } catch (error) {

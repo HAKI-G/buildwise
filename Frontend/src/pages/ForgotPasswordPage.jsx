@@ -20,7 +20,7 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('http://localhost:5001/api/forgot-password/request', { email });
+            await axios.post('/forgot-password/request', { email });
             
             setSuccess('Verification code sent to your email!');
             setStep(2);
@@ -38,7 +38,7 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('http://localhost:5001/api/forgot-password/verify-code', {
+            await axios.post('/forgot-password/verify-code', {
                 email,
                 code
             });
@@ -70,7 +70,7 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('http://localhost:5001/api/forgot-password/reset', {
+            await axios.post('/forgot-password/reset', {
                 email,
                 code,
                 newPassword

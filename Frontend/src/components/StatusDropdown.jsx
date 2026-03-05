@@ -30,7 +30,7 @@ function StatusDropdown({ projectId, currentStatus, onStatusChange }) {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             
             await axios.patch(
-                `http://localhost:5001/api/projects/${projectId}`,
+                `/projects/${projectId}`,
                 { status: newStatus },
                 config
             );

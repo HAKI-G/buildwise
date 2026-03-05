@@ -25,7 +25,7 @@ function DocumentsViewPage() {
 
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get(`http://localhost:5001/api/projects/${projectId}`, config);
+                const response = await axios.get(`/projects/${projectId}`, config);
                 setProject(response.data);
                 localStorage.setItem('lastSelectedProjectId', projectId);
             } catch (error) {

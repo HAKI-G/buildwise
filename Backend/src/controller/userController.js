@@ -16,20 +16,23 @@ import {
   isAccountLocked, 
   resetAttempts 
 } from '../utils/loginAttemptTracker.js';
-import { verify2FAToken } from '../services/twoFactorService.js'; // ✅ Add this import
+import { verify2FAToken } from '../services/twoFactorService.js';
 
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 const tableName = 'BuildWiseUsers';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-for-now';
 
+// @desc    Get all registered users (for dashboard team display)
+// @route   GET /api/users/all
+// @access  Protected
 export const getAllUsers = async (req, res) => {
     const params = { TableName: tableName };
     try {
         const data = await docClient.send(new ScanCommand(params));
         const usersWithoutPasswords = data.Items.map(user => {
-            const { password, ...userWithoutPassword } = user;
-            return userWithoutPassword;
+            const { password, twoFactorSecret, backupCodes, ...userWithoutSensitive } = user;
+            return userWithoutSensitive;
         });
         res.status(200).json(usersWithoutPasswords);
     } catch (error) {
@@ -39,14 +42,13 @@ export const getAllUsers = async (req, res) => {
 };
 
 export const registerUser = async (req, res) => {
-    const { name, email, password } = req.body; // ✅ No role from frontend
+    const { name, email, password } = req.body;
     
     if (!name || !email || !password) {
         return res.status(400).json({ message: "Please provide all required fields." });
     }
 
     try {
-        // ✅ Validate password against security settings
         const validation = await validatePassword(password);
         if (!validation.isValid) {
             return res.status(400).json({ 
@@ -68,8 +70,6 @@ export const registerUser = async (req, res) => {
         const userId = uuidv4();
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        
-        // ✅ ASSIGN DEFAULT ROLE 
         const defaultRole = 'Project Manager';
         
         const putParams = {
@@ -79,18 +79,17 @@ export const registerUser = async (req, res) => {
                 name, 
                 email, 
                 password: hashedPassword, 
-                role: defaultRole, // ✅ Default role assigned
+                role: defaultRole,
                 avatar: '',
-                twoFactorEnabled: false, // ✅ Add 2FA fields
-                twoFactorSecret: '', // ✅ Initially empty
-                backupCodes: [], // ✅ Initially empty
+                twoFactorEnabled: false,
+                twoFactorSecret: '',
+                backupCodes: [],
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             },
         };
         await docClient.send(new PutCommand(putParams));
 
-        // Create audit log
         await logAudit({
             userId: userId,
             action: 'USER_CREATED',
@@ -114,14 +113,13 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-    const { email, password, twoFactorCode } = req.body; // ✅ Add twoFactorCode
+    const { email, password, twoFactorCode } = req.body;
     
     if (!email || !password) {
         return res.status(400).json({ message: "Please provide email and password." });
     }
 
     try {
-        // ✅ Check if account is locked
         const lockStatus = await isAccountLocked(email);
         if (lockStatus.isLocked) {
             return res.status(423).json({ 
@@ -139,7 +137,6 @@ export const loginUser = async (req, res) => {
         const data = await docClient.send(new ScanCommand(scanParams));
         
         if (data.Items.length === 0) {
-            // ✅ Record failed attempt
             const attemptResult = await recordFailedAttempt(email);
             return res.status(401).json({ 
                 message: attemptResult.message,
@@ -151,7 +148,6 @@ export const loginUser = async (req, res) => {
         
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            // ✅ Record failed attempt
             const attemptResult = await recordFailedAttempt(email);
             return res.status(401).json({ 
                 message: attemptResult.message,
@@ -160,10 +156,8 @@ export const loginUser = async (req, res) => {
             });
         }
 
-        // ✅ CHECK IF 2FA IS ENABLED
         if (user.twoFactorEnabled) {
             if (!twoFactorCode) {
-                // Password is correct, but need 2FA code
                 return res.status(200).json({
                     message: '2FA required',
                     requires2FA: true,
@@ -171,7 +165,6 @@ export const loginUser = async (req, res) => {
                 });
             }
             
-            // Verify 2FA code
             const is2FAValid = verify2FAToken(twoFactorCode, user.twoFactorSecret);
             if (!is2FAValid) {
                 return res.status(401).json({ 
@@ -181,7 +174,6 @@ export const loginUser = async (req, res) => {
             }
         }
 
-        // ✅ Reset login attempts on successful login
         await resetAttempts(email);
         
         const payload = { id: user.userId, role: user.role };
@@ -196,7 +188,7 @@ export const loginUser = async (req, res) => {
                 email: user.email, 
                 role: user.role,
                 avatar: user.avatar || '',
-                twoFactorEnabled: user.twoFactorEnabled || false // ✅ Include 2FA status
+                twoFactorEnabled: user.twoFactorEnabled || false
             }
         });
     } catch (error) {
@@ -212,7 +204,7 @@ export const getUserProfile = async (req, res) => {
         const { Item } = await docClient.send(new GetCommand(params));
         
         if (Item) {
-            const { password, ...userProfile } = Item;
+            const { password, twoFactorSecret, backupCodes, ...userProfile } = Item;
             res.json(userProfile);
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -228,13 +220,11 @@ export const updateUserProfile = async (req, res) => {
     const { name, email, avatar, currentPassword, newPassword } = req.body;
     
     try {
-        // If changing password, validate it
         if (newPassword) {
             if (!currentPassword) {
                 return res.status(400).json({ message: 'Current password is required to set a new password' });
             }
 
-            // Get user and verify current password
             const params = { TableName: tableName, Key: { userId } };
             const { Item } = await docClient.send(new GetCommand(params));
             
@@ -247,7 +237,6 @@ export const updateUserProfile = async (req, res) => {
                 return res.status(401).json({ message: 'Current password is incorrect' });
             }
 
-            // ✅ Validate new password
             const validation = await validatePassword(newPassword);
             if (!validation.isValid) {
                 return res.status(400).json({ 
@@ -256,11 +245,9 @@ export const updateUserProfile = async (req, res) => {
                 });
             }
 
-            // Hash new password
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-            // Update password
             const updatePasswordParams = {
                 TableName: tableName,
                 Key: { userId },
@@ -274,7 +261,6 @@ export const updateUserProfile = async (req, res) => {
             await docClient.send(new UpdateCommand(updatePasswordParams));
         }
 
-        // Update other profile fields
         const updateExpression = [];
         const expressionAttributeNames = {};
         const expressionAttributeValues = {};
@@ -308,7 +294,6 @@ export const updateUserProfile = async (req, res) => {
             
             const { Attributes } = await docClient.send(new UpdateCommand(params));
 
-            // Create audit log
             await logAudit({
                 userId: userId,
                 action: 'USER_UPDATED',
@@ -318,7 +303,7 @@ export const updateUserProfile = async (req, res) => {
                 changes: { name, email, avatar, passwordChanged: !!newPassword }
             });
             
-            const { password: _, ...updatedProfile } = Attributes;
+            const { password: _, twoFactorSecret: __, backupCodes: ___, ...updatedProfile } = Attributes;
             res.json({
                 message: 'Profile updated successfully',
                 user: updatedProfile

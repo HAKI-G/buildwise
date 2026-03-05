@@ -52,7 +52,7 @@ const MaintenanceScreen = () => {
       // Get API URL from environment variable or use default
       const API_URL = import.meta.env.VITE_API_URL 
         ? `${import.meta.env.VITE_API_URL}/support-tickets`
-        : 'http://localhost:5001/api/support-tickets';
+        : '/support-tickets';
       
       const response = await fetch(API_URL, {
         method: 'POST',

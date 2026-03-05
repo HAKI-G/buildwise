@@ -1,18 +1,18 @@
 import express from 'express';
-
-// Import only what you need
 import { 
     getUserProfile,
-    updateUserProfile 
+    updateUserProfile,
+    getAllUsers
 } from '../controller/userController.js';
-
-// Import the protect middleware to secure routes
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// --- Protected Routes Only ---
-// Only logged-in users with a valid token can access these.
+// GET /api/users/all — all registered users (for dashboard team display)
+router.get('/all', protect, getAllUsers);
+
+// GET /api/users/profile — current logged-in user's profile
+// PUT /api/users/profile — update current logged-in user's profile
 router.route('/profile')
   .get(protect, getUserProfile)
   .put(protect, updateUserProfile);

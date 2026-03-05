@@ -21,7 +21,7 @@
         setIsLoading(true);
 
         try {
-          const response = await axios.post('http://localhost:5001/api/auth/login', {
+          const response = await axios.post('/auth/login', {
             email,
             password,
             twoFactorCode: requires2FA ? twoFactorCode : undefined // ✅ Include 2FA code if needed
