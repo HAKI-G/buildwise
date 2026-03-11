@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import Layout from '../components/Layout.jsx';
+import { useNotification } from '../context/NotificationContext';
 import { 
     Sparkles, 
     MapPin, 
@@ -34,8 +35,8 @@ const cleanText = text =>
 function GenerateReportPage() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const notify = useNotification();
     const [project, setProject] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [generating, setGenerating] = useState(false);
     const [reportType, setReportType] = useState('Daily Progress');
@@ -255,7 +256,7 @@ function GenerateReportPage() {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`/projects/${projectId}`, config);
+            const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`, config);
             setProject(response.data);
         } catch (error) {
             console.error('Error fetching project:', error);
@@ -271,7 +272,7 @@ function GenerateReportPage() {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
-                `/reports/project/${projectId}`,
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/reports/project/${projectId}`,
                 config
             );
             setReports(response.data || []);
@@ -296,11 +297,11 @@ function GenerateReportPage() {
                 timeout: 120000
             };
             await axios.post(
-                `/reports/generate/${projectId}`,
+                `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/reports/generate/${projectId}`,
                 { reportType },
                 config
             );
-            alert('✅ Report generated successfully!');
+            notify.success('Report generated successfully!');
             await fetchReports();
         } catch (err) {
             console.error('Error generating report:', err);
@@ -555,29 +556,30 @@ function GenerateReportPage() {
             }
 
             doc.save(`${report.projectName}_Accomplishment_Report_${new Date(report.createdAt).toISOString().split('T')[0]}.pdf`);
-            alert('✅ PDF downloaded successfully!');
+            notify.success('PDF downloaded successfully!');
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('❌ Failed to generate PDF: ' + error.message);
+            notify.error('Failed to generate PDF: ' + error.message);
         }
     };
 
     const handleDelete = async (reportId) => {
-        if (!window.confirm('Are you sure you want to delete this report?')) return;
-        try {
-            const token = getToken();
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(`/reports/${reportId}`, config);
-            setReports(reports.filter(r => r.reportId !== reportId));
-            if (selectedReport?.reportId === reportId) {
-                setShowModal(false);
-                setSelectedReport(null);
+        notify.confirm('Are you sure you want to delete this report?', async () => {
+            try {
+                const token = getToken();
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                await axios.delete(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/reports/${reportId}`, config);
+                setReports(reports.filter(r => r.reportId !== reportId));
+                if (selectedReport?.reportId === reportId) {
+                    setShowModal(false);
+                    setSelectedReport(null);
+                }
+                notify.success('Report deleted successfully');
+            } catch (err) {
+                console.error('Error deleting report:', err);
+                notify.error('Failed to delete report');
             }
-            alert('✅ Report deleted successfully');
-        } catch (err) {
-            console.error('Error deleting report:', err);
-            alert('❌ Failed to delete report');
-        }
+        }, { title: 'Delete Report', confirmText: 'Delete', cancelText: 'Cancel' });
     };
 
     if (loading) {

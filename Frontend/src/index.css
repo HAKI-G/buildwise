@@ -1,0 +1,226 @@
+/* ═══════════════════════════════════════════════════
+   INVISIBLE SCROLLBAR — still scrollable everywhere
+   ═══════════════════════════════════════════════════ */
+
+/* Webkit browsers (Chrome, Edge, Safari) */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+/* Show subtle scrollbar on hover for discoverability */
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.25);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.25) transparent;
+}
+
+/* Utility class for fully hidden scrollbar (like AI advisor sidebar chips) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   DARK MODE <option> STYLING
+   Browser-native <option> elements ignore Tailwind 
+   dark: classes, so we style them via CSS.
+   ═══════════════════════════════════════════════════ */
+.dark select option {
+  background-color: #1e293b; /* slate-800 */
+  color: #e2e8f0;           /* slate-200 */
+}
+
+select option {
+  background-color: #ffffff;
+  color: #1e293b;
+  padding: 4px 8px;
+}
+
+/* ═══════════════════════════════════════════════════
+   AI BOT ICON ANIMATIONS
+   All animations loop infinitely & have hover reactions
+   ═══════════════════════════════════════════════════ */
+
+/* ── Breathing glow — always loops ── */
+@keyframes botPulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25); }
+  50% { box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45), 0 0 30px rgba(124, 58, 237, 0.15); }
+}
+.bot-icon {
+  animation: botPulse 3s ease-in-out infinite;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+/* ── Hover wiggle — playful reaction on hover ── */
+@keyframes botHoverWiggle {
+  0%   { transform: rotate(0deg)   scale(1); }
+  15%  { transform: rotate(-12deg) scale(1.18); }
+  30%  { transform: rotate(10deg)  scale(1.14); }
+  45%  { transform: rotate(-8deg)  scale(1.1); }
+  60%  { transform: rotate(5deg)   scale(1.06); }
+  75%  { transform: rotate(-3deg)  scale(1.03); }
+  100% { transform: rotate(0deg)   scale(1); }
+}
+.bot-icon:hover {
+  animation: botHoverWiggle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: brightness(1.15);
+}
+
+/* ── Eye blink — loops continuously ── */
+@keyframes botBlink {
+  0%, 42%, 44%, 100% { transform: scaleY(1); }
+  43% { transform: scaleY(0.1); }
+}
+.bot-eye {
+  animation: botBlink 4s ease-in-out infinite;
+  transform-origin: center;
+}
+.bot-eye-right {
+  animation: botBlink 4s ease-in-out infinite;
+  animation-delay: 0.1s;
+  transform-origin: center;
+}
+
+/* ── Hover eyes — get excited (widen) ── */
+@keyframes botEyeExcited {
+  0%   { transform: scaleY(1) scale(1); }
+  40%  { transform: scaleY(1) scale(1.5); }
+  100% { transform: scaleY(1) scale(1.3); }
+}
+.bot-icon:hover .bot-eye,
+.bot-icon:hover .bot-eye-right {
+  animation: botEyeExcited 0.35s ease-out forwards !important;
+}
+
+/* ── Antenna wobble — loops continuously ── */
+@keyframes antennaWobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(3deg); }
+  75% { transform: rotate(-3deg); }
+}
+.bot-antenna {
+  animation: antennaWobble 2.5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* ── Hover antenna — wiggles faster ── */
+@keyframes antennaExcited {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(12deg); }
+  40% { transform: rotate(-10deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-6deg); }
+}
+.bot-icon:hover .bot-antenna {
+  animation: antennaExcited 0.4s ease-in-out infinite !important;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   THINKING / LOADING STATE — Discord-style bounce
+   The robot bounces, tilts, and wiggles while
+   generating an answer (like Discord's Clyde on refresh)
+   ═══════════════════════════════════════════════════ */
+
+@keyframes botThinkBounce {
+  0%   { transform: translateY(0)    scale(1)    rotate(0deg);   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); }
+  10%  { transform: translateY(-10px) scale(1.1)  rotate(-6deg);  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.5); }
+  20%  { transform: translateY(2px)   scale(0.95) rotate(4deg);   }
+  30%  { transform: translateY(-7px)  scale(1.07) rotate(-4deg);  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.55); }
+  40%  { transform: translateY(1px)   scale(0.97) rotate(3deg);   }
+  50%  { transform: translateY(-5px)  scale(1.04) rotate(-2deg);  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.6), 0 0 40px rgba(124, 58, 237, 0.2); }
+  60%  { transform: translateY(1px)   scale(0.98) rotate(1deg);   }
+  70%  { transform: translateY(-3px)  scale(1.02) rotate(-1deg);  }
+  80%  { transform: translateY(0)     scale(1)    rotate(0.5deg); }
+  90%  { transform: translateY(-1px)  scale(1.01) rotate(0deg);   }
+  100% { transform: translateY(0)     scale(1)    rotate(0deg);   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); }
+}
+
+.bot-icon-thinking {
+  animation: botThinkBounce 1.8s ease-in-out infinite;
+  cursor: pointer;
+}
+
+/* ── Thinking eyes — look around nervously ── */
+@keyframes botThinkEyes {
+  0%, 100% { transform: scaleY(1) translateX(0); }
+  12% { transform: scaleY(1) translateX(-1px); }
+  25% { transform: scaleY(1) translateX(1px); }
+  37% { transform: scaleY(0.1) translateX(0); }
+  42% { transform: scaleY(1) translateX(0); }
+  60% { transform: scaleY(1) translateX(-0.5px); }
+  80% { transform: scaleY(1) translateX(0.5px); }
+}
+.bot-icon-thinking .bot-eye {
+  animation: botThinkEyes 1.2s ease-in-out infinite !important;
+  transform-origin: center;
+}
+.bot-icon-thinking .bot-eye-right {
+  animation: botThinkEyes 1.2s ease-in-out infinite !important;
+  animation-delay: 0.05s;
+  transform-origin: center;
+}
+
+/* ── Thinking antenna — frantic wobble ── */
+@keyframes antennaThink {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(10deg); }
+  40% { transform: rotate(-8deg); }
+  60% { transform: rotate(6deg); }
+  80% { transform: rotate(-4deg); }
+}
+.bot-icon-thinking .bot-antenna {
+  animation: antennaThink 0.6s ease-in-out infinite !important;
+  transform-origin: bottom center;
+}
+
+/* ── Hover on thinking icon — speeds up the bounce ── */
+.bot-icon-thinking:hover {
+  animation-duration: 1s;
+  filter: brightness(1.2);
+}
+
+
+/* ═══════════════════════════════════════════════════
+   WELCOME STATE — gentle floating
+   ═══════════════════════════════════════════════════ */
+
+@keyframes botFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.bot-float {
+  animation: botFloat 3s ease-in-out infinite;
+}
+
+/* Hover on welcome container bubbles the icon */
+.bot-float:hover {
+  animation: botFloat 1.5s ease-in-out infinite;
+}

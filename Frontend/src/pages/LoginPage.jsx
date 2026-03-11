@@ -21,7 +21,7 @@
         setIsLoading(true);
 
         try {
-          const response = await axios.post('/auth/login', {
+          const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/auth/login`, {
             email,
             password,
             twoFactorCode: requires2FA ? twoFactorCode : undefined // ✅ Include 2FA code if needed

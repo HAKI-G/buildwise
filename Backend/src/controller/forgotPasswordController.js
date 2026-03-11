@@ -27,18 +27,20 @@ export const requestPasswordReset = async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        // Find user by email
+        // Normalize email to lowercase for case-insensitive matching
+        const emailNormalized = email.trim().toLowerCase();
+
+        // Find user by email (case-insensitive scan)
         const scanParams = {
             TableName: tableName,
-            FilterExpression: "email = :email",
-            ExpressionAttributeValues: {
-                ":email": email
-            }
         };
 
         const data = await docClient.send(new ScanCommand(scanParams));
+        const user = data.Items.find(item => 
+            item.email && item.email.trim().toLowerCase() === emailNormalized
+        );
         
-        if (data.Items.length === 0) {
+        if (!user) {
             // Don't reveal if email exists or not (security best practice)
             return res.json({ 
                 message: 'If the email exists, a verification code has been sent.',
@@ -46,24 +48,30 @@ export const requestPasswordReset = async (req, res) => {
             });
         }
 
-        const user = data.Items[0];
-
         // Generate 6-digit code
         const code = generateVerificationCode();
         const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
 
-        // Store code temporarily
-        verificationCodes.set(email, {
+        // Store code temporarily (use the actual email from DB for sending, normalized key for lookup)
+        verificationCodes.set(emailNormalized, {
             code,
             expiresAt,
             attempts: 0
         });
 
-        // Send email
-        await sendVerificationEmail(email, code);
-
-        // Log for debugging (remove in production)
-        console.log(`📧 Verification code for ${email}: ${code}`);
+        // Send email to the actual email address stored in the database
+        try {
+            await sendVerificationEmail(user.email, code);
+            console.log(`📧 Verification code for ${user.email}: ${code}`);
+        } catch (emailError) {
+            console.error('❌ Failed to send email:', emailError.message);
+            // Remove the stored code since email failed
+            verificationCodes.delete(emailNormalized);
+            return res.status(500).json({ 
+                message: 'Failed to send verification email. Please try again later.',
+                codeSent: false 
+            });
+        }
 
         res.json({ 
             message: 'Verification code sent to your email',
@@ -85,7 +93,9 @@ export const verifyResetCode = async (req, res) => {
             return res.status(400).json({ message: 'Email and code are required' });
         }
 
-        const stored = verificationCodes.get(email);
+        // Normalize email for consistent lookup
+        const emailNormalized = email.trim().toLowerCase();
+        const stored = verificationCodes.get(emailNormalized);
 
         if (!stored) {
             return res.status(400).json({ message: 'No verification code found. Please request a new one.' });
@@ -93,13 +103,13 @@ export const verifyResetCode = async (req, res) => {
 
         // Check if expired
         if (Date.now() > stored.expiresAt) {
-            verificationCodes.delete(email);
+            verificationCodes.delete(emailNormalized);
             return res.status(400).json({ message: 'Verification code expired. Please request a new one.' });
         }
 
         // Check attempts (prevent brute force)
         if (stored.attempts >= 5) {
-            verificationCodes.delete(email);
+            verificationCodes.delete(emailNormalized);
             return res.status(429).json({ message: 'Too many attempts. Please request a new code.' });
         }
 
@@ -130,29 +140,29 @@ export const resetPassword = async (req, res) => {
             return res.status(400).json({ message: 'Email, code, and new password are required' });
         }
 
+        // Normalize email for consistent lookup
+        const emailNormalized = email.trim().toLowerCase();
+
         // Verify code one more time
-        const stored = verificationCodes.get(email);
+        const stored = verificationCodes.get(emailNormalized);
 
         if (!stored || stored.code !== code || Date.now() > stored.expiresAt) {
             return res.status(400).json({ message: 'Invalid or expired verification code' });
         }
 
-        // Find user
+        // Find user (case-insensitive)
         const scanParams = {
             TableName: tableName,
-            FilterExpression: "email = :email",
-            ExpressionAttributeValues: {
-                ":email": email
-            }
         };
 
         const data = await docClient.send(new ScanCommand(scanParams));
+        const user = data.Items.find(item => 
+            item.email && item.email.trim().toLowerCase() === emailNormalized
+        );
         
-        if (data.Items.length === 0) {
+        if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
-        const user = data.Items[0];
 
         // Hash new password
         const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -171,10 +181,10 @@ export const resetPassword = async (req, res) => {
         await docClient.send(new UpdateCommand(updateParams));
 
         // Remove verification code
-        verificationCodes.delete(email);
+        verificationCodes.delete(emailNormalized);
 
-        // Send success email
-        await sendPasswordResetSuccessEmail(email, user.name);
+        // Send success email to actual stored address
+        await sendPasswordResetSuccessEmail(user.email, user.name);
 
         res.json({ 
             message: 'Password reset successfully',

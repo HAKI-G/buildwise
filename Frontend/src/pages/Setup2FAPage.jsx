@@ -18,7 +18,7 @@ function Setup2FAPage() {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        '/2fa/setup',
+        `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/2fa/setup`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -43,7 +43,7 @@ function Setup2FAPage() {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        '/2fa/verify',
+        `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/2fa/verify`,
         { token: verificationCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );

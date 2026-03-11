@@ -25,10 +25,10 @@ function PendingTasksPage() {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 
-                const projectRes = await axios.get(`/projects/${projectId}`, config);
+                const projectRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`, config);
                 setProject(projectRes.data);
 
-                const photosRes = await axios.get(`/photos/project/${projectId}`, config);
+                const photosRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/photos/project/${projectId}`, config);
                 // Map fileURL to photoUrl for consistency
                 const photosData = (photosRes.data || []).map(photo => ({
                     ...photo,

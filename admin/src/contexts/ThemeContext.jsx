@@ -12,9 +12,7 @@ export const useTheme = () => {
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    // Check localStorage first, then system preference
     const savedTheme = localStorage.getItem('adminTheme');
-    console.log('🎨 Initial theme from localStorage:', savedTheme); // DEBUG
     if (savedTheme) {
       return savedTheme;
     }
@@ -28,30 +26,17 @@ export const ThemeProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    console.log('🎨 Theme changed to:', theme); // DEBUG
-    // Apply theme to document
     const root = document.documentElement;
-    
     if (theme === 'dark') {
       root.classList.add('dark');
-      console.log('🌙 Added dark class to root'); // DEBUG
     } else {
       root.classList.remove('dark');
-      console.log('☀️ Removed dark class from root'); // DEBUG
     }
-    
-    // Save to localStorage
     localStorage.setItem('adminTheme', theme);
-    console.log('💾 Saved theme to localStorage:', theme); // DEBUG
   }, [theme]);
 
   const toggleTheme = () => {
-    console.log('🔄 Toggle theme clicked'); // DEBUG
-    setTheme(prevTheme => {
-      const newTheme = prevTheme === 'light' ? 'dark' : 'light';
-      console.log('🔄 Toggling from', prevTheme, 'to', newTheme); // DEBUG
-      return newTheme;
-    });
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
   const setLightTheme = () => setTheme('light');

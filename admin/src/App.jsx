@@ -1,6 +1,7 @@
-import { HashRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+
 import { ThemeProvider } from './contexts/ThemeContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
@@ -12,6 +13,11 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { useMaintenanceMode } from './hooks/useMaintenanceMode';
 import { AlertTriangle } from 'lucide-react';
 import SupportTickets from './pages/SupportTickets';
+import Projects from './pages/Projects';
+import Analytics from './pages/Analytics';
+import Announcements from './pages/Announcements';
+import ExportCenter from './pages/ExportCenter';
+import AdminProfile from './pages/AdminProfile';
 
 // Maintenance Banner Component
 const MaintenanceBanner = () => {
@@ -43,8 +49,13 @@ const ProtectedContent = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/users" element={<UserManagement />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/audit-logs" element={<AuditLogs />} />
+          <Route path="/projects" element={<Projects />} />
           <Route path="/support-tickets" element={<SupportTickets />} />
+          <Route path="/announcements" element={<Announcements />} />
+          <Route path="/export" element={<ExportCenter />} />
+          <Route path="/profile" element={<AdminProfile />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
@@ -79,28 +90,11 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProvider>
+      <NotificationProvider>
       <Router>
-        {/* Global Toast Container */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            className: "dark:bg-gray-800",
-            style: {
-              background: "#1f2937",
-              color: "#fff",
-              borderRadius: "0.5rem",
-            },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-
         <AppContent />
       </Router>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

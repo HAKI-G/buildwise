@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import settingsService from '../services/settingsService';
+import { useNotification } from '../contexts/NotificationContext';
 
 const AdminSettings = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [message, setMessage] = useState({ type: '', text: '' });
+  const notify = useNotification();
 
   // Settings State
   const [generalSettings, setGeneralSettings] = useState({});
@@ -135,21 +137,19 @@ const AdminSettings = () => {
   };
 
   const handleResetSettings = async (category) => {
-    if (!window.confirm(`Are you sure you want to reset ${category} settings to default?`)) {
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await settingsService.resetSettings(category);
-      await fetchSettings();
-      showMessage('success', `${category} settings reset to default successfully!`);
-    } catch (error) {
-      console.error(`Error resetting ${category} settings:`, error);
-      showMessage('error', `Failed to reset ${category} settings`);
-    } finally {
-      setSaving(false);
-    }
+    notify.confirm(`Are you sure you want to reset ${category} settings to default?`, async () => {
+      try {
+        setSaving(true);
+        await settingsService.resetSettings(category);
+        await fetchSettings();
+        showMessage('success', `${category} settings reset to default successfully!`);
+      } catch (error) {
+        console.error(`Error resetting ${category} settings:`, error);
+        showMessage('error', `Failed to reset ${category} settings`);
+      } finally {
+        setSaving(false);
+      }
+    }, { title: 'Reset Settings', confirmText: 'Reset', cancelText: 'Cancel' });
   };
 
   const tabs = [

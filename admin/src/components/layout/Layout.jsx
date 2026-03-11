@@ -24,12 +24,10 @@ const Layout = ({ children }) => {
   }, []);
 
   const toggleSidebar = () => {
-    console.log('Toggle clicked! Current state:', sidebarOpen);
     setSidebarOpen(prev => !prev);
   };
 
   const closeSidebar = () => {
-    console.log('Close clicked!');
     setSidebarOpen(false);
   };
 

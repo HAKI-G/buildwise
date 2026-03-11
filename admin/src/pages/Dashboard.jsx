@@ -1,5 +1,6 @@
-import { Users, FolderOpen, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Users, FolderOpen, AlertCircle, CheckCircle, Clock, LifeBuoy, ArrowRight, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const StatCard = ({ title, value, icon: Icon, color, gradient, loading }) => (
@@ -21,16 +22,18 @@ const StatCard = ({ title, value, icon: Icon, color, gradient, loading }) => (
 );
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeProjects: 0,
     completedProjects: 0,
-    pendingIssues: 0
+    pendingTickets: 0
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [serverHealth, setServerHealth] = useState({ server: null, db: null });
 
   useEffect(() => {
     fetchDashboardData();
@@ -49,10 +52,11 @@ const Dashboard = () => {
         setLoading(true);
       }
 
-      const [usersRes, projectsRes, auditRes] = await Promise.all([
+      const [usersRes, projectsRes, auditRes, ticketsRes] = await Promise.all([
         api.get('/admin/users'),
         api.get('/projects'),
-        api.get(`/audit-logs?limit=4&t=${Date.now()}`)
+        api.get(`/audit-logs?limit=4`),
+        api.get('/support-tickets').catch(() => ({ data: { data: [] } }))
       ]);
 
       const totalUsers = usersRes.data?.length || 0;
@@ -63,12 +67,13 @@ const Dashboard = () => {
       const completedProjects = allProjects.filter(p => 
         p.status === 'Completed'
       ).length;
+      const pendingTickets = (ticketsRes.data?.data || []).filter(t => t.status === 'pending' || t.status === 'open').length;
 
       setStats({
         totalUsers,
         activeProjects,
         completedProjects,
-        pendingIssues: 0
+        pendingTickets
       });
 
       const activities = (auditRes.data?.logs || [])
@@ -85,6 +90,14 @@ const Dashboard = () => {
       setRecentActivities(activities);
       setLastUpdated(new Date());
       setError(null);
+
+      // Check server health
+      try {
+        const healthRes = await api.get('/health');
+        setServerHealth({ server: 'ok', db: healthRes.data?.dynamodb || 'ok' });
+      } catch {
+        setServerHealth({ server: 'down', db: 'unknown' });
+      }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data');
@@ -163,9 +176,9 @@ const Dashboard = () => {
           loading={loading}
         />
         <StatCard
-          title="Pending Issues"
-          value={stats.pendingIssues}
-          icon={AlertCircle}
+          title="Pending Tickets"
+          value={stats.pendingTickets}
+          icon={LifeBuoy}
           gradient="from-yellow-500 to-orange-500"
           loading={loading}
         />
@@ -176,6 +189,31 @@ const Dashboard = () => {
           gradient="from-purple-500 to-purple-600"
           loading={loading}
         />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Manage Users', icon: Users, path: '/users', color: 'blue' },
+            { label: 'View Projects', icon: FolderOpen, path: '/projects', color: 'green' },
+            { label: 'Support Tickets', icon: LifeBuoy, path: '/support-tickets', color: 'orange' },
+            { label: 'Audit Logs', icon: FileText, path: '/audit-logs', color: 'purple' },
+          ].map(({ label, icon: Icon, path, color }) => (
+            <button
+              key={path}
+              onClick={() => navigate(path)}
+              className={`group flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-${color}-300 dark:hover:border-${color}-600 hover:bg-${color}-50 dark:hover:bg-${color}-900/20 transition-all text-left`}
+            >
+              <div className={`p-2 rounded-lg bg-${color}-100 dark:bg-${color}-900/30 text-${color}-600 dark:text-${color}-400`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">{label}</span>
+              <ArrowRight className="w-4 h-4 ml-auto text-gray-400 dark:text-gray-600 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content Grid */}
@@ -242,13 +280,27 @@ const Dashboard = () => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Server Status</span>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
-                  Operational
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
+                  serverHealth.server === 'ok'
+                    ? 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+                    : serverHealth.server === 'down'
+                    ? 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
+                    : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    serverHealth.server === 'ok' ? 'bg-green-600 dark:bg-green-400 animate-pulse'
+                    : serverHealth.server === 'down' ? 'bg-red-500'
+                    : 'bg-gray-400'
+                  }`}></span>
+                  {serverHealth.server === 'ok' ? 'Operational' : serverHealth.server === 'down' ? 'Down' : 'Checking...'}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{ width: '100%' }}></div>
+                <div className={`h-2 rounded-full transition-all duration-500 ${
+                  serverHealth.server === 'ok' ? 'bg-gradient-to-r from-green-500 to-green-600 w-full'
+                  : serverHealth.server === 'down' ? 'bg-red-500 w-1/4'
+                  : 'bg-gray-400 w-1/2 animate-pulse'
+                }`}></div>
               </div>
             </div>
 
@@ -256,13 +308,25 @@ const Dashboard = () => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Database</span>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
-                  Connected
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
+                  serverHealth.db === 'ok' || serverHealth.db === 'connected'
+                    ? 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+                    : serverHealth.db === 'unknown'
+                    ? 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700'
+                    : 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    serverHealth.db === 'ok' || serverHealth.db === 'connected' ? 'bg-green-600 dark:bg-green-400 animate-pulse'
+                    : 'bg-gray-400'
+                  }`}></span>
+                  {serverHealth.db === 'ok' || serverHealth.db === 'connected' ? 'Connected' : 'Checking...'}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{ width: '100%' }}></div>
+                <div className={`h-2 rounded-full transition-all duration-500 ${
+                  serverHealth.db === 'ok' || serverHealth.db === 'connected' ? 'bg-gradient-to-r from-green-500 to-green-600 w-full'
+                  : 'bg-gray-400 w-1/2 animate-pulse'
+                }`}></div>
               </div>
             </div>
 

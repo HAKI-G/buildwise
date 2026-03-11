@@ -14,8 +14,8 @@
 }
 
 /* Smooth transitions for theme changes */
-* {
-  @apply transition-colors duration-200;
+body, aside, header, main, nav {
+  transition: background-color 200ms, color 200ms, border-color 200ms;
 }
 
 /* Custom Scrollbar */
@@ -49,6 +49,18 @@ html, body, #root {
   width: 100%;
 }
 
+/* Dark mode <option> styling for native select elements */
+.dark select option {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #1e293b;
+  padding: 4px 8px;
+}
+
 /* Prevent FOUC (Flash of Unstyled Content) */
 html.dark {
   color-scheme: dark;
@@ -56,4 +68,21 @@ html.dark {
 
 html:not(.dark) {
   color-scheme: light;
+}
+
+/* Slide-in animation for detail panel */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
+@keyframes slide-up {
+  from { transform: translate(-50%, 100%); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
 }

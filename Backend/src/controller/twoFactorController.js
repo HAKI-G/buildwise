@@ -220,20 +220,22 @@ export const verify2FALogin = async (req, res) => {
             return res.status(400).json({ message: 'Email and token/backup code are required' });
         }
 
-        // Get user by email
+        // Normalize email for case-insensitive lookup
+        const emailNormalized = email.trim().toLowerCase();
+
+        // Get user by email (case-insensitive)
         const scanParams = {
             TableName: tableName,
-            FilterExpression: "email = :email",
-            ExpressionAttributeValues: { ":email": email },
         };
 
         const data = await docClient.send(new ScanCommand(scanParams));
+        const user = data.Items.find(item => 
+            item.email && item.email.trim().toLowerCase() === emailNormalized
+        );
         
-        if (data.Items.length === 0) {
+        if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
-        const user = data.Items[0];
 
         if (!user.twoFactorEnabled) {
             return res.status(400).json({ message: '2FA is not enabled for this account' });

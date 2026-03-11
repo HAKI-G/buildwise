@@ -67,21 +67,25 @@ export const createUserAdmin = async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
     
+    // Normalize email to lowercase
+    const emailNormalized = email.trim().toLowerCase();
+    
     // Validate role
     const validRoles = ['Admin', 'Project Manager', 'Site Engineer', 'Vice President', 'Viewer'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Invalid role', validRoles });
     }
     
-    // Check if email exists
+    // Check if email exists (case-insensitive)
     const scanParams = {
       TableName: tableName,
-      FilterExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email }
     };
     
     const existingUsers = await docClient.send(new ScanCommand(scanParams));
-    if (existingUsers.Items.length > 0) {
+    const emailExists = existingUsers.Items.some(item => 
+      item.email && item.email.trim().toLowerCase() === emailNormalized
+    );
+    if (emailExists) {
       return res.status(409).json({ error: 'Email already exists' });
     }
     
@@ -93,7 +97,7 @@ export const createUserAdmin = async (req, res) => {
     const newUser = {
       userId,
       name,
-      email,
+      email: emailNormalized,
       password: hashedPassword,
       role,
       avatar: '',

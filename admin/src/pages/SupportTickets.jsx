@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Clock, CheckCircle, XCircle, AlertTriangle, Search, Filter, Eye, Trash2, MessageSquare, Calendar, User, Tag, FileText } from 'lucide-react';
+import { Mail, Clock, CheckCircle, XCircle, AlertTriangle, Search, Filter, Eye, Archive, MessageSquare, Calendar, User, Tag, FileText } from 'lucide-react';
 import api from '../services/api';
+import { useNotification } from '../contexts/NotificationContext';
 
 // Only custom animations not in Tailwind
 const customStyles = `
@@ -35,6 +36,7 @@ const SupportTickets = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const notify = useNotification();
 
   // Inject custom styles
   useEffect(() => {
@@ -78,35 +80,28 @@ const SupportTickets = () => {
       setShowModal(false);
       setSelectedTicket(null);
       
-      // Success toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
-      toast.textContent = '✓ Ticket updated successfully!';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
+      notify.success('Ticket updated successfully!');
     } catch (error) {
       console.error('Error updating ticket:', error);
-      alert('Failed to update ticket: ' + (error.response?.data?.message || error.message));
+      notify.error('Failed to update ticket: ' + (error.response?.data?.message || error.message));
     }
   };
 
-  const deleteTicket = async (ticketNumber) => {
-    if (!confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) return;
-    
-    try {
-      await api.delete(`/support-tickets/${ticketNumber}`);
-      setTickets(tickets.filter(ticket => ticket.ticketNumber !== ticketNumber));
-      
-      // Success toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
-      toast.textContent = '✓ Ticket deleted successfully!';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
-    } catch (error) {
-      console.error('Error deleting ticket:', error);
-      alert('Failed to delete ticket');
-    }
+  const closeTicket = async (ticketNumber) => {
+    notify.confirm('Close this ticket? It will be marked as closed but kept in the system.', async () => {
+      try {
+        const response = await api.patch(`/support-tickets/${ticketNumber}`, { status: 'closed' });
+        setTickets(tickets.map(ticket =>
+          ticket.ticketNumber === ticketNumber
+            ? { ...ticket, status: 'closed' }
+            : ticket
+        ));
+        notify.success('Ticket closed successfully!');
+      } catch (error) {
+        console.error('Error closing ticket:', error);
+        notify.error('Failed to close ticket');
+      }
+    }, { title: 'Close Ticket', confirmText: 'Close Ticket', cancelText: 'Cancel' });
   };
 
   const getStatusBadge = (status) => {
@@ -380,13 +375,15 @@ const SupportTickets = () => {
                       >
                         <Eye className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => deleteTicket(ticket.ticketNumber)}
-                        className="group/btn p-3 text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl transition-all duration-200 border border-red-500/20 hover:border-red-500/40 hover:scale-105"
-                        title="Delete Ticket"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {ticket.status !== 'closed' && (
+                        <button
+                          onClick={() => closeTicket(ticket.ticketNumber)}
+                          className="group/btn p-3 text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 rounded-xl transition-all duration-200 border border-orange-500/20 hover:border-orange-500/40 hover:scale-105"
+                          title="Close Ticket"
+                        >
+                          <Archive className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

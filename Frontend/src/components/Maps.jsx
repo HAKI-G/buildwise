@@ -34,7 +34,7 @@ function Maps() {
         try {
             const token = getToken();
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`/projects/${projectId}`, config);
+            const res = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`, config);
             setProject(res.data);
             
             // Try to geocode the location

@@ -25,10 +25,10 @@ function TaskPriorityPage() {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 
-                const projectRes = await axios.get(`/projects/${projectId}`, config);
+                const projectRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`, config);
                 setProject(projectRes.data);
 
-                const milestonesRes = await axios.get(`/milestones/project/${projectId}`, config);
+                const milestonesRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/milestones/project/${projectId}`, config);
                 setMilestones(milestonesRes.data || []);
                 
                 localStorage.setItem('lastSelectedProjectId', projectId);

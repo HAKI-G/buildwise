@@ -20,8 +20,10 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('/forgot-password/request', { email });
-            
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/forgot-password/request`, {
+                email
+            });
+
             setSuccess('Verification code sent to your email!');
             setStep(2);
         } catch (err) {
@@ -38,7 +40,7 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('/forgot-password/verify-code', {
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/forgot-password/verify-code`, {
                 email,
                 code
             });
@@ -70,7 +72,7 @@ function ForgotPasswordPage() {
         setIsLoading(true);
 
         try {
-            await axios.post('/forgot-password/reset', {
+            await axios.post(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/forgot-password/reset`, {
                 email,
                 code,
                 newPassword

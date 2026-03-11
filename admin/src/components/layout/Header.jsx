@@ -1,15 +1,17 @@
 import { Menu, Bell, LogOut, Moon, Sun } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { auth } from '../../utils/auth';
 import NotificationDropdown from '../common/NotificationDropdown';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import notificationService from '../../services/notificationService';
 
 const Header = ({ toggleSidebar, sidebarOpen }) => {
   const navigate = useNavigate();
   const user = auth.getUser();
   const { settings } = useSettings();
+  const { isDark, toggleTheme } = useTheme();
   
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -27,28 +29,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // ✅ DARK MODE STATE
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-
-  // ✅ APPLY DARK MODE
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'light');
-    }
-    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-  }, [isDarkMode]);
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
-  };
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -140,17 +120,17 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
       <div className="flex items-center gap-3 ml-auto">
         {/* Dark Mode Toggle */}
         <button
-          onClick={toggleDarkMode}
+          onClick={toggleTheme}
           className="group relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-200 hover:bg-gray-200 dark:hover:bg-gray-700/50 rounded-lg"
-          title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {isDarkMode ? (
+          {isDark ? (
             <Moon className="w-5 h-5 text-blue-400 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12" />
           ) : (
             <Sun className="w-5 h-5 text-yellow-500 transition-all duration-300 group-hover:scale-110 group-hover:rotate-180" />
           )}
           <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-gray-800 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-xl z-50">
-            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            {isDark ? 'Light Mode' : 'Dark Mode'}
             <div className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-800 dark:border-b-gray-700"></div>
           </span>
         </button>
@@ -181,14 +161,14 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
 
         {/* User Profile Section */}
         <div className="flex items-center gap-3 pl-3 border-l border-gray-300 dark:border-gray-700/50">
-          <div className="relative group cursor-pointer">
+          <Link to="/profile" className="relative group cursor-pointer" title="My Profile">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur opacity-50 group-hover:opacity-75 transition-opacity"></div>
             <div className="relative w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-gray-200 dark:ring-gray-800 group-hover:ring-blue-500/50 transition-all">
               {user?.name?.charAt(0).toUpperCase() || 'A'}
             </div>
-          </div>
+          </Link>
 
-          <div className="hidden md:block">
+          <Link to="/profile" className="hidden md:block hover:opacity-80 transition-opacity" title="My Profile">
             <p className="text-sm font-semibold text-gray-900 dark:text-white">
               {user?.name || 'Admin'}
             </p>
@@ -196,7 +176,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
               <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
               {user?.role || 'Administrator'}
             </p>
-          </div>
+          </Link>
 
           <button
             onClick={handleLogout}

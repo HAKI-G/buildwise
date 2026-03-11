@@ -25,7 +25,7 @@ function ReportsViewPage() {
 
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get(`/projects/${projectId}`, config);
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${projectId}`, config);
                 setProject(response.data);
                 localStorage.setItem('lastSelectedProjectId', projectId);
             } catch (error) {
@@ -74,14 +74,14 @@ function ReportsViewPage() {
 
     return (
         <Layout title={`Reports - ${project?.name || 'Project'}`}>
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
                 {/* Project Info Header */}
-                <div className="bg-gradient-to-r from-orange-600 to-orange-700 dark:from-orange-700 dark:to-orange-800 rounded-xl p-6 text-white shadow-lg">
-                    <div className="flex items-start justify-between mb-4">
+                <div className="bg-gradient-to-r from-orange-600 to-orange-700 dark:from-orange-700 dark:to-orange-800 rounded-xl p-4 sm:p-6 text-white shadow-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                                <BarChart3 className="w-6 h-6" />
-                                <h2 className="text-2xl font-bold">{project?.name}</h2>
+                                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <h2 className="text-lg sm:text-2xl font-bold">{project?.name}</h2>
                             </div>
                             <div className="flex flex-wrap gap-4 text-orange-100">
                                 {project?.location && (
@@ -114,7 +114,7 @@ function ReportsViewPage() {
                 </div>
 
                 {/* Content */}
-                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 sm:p-6 shadow-sm">
                     <Reports projectId={projectId} />
                 </div>
             </div>

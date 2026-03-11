@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { autoUpdateProjectStatus } from './projectController.js';
 import { sendMilestoneCompletionEmail } from '../services/emailService.js';
+import { sendNotification } from './notificationController.js';
 
 import {
   DynamoDBDocumentClient,
@@ -177,6 +178,19 @@ export const createMilestone = async (req, res) => {
   try {
     await docClient.send(new PutCommand(params));
     await autoUpdateProjectStatus(projectId);
+
+    // Send notification
+    try {
+      await sendNotification(
+        isPhase ? 'phase_created' : 'milestone_created',
+        isPhase ? 'New Phase Added' : 'New Milestone Added',
+        `"${milestoneName}" has been added to a project`,
+        { projectId, milestoneId, milestoneName }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
+
     res.status(201).json({
       message: 'Milestone created successfully',
       milestone: params.Item
@@ -348,11 +362,31 @@ export const canCompletePhase = async (req, res) => {
 
     const completedTasks = tasksInPhase.filter(t => t.status === 'completed').length;
 
+    // S14: Check if photos exist for this phase
+    let hasPhotos = false;
+    try {
+      const photoParams = {
+        TableName: 'BuildWisePhotos',
+        FilterExpression: 'projectId = :pid AND phaseId = :phaseId',
+        ExpressionAttributeValues: {
+          ':pid': projectId,
+          ':phaseId': phaseId
+        }
+      };
+      const photoData = await docClient.send(new ScanCommand(photoParams));
+      hasPhotos = (photoData.Items || []).length > 0;
+    } catch (photoErr) {
+      console.warn('Could not check photos for phase:', photoErr.message);
+      hasPhotos = true; // Don't block if photo check fails
+    }
+
     res.status(200).json({
-      canComplete: allTasksCompleted,
+      canComplete: allTasksCompleted && hasPhotos,
       totalTasks: tasksInPhase.length,
       completedTasks: completedTasks,
-      pendingTasks: tasksInPhase.length - completedTasks
+      pendingTasks: tasksInPhase.length - completedTasks,
+      hasPhotos: hasPhotos,
+      missingPhotos: !hasPhotos
     });
   } catch (error) {
     console.error("Error checking phase completion:", error);
@@ -495,6 +529,18 @@ export const completePhase = async (req, res) => {
     // ✅ AWAIT and SEND email notification to logged-in user
     if (req.user?.id) {
       await sendCompletionEmail(projectId, result.Attributes.milestoneName, "phase", req.user.id);
+    }
+
+    // Send in-app notification
+    try {
+      await sendNotification(
+        'phase_completed',
+        'Phase Completed ✅',
+        `"${result.Attributes.milestoneName}" has been completed`,
+        { projectId, phaseId, phaseName: result.Attributes.milestoneName }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
     }
 
     res.status(200).json({

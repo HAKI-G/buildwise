@@ -5,6 +5,7 @@ import {
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
+import { sendNotification } from './notificationController.js';
 
 // --- AWS DynamoDB Client Setup ---
 const client = new DynamoDBClient({ region: "ap-southeast-1" });
@@ -41,6 +42,19 @@ export const createComment = async (req, res) => {
 
   try {
     await docClient.send(new PutCommand(params));
+
+    // Send notification
+    try {
+      await sendNotification(
+        'comment',
+        'New Comment',
+        `${userName || 'Someone'} posted a comment`,
+        { updateId, commentId }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Notification failed (non-blocking):', notifErr.message);
+    }
+
     res.status(201).json({
       message: 'Comment posted successfully!',
       comment: params.Item

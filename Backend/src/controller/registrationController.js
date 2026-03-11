@@ -30,18 +30,20 @@ export const initiateRegistration = async (req, res) => {
             return res.status(400).json({ message: 'Name, email, and password are required' });
         }
 
-        // Check if email already exists
+        // Normalize email to lowercase
+        const emailNormalized = email.trim().toLowerCase();
+
+        // Check if email already exists (case-insensitive)
         const scanParams = {
             TableName: tableName,
-            FilterExpression: "email = :email",
-            ExpressionAttributeValues: {
-                ":email": email
-            }
         };
 
         const data = await docClient.send(new ScanCommand(scanParams));
+        const emailExists = data.Items.some(item => 
+            item.email && item.email.trim().toLowerCase() === emailNormalized
+        );
         
-        if (data.Items.length > 0) {
+        if (emailExists) {
             return res.status(409).json({ message: 'Email already registered' });
         }
 
@@ -57,10 +59,10 @@ export const initiateRegistration = async (req, res) => {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Store pending registration
-        pendingRegistrations.set(email, {
+        // Store pending registration (use normalized email as key)
+        pendingRegistrations.set(emailNormalized, {
             name,
-            email,
+            email: emailNormalized,
             password: hashedPassword,
             role: role || 'User',
             code,
@@ -69,14 +71,14 @@ export const initiateRegistration = async (req, res) => {
         });
 
         // Send verification email
-        await sendRegistrationVerificationEmail(email, name, code);
+        await sendRegistrationVerificationEmail(emailNormalized, name, code);
 
         // Log for debugging (remove in production)
-        console.log(`📧 Registration code for ${email}: ${code}`);
+        console.log(`📧 Registration code for ${emailNormalized}: ${code}`);
 
         res.json({ 
             message: 'Verification code sent to your email',
-            email,
+            email: emailNormalized,
             codeSent: true 
         });
 
@@ -95,8 +97,11 @@ export const verifyAndRegister = async (req, res) => {
             return res.status(400).json({ message: 'Email and verification code are required' });
         }
 
+        // Normalize email for consistent lookup
+        const emailNormalized = email.trim().toLowerCase();
+
         // Get pending registration
-        const pending = pendingRegistrations.get(email);
+        const pending = pendingRegistrations.get(emailNormalized);
 
         if (!pending) {
             return res.status(400).json({ message: 'No pending registration found. Please register again.' });
@@ -104,13 +109,13 @@ export const verifyAndRegister = async (req, res) => {
 
         // Check if expired
         if (Date.now() > pending.expiresAt) {
-            pendingRegistrations.delete(email);
+            pendingRegistrations.delete(emailNormalized);
             return res.status(400).json({ message: 'Verification code expired. Please register again.' });
         }
 
         // Check attempts (prevent brute force)
         if (pending.attempts >= 5) {
-            pendingRegistrations.delete(email);
+            pendingRegistrations.delete(emailNormalized);
             return res.status(429).json({ message: 'Too many failed attempts. Please register again.' });
         }
 
@@ -145,14 +150,14 @@ export const verifyAndRegister = async (req, res) => {
         await docClient.send(new PutCommand(putParams));
 
         // Remove pending registration
-        pendingRegistrations.delete(email);
+        pendingRegistrations.delete(emailNormalized);
 
         // Send welcome email
         await sendWelcomeEmail(pending.email, pending.name);
 
         // Generate JWT token
         const token = jwt.sign(
-            { userId, email: pending.email },
+            { id: userId, email: pending.email, name: pending.name, role: pending.role },
             process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '24h' }
         );

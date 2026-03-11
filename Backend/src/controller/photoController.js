@@ -1,11 +1,12 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, DeleteCommand, UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb"; // ✅ ADD GetCommand
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, DeleteCommand, UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import multerS3 from 'multer-s3';
 import axios from 'axios';
 import { autoUpdateProjectStatus } from './projectController.js';
+import { analyzeConstructionPhoto } from '../services/aiService.js';
 
 // --- AWS Client Setup ---
 const s3 = new S3Client({ region: "ap-southeast-1" });
@@ -13,7 +14,6 @@ const client = new DynamoDBClient({ region: "ap-southeast-1" });
 const docClient = DynamoDBDocumentClient.from(client);
 
 const BUCKET_NAME = 'buildwise-project-files';
-const AI_API_URL = 'http://54.251.28.81:5000';
 
 
 
@@ -101,72 +101,46 @@ export const uploadPhotoForUpdate = async (req, res) => {
     console.log('🏗️ Phase ID:', phaseId);
     console.log('🏷️ Phase Name:', phaseName);
 
-    // AI Analysis
+    // AI Analysis using Claude Vision
     let aiAnalysis = null;
     let aiProcessed = false;
 
     try {
-      const imageResponse = await axios.get(publicUrl, { 
-        responseType: 'arraybuffer', 
-        timeout: 30000  // Increased to 30 seconds
+      console.log('🤖 Calling Claude Vision AI for construction analysis...');
+      
+      aiAnalysis = await analyzeConstructionPhoto(publicUrl, taskName, phaseName, {
+        projectName: projectId,
       });
       
-      const FormData = (await import('form-data')).default;
-      const formData = new FormData();
-      formData.append('image', Buffer.from(imageResponse.data), {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype
-      });
-
-      try {
-        console.log('🤖 Calling AI service at:', AI_API_URL);
-        const aiResponse = await axios.post(`${AI_API_URL}/analyze`, formData, {
-          headers: formData.getHeaders(),
-          timeout: 30000  // Increased to 30 seconds
-        });
-
-        aiAnalysis = aiResponse.data;
-        aiProcessed = aiAnalysis && aiAnalysis.success;
-        console.log('✅ AI Analysis successful:', aiProcessed);
-        console.log('📊 Full AI Response:', JSON.stringify(aiAnalysis, null, 2));
-        
-        // ✅ LOG AI PERCENTAGE for debugging
-        const aiPercentage = aiAnalysis?.ai_suggestion?.ai_estimated_completion || 
-                           aiAnalysis?.ai_suggestion?.suggested_percentage ||
-                           aiAnalysis?.suggested_percentage || 
+      aiProcessed = aiAnalysis && aiAnalysis.success;
+      console.log('✅ Claude Vision Analysis successful:', aiProcessed);
+      
+      if (aiProcessed) {
+        const aiPercentage = aiAnalysis?.ai_suggestion?.suggested_percentage || 
+                           aiAnalysis?.progress_assessment?.estimated_completion_percentage || 
                            null;
         console.log('📊 AI Suggested Percentage:', aiPercentage);
-        
-      } catch (aiTimeoutError) {
-        // If AI service is unavailable or timing out, create a default suggestion
-        console.warn('⚠️ AI Analysis unavailable (timeout/connection error):', aiTimeoutError.code || aiTimeoutError.message);
-        
-        aiAnalysis = {
-          success: false,
-          error: true,
-          message: 'AI service temporarily unavailable',
-          code: aiTimeoutError.code,
-          timestamp: new Date().toISOString(),
-          ai_suggestion: {
-            milestone: taskName || 'Task',
-            confidence: 'low',
-            reason: 'AI service unavailable - manual review required'
-          }
-        };
-        aiProcessed = false;
+        console.log('📋 AI Summary:', aiAnalysis?.summary || 'N/A');
+        console.log('🛡️ Safety Rating:', aiAnalysis?.safety_assessment?.overall_rating || 'N/A');
       }
-    } catch (imageError) {
-      console.error('❌ Image download failed:', imageError.message);
-      aiAnalysis = { 
-        error: true, 
-        message: 'Failed to download image for analysis',
-        code: imageError.code,
-        timestamp: new Date().toISOString() 
+      
+    } catch (aiError) {
+      console.error('❌ Claude Vision analysis failed:', aiError.message);
+      aiAnalysis = {
+        success: false,
+        error: true,
+        message: 'AI analysis temporarily unavailable',
+        timestamp: new Date().toISOString(),
+        ai_suggestion: {
+          milestone: taskName || 'Task',
+          confidence: 'low',
+          reason: 'AI analysis error - manual review required'
+        }
       };
       aiProcessed = false;
     }
 
-    // ✅ Save WITH phase information
+    // ✅ Save WITH phase information + Claude Vision analysis
     const params = {
       TableName: 'BuildWisePhotos',
       Item: {
@@ -175,8 +149,8 @@ export const uploadPhotoForUpdate = async (req, res) => {
         projectId,
         taskId,
         taskName,
-        phaseId,        // ✅ NEW: Store phase ID
-        phaseName,      // ✅ NEW: Store phase name
+        phaseId,        // ✅ Store phase ID
+        phaseName,      // ✅ Store phase name
         fileURL: publicUrl,
         s3Key: req.file.key,
         caption: caption || 'No caption',
@@ -185,12 +159,17 @@ export const uploadPhotoForUpdate = async (req, res) => {
         aiAnalysis,
         aiProcessed,
         aiSuggestion: aiAnalysis?.ai_suggestion || null,
-        aiSuggestedPercentage: aiAnalysis?.ai_suggestion?.ai_estimated_completion || 
-                              aiAnalysis?.ai_suggestion?.suggested_percentage || 
-                              aiAnalysis?.suggested_percentage || 
-                              null,  // ✅ PERSIST AI PERCENTAGE from multiple possible fields
-        aiDetections: aiAnalysis?.detections || null,
-        totalObjects: aiAnalysis?.total_objects || 0,
+        aiSuggestedPercentage: aiAnalysis?.ai_suggestion?.suggested_percentage || 
+                              aiAnalysis?.progress_assessment?.estimated_completion_percentage || 
+                              null,
+        aiSummary: aiAnalysis?.summary || null,
+        aiSafetyRating: aiAnalysis?.safety_assessment?.overall_rating || null,
+        aiProgressStage: aiAnalysis?.progress_assessment?.stage || null,
+        aiConfidence: aiAnalysis?.progress_assessment?.confidence || null,
+        aiProvider: 'claude-vision',
+        aiDetections: aiAnalysis?.construction_details?.materials_detected || null,
+        totalObjects: (aiAnalysis?.construction_details?.materials_detected?.length || 0) +
+                      (aiAnalysis?.construction_details?.equipment_detected?.length || 0),
         confirmationStatus: 'pending',
         userConfirmedMilestone: null,
         userInputPercentage: null,
@@ -240,30 +219,14 @@ export const confirmAISuggestion = async (req, res) => {
 
     let calculation;
     
-    // Try to call the AI service with a 10-second timeout
-    try {
-      const confirmResponse = await axios.post(`${AI_API_URL}/confirm`, {
-        milestone,
-        user_percentage: parseFloat(userPercentage),
-        confirmed
-      }, {
-        timeout: 10000  // 10 second timeout
-      });
-
-      calculation = confirmResponse.data;
-      console.log('✅ AI service responded successfully');
-    } catch (aiError) {
-      // If AI service is unavailable, use fallback calculation
-      console.warn('⚠️ AI service unavailable, using fallback calculation:', aiError.code);
-      
-      calculation = {
-        overall_progress_percent: parseFloat(userPercentage),
-        calculation: `Fallback calculation (AI service unavailable): ${milestone} - ${userPercentage}% completion confirmed by user`,
-        milestone: milestone,
-        user_percentage: parseFloat(userPercentage),
-        confirmed: confirmed
-      };
-    }
+    // Use local calculation (no external AI service needed for confirmation)
+    calculation = {
+      overall_progress_percent: parseFloat(userPercentage),
+      calculation: `${milestone} — ${userPercentage}% completion confirmed by user`,
+      milestone: milestone,
+      user_percentage: parseFloat(userPercentage),
+      confirmed: confirmed
+    };
 
     // Get current photo to preserve AI suggested percentage
     const getPhotoParams = {
@@ -327,7 +290,7 @@ export const confirmAISuggestion = async (req, res) => {
         
         // Call the sync endpoint to recalculate status from ALL photos
         const token = req.headers.authorization; // Forward the auth token
-        const apiUrl = process.env.API_URL || '47.129.233.194';
+        const apiUrl = process.env.API_URL || `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}`;
         
         console.log(`📡 Calling sync endpoint: ${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`);
         
@@ -529,7 +492,7 @@ export const deletePhoto = async (req, res) => {
                 console.log('🔄 Triggering auto-status update after photo deletion...');
                 
                 const token = req.headers.authorization;
-                const apiUrl = process.env.API_URL || '47.129.233.194';
+                const apiUrl = process.env.API_URL || `${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}`;
                 
                 await axios.post(
                     `${apiUrl}/api/milestones/${projectId}/task/${taskId}/sync-status`,

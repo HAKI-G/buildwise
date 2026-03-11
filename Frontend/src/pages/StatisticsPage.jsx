@@ -43,7 +43,7 @@ function StatisticsPage() {
             }
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get('/projects', config);
+                const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects`, config);
                 setProjects(response.data || []);
             } catch (err) {
                 console.error('Error fetching projects:', err);
@@ -70,11 +70,11 @@ function StatisticsPage() {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 
-                const projectRes = await axios.get(`/projects/${selectedProjectId}`, config);
+                const projectRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/projects/${selectedProjectId}`, config);
                 setProject(projectRes.data);
 
                 try {
-                    const milestonesRes = await axios.get(`/milestones/project/${selectedProjectId}`, config);
+                    const milestonesRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/milestones/project/${selectedProjectId}`, config);
                     setMilestones(milestonesRes.data || []);
                 } catch (err) {
                     console.warn('Could not fetch milestones:', err);
@@ -82,7 +82,7 @@ function StatisticsPage() {
                 }
 
                 try {
-                    const expensesRes = await axios.get(`/expenses/project/${selectedProjectId}`, config);
+                    const expensesRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/expenses/project/${selectedProjectId}`, config);
                     setExpenses(expensesRes.data || []);
                 } catch (err) {
                     console.warn('Could not fetch expenses:', err);
@@ -90,7 +90,7 @@ function StatisticsPage() {
                 }
 
                 try {
-                    const photosRes = await axios.get(`/photos/project/${selectedProjectId}`, config);
+                    const photosRes = await axios.get(`${process.env.REACT_APP_API_URL || 'http://54.251.28.81'}/api/photos/project/${selectedProjectId}`, config);
                     setPhotos(photosRes.data || []);
                     console.log('✅ Photos loaded:', photosRes.data?.length);
                 } catch (err) {
@@ -385,14 +385,14 @@ const projectProgress = useMemo(() => {
             </div>
 
             {/* ✅ NEW: Overall Project Progress Card */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 p-6 rounded-xl shadow-lg mb-6 text-white">
-                <div className="flex items-center justify-between mb-4">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 p-4 sm:p-6 rounded-xl shadow-lg mb-4 sm:mb-6 text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                        <h2 className="text-2xl font-bold mb-1">Overall Project Progress</h2>
+                        <h2 className="text-xl sm:text-2xl font-bold mb-1">Overall Project Progress</h2>
                         <p className="text-blue-100 text-sm">Based on task completion percentages</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-5xl font-bold">{projectProgress.overallCompletion}%</div>
+                        <div className="text-3xl sm:text-5xl font-bold">{projectProgress.overallCompletion}%</div>
                         <p className="text-sm text-blue-100 mt-1">
                             {projectProgress.completedTasks} of {projectProgress.totalTasks} tasks completed
                         </p>
