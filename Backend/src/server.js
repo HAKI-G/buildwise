@@ -67,6 +67,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 // Middleware
 app.use(cors({
   origin: [
+    'http://localhost:5173',
     'http://buildwise-frontend.s3-website-ap-southeast-1.amazonaws.com',
     'http://buildwise-admin.s3-website-ap-southeast-1.amazonaws.com'
   ],

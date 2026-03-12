@@ -56,7 +56,6 @@ function Layout({ title, children, headerContent }) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Close sidebar on navigation (mobile)
     useEffect(() => {
         if (!isDesktop) setSidebarOpen(false);
     }, [location.pathname]);
@@ -65,15 +64,9 @@ function Layout({ title, children, headerContent }) {
         const userName = localStorage.getItem('userName') || 'User';
         const userRole = localStorage.getItem('userRole') || 'User';
         const userAvatar = localStorage.getItem('userAvatar') || '';
-        
-        setUserInfo({
-            name: userName,
-            role: userRole,
-            avatar: userAvatar
-        });
+        setUserInfo({ name: userName, role: userRole, avatar: userAvatar });
     }, []);
 
-    // S6: Fetch notifications
     const fetchNotifications = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -93,12 +86,10 @@ function Layout({ title, children, headerContent }) {
 
     useEffect(() => {
         fetchNotifications();
-        // Poll every 30 seconds
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
     }, []);
 
-    // Close notifications dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (notificationRef.current && !notificationRef.current.contains(event.target)) {
@@ -148,9 +139,7 @@ function Layout({ title, children, headerContent }) {
         : [];
 
     const handleNotificationClick = (notif) => {
-        // Mark as read first
         if (!notif.read) markNotificationRead(notif.notificationId);
-        // Open the detail modal instead of navigating
         setDetailNotif(notif);
         setShowNotifications(false);
     };
@@ -199,15 +188,9 @@ function Layout({ title, children, headerContent }) {
 
     const getInitials = (name) => {
         if (!name) return 'U';
-        return name
-            .split(' ')
-            .map(word => word[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
+        return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
     };
 
-    // Custom robot icon matching the AI chatbot
     const RobotIcon = ({ className }) => (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="10" rx="3" />
@@ -249,14 +232,9 @@ function Layout({ title, children, headerContent }) {
                 <div>
                     <div className="flex items-center justify-between mb-10">
                         <div className="flex items-center space-x-3">
-                            <img
-                                src={logo}
-                                alt="BuildWise Logo"
-                                className="h-10 w-auto object-contain"
-                            />
+                            <img src={logo} alt="BuildWise Logo" className="h-10 w-auto object-contain" />
                             <h1 className="text-xl font-semibold text-gray-800 dark:text-white">BuildWise</h1>
                         </div>
-                        {/* Close button on mobile */}
                         {!isDesktop && (
                             <button 
                                 onClick={() => setSidebarOpen(false)}
@@ -273,7 +251,6 @@ function Layout({ title, children, headerContent }) {
                                 key={item.path}
                                 to={item.path}
                                 className={({ isActive }) => {
-                                    // Also highlight Projects when on /projects/... sub-routes
                                     const isMatch = isActive || 
                                         (item.path === '/projects' && location.pathname.startsWith('/projects')) ||
                                         (item.path === '/statistics' && location.pathname.startsWith('/statistics'));
@@ -302,175 +279,22 @@ function Layout({ title, children, headerContent }) {
                 </div>
             </aside>
 
+            {/* Main content — no top header bar */}
             <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-                {/* Responsive Header */}
-                <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 transition-colors">
-                    <div className="flex justify-between items-center gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                            {/* Hamburger menu - mobile only */}
-                            <button 
-                                onClick={() => setSidebarOpen(true)}
-                                className="lg:hidden p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
-                                aria-label="Open menu"
-                            >
-                                <Menu className="w-5 h-5" />
-                            </button>
-                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white truncate">{title || 'BuildWise'}</h1>
-                            {headerContent && <div className="flex-1 min-w-0 hidden sm:block">{headerContent}</div>}
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-                            {/* S6: Notification Bell */}
-                            <div className="relative" ref={notificationRef}>
-                                <button 
-                                    onClick={() => setShowNotifications(!showNotifications)}
-                                    className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors relative"
-                                    aria-label="Notifications"
-                                >
-                                    <Bell className="w-5 h-5" />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                                            {unreadCount > 9 ? '9+' : unreadCount}
-                                        </span>
-                                    )}
-                                </button>
 
-                                {/* Notification Dropdown */}
-                                {showNotifications && (
-                                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 z-50 max-h-[30rem] overflow-hidden">
-                                        {/* Header */}
-                                        <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-                                            <div className="flex justify-between items-center">
-                                                <h3 className="font-bold text-gray-900 dark:text-white text-sm">Notifications</h3>
-                                                {unreadCount > 0 && (
-                                                    <button
-                                                        onClick={markAllNotificationsRead}
-                                                        className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
-                                                        title="Mark all as read"
-                                                    >
-                                                        <CheckCheck className="w-3.5 h-3.5" />
-                                                        Clear all
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {/* Chip Tabs */}
-                                            <div className="flex gap-2 mt-2.5">
-                                                <button
-                                                    onClick={() => setNotifTab('new')}
-                                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                                                        notifTab === 'new'
-                                                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800'
-                                                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600'
-                                                    }`}
-                                                >
-                                                    New{unreadCount > 0 && ` (${unreadCount})`}
-                                                </button>
-                                                <button
-                                                    onClick={() => setNotifTab('read')}
-                                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                                                        notifTab === 'read'
-                                                            ? 'bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-slate-200 ring-1 ring-gray-300 dark:ring-slate-500'
-                                                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600'
-                                                    }`}
-                                                >
-                                                    Read{readCount > 0 && ` (${readCount})`}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {/* Notification List */}
-                                        <div className="overflow-y-auto max-h-72">
-                                            {filteredNotifications.length > 0 ? (
-                                                filteredNotifications.slice(0, 30).map((notif) => (
-                                                    <div 
-                                                        key={notif.notificationId}
-                                                        onClick={() => handleNotificationClick(notif)}
-                                                        className={`px-4 py-3 border-b border-gray-100 dark:border-slate-700/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
-                                                            !notif.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-start gap-2.5">
-                                                            {!notif.read && (
-                                                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />
-                                                            )}
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                                                    {notif.title || notif.type}
-                                                                </p>
-                                                                <p className="text-xs text-gray-600 dark:text-slate-400 mt-0.5 line-clamp-2">
-                                                                    {notif.message}
-                                                                </p>
-                                                                <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
-                                                                    {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="px-4 py-10 text-center">
-                                                    {notifTab === 'new' ? (
-                                                        <>
-                                                            <Inbox className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                                                            <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">All caught up!</p>
-                                                            <p className="text-gray-400 dark:text-slate-500 text-xs mt-0.5">No new notifications</p>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Bell className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                                                            <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No read notifications</p>
-                                                            <p className="text-gray-400 dark:text-slate-500 text-xs mt-0.5">Cleared notifications appear here</p>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                        {/* Footer */}
-                                        <div className="px-4 py-2 border-t border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800/50">
-                                            <button
-                                                onClick={() => { navigate('/settings'); setShowNotifications(false); }}
-                                                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium w-full text-center"
-                                            >
-                                                Notification preferences
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                {/* Mobile-only top bar (just hamburger + title) */}
+                <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+                    <button 
+                        onClick={() => setSidebarOpen(true)}
+                        className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
+                        aria-label="Open menu"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                    <h1 className="text-lg font-bold text-gray-800 dark:text-white truncate">{title || 'BuildWise'}</h1>
+                </div>
 
-                            <button 
-                                onClick={toggleTheme}
-                                className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                                aria-label="Toggle theme"
-                            >
-                                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-                            </button>
-
-                            <button 
-                                onClick={() => navigate('/settings')}
-                                className="p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors hidden sm:block"
-                                aria-label="Settings"
-                            >
-                                <Settings className="w-5 h-5" />
-                            </button>
-
-                            <div className="flex items-center space-x-2 sm:space-x-3">
-                                <div className="text-right hidden sm:block">
-                                    <div className="font-bold text-sm text-gray-800 dark:text-white">{userInfo.name}</div>
-                                    <div className="text-xs text-gray-500 dark:text-slate-400">{userInfo.role}</div>
-                                </div>
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs sm:text-sm font-semibold overflow-hidden flex-shrink-0">
-                                    {userInfo.avatar ? (
-                                        <img src={userInfo.avatar} alt={userInfo.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        getInitials(userInfo.name)
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+                <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto h-full">
                     {children}
                 </div>
             </main>
@@ -481,7 +305,7 @@ function Layout({ title, children, headerContent }) {
             {/* Notification Detail Modal */}
             {detailNotif && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]" onClick={() => setDetailNotif(null)}>
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-700 animate-[fadeIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 border-b border-gray-200 dark:border-slate-700 px-5 py-4">
                             <div className="flex items-start justify-between gap-3">
@@ -506,14 +330,12 @@ function Layout({ title, children, headerContent }) {
                                 </button>
                             </div>
                         </div>
-
                         {/* Body */}
                         <div className="px-5 py-5 overflow-y-auto max-h-[50vh]">
                             <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                                 {detailNotif.message || 'No content available.'}
                             </p>
                         </div>
-
                         {/* Footer */}
                         <div className="px-5 py-3 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
                             <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-slate-500">
